@@ -1,0 +1,17 @@
+[package]
+name = "mbf-agent"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rsa = { version = "0.9.6", features = ["sha2"] }
+rasn = "0.12.4"
+rasn-pkix = "0.12.4"
+rand = "0.8.5"
+byteorder = "1.5.0"
+pem = "3.0.3"
+anyhow = "1.0.79"
+libflate = "2.0.0"
+crc = "3.0.1"
+serde = { version = "1.0.197", features = ["derive"] }
+serde_json = "1.0.115"

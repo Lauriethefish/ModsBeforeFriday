@@ -1,0 +1,5 @@
+/target
+*.apk
+*.so
+
+mbf-agent
