@@ -45,10 +45,9 @@ function ChooseDevice() {
     </>
   } else if(authing) {
     return <div className='container'>
-      <h2>Authenticating</h2>
-      <p>Put on your headset and check the box to give MBF access to your Quest, then press "OK"</p>
-      <p>You will only have to do this once.</p>
-      <img src="allowDebugging.png"/>
+      <h2>Allow connection in headset</h2>
+      <p>Put on your headset and click <b>"Always allow from this computer"</b></p>
+      <p>(You should only have to do this once.)</p>
     </div>
   } else  {
     return <>

@@ -1,0 +1,19 @@
+h2 {
+    margin-bottom: 0;
+}
+
+.modButton {
+    font-size: larger;
+    margin: 0 auto;
+    display: block;
+    font-size: medium;
+    margin-top: 10px;
+}
+
+.installSongs {
+    max-width: 30%;
+}
+
+.warning {
+    color: red
+}

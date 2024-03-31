@@ -41,3 +41,7 @@ h1:hover > .title {
 .fireFox {
     color: red;
 }
+
+.allowDebug {
+    width: 100%
+}
