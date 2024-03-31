@@ -1,0 +1,43 @@
+body {
+    background-color: #002040;
+    align-items: center;
+    font-family: Roboto;
+    color: white
+}
+
+.mainContainer {
+    padding: 15px
+}
+
+.initial {
+    color: #0090FF;
+}
+
+.title {
+    color: white;
+    transition-duration: 1000ms;
+}
+
+
+h1:hover > .title {
+    opacity: 0;
+    transition-duration: 1000ms;
+}
+
+.main {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+#chooseDevice {
+    margin: 0 auto;
+    display: block;
+    font-size: medium
+}
+
+.fireFox {
+    color: red;
+}

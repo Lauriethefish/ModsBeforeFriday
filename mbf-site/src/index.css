@@ -1,1 +1,29 @@
+h1 {
+    margin-top: 0;
+}
 
+h2 {
+    margin-top: 0;
+}
+
+.container {
+    background-color: black;
+    padding: 1%;
+    border-radius: 10px;
+    width: fit-content;
+}
+
+button {
+    background-color: #444444;
+    border-radius: 10px;
+    border-width: 0px;
+    color: white;
+    font-weight: 300;
+    padding: 2%;
+    transition-duration: 200ms;
+}
+
+button:hover {
+    background-color: #0030E0;
+    transition-duration: 200ms;
+}

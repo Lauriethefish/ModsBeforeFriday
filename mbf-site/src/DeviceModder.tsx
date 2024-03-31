@@ -31,24 +31,24 @@ function DeviceModder(props: DeviceModderProps) {
     }, [props.device]);
 
     if(isPatching) {
-        return <>
+        return <div className='container'>
             <h3>App is being patched</h3>
             <p>This should only take a few seconds</p>
-        </>
+        </div>
     } else if(modStatus === null) {
-        return <>
+        return <div className='container'>
             <h2>Loading (please wait)</h2>
-        </>;
+        </div>;
     }   else if(modStatus.app_info === null) {
-        return <>
+        return <div className='container'>
             <h1>Beat Saber is not installed</h1>
-        </>
+        </div>
     }   else if(modStatus.app_info.is_modded)   {
-        return <>
+        return <div className='container'>
             <h1>App is modded!</h1>
-        </>
+        </div>
     }   else    {
-        return <>
+        return <div className='container'>
             <h1>Install Custom Songs</h1>
             <p>Your app has version: {modStatus.app_info.version}, which is supported by mods!</p>
             <p>To get your game ready for custom songs, ModsBeforeFriday will next patch your Beat Saber app and install some essential mods that will load the songs into the game. Once this is done, you will be able to manage your custom songs <b>inside the game.</b></p>
@@ -64,7 +64,7 @@ function DeviceModder(props: DeviceModderProps) {
                 }
             }}>Mod the app</button>
             <br />
-        </>
+        </div   >
     }
 }
 

@@ -1,0 +1,34 @@
+.switch {
+    display: block;
+    flex-direction: row;
+    background-color: #555555;
+    height: 20px;
+    width: 45px;
+    border-radius: 12px;
+}
+
+.switch:has(input[type=checkbox]:checked) {
+    background-color: #0080E0;
+}
+
+input[type=checkbox] {
+    display: none;
+    padding: none
+}
+
+.slider {
+    height: 16px;
+    width: 16px;
+    margin: 2px;
+    display: inline-block;
+    position: absolute;
+
+    background-color: white;
+    border-radius: 8px;
+    transition-duration: 50ms;
+}
+
+input[type=checkbox]:checked + .slider {
+    transition-duration: 50ms;
+    margin-left: 26px;
+}
