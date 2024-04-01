@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { ModStatus } from './Messages';
 import './DeviceModder.css';
 import { ModCard } from './ModCard';
+import { ReactComponent as ModIcon } from './mod-icon.svg'
 
 interface DeviceModderProps {
     device: Adb
@@ -61,6 +62,10 @@ function DeviceModder(props: DeviceModderProps) {
                 <p>Beat Saber is already modded on your Quest, and the version that's installed is compatible with mods.</p>
 
                 <InstallStatus modloaderReady={modStatus.modloader_present} coreModsReady={modStatus.core_mods.all_core_mods_installed} />
+            </div>
+
+            <div className='container horizontalCenter'>
+             <h1>Installed Mods</h1><ModIcon stroke="white"/>
             </div>
 
             {modStatus.installed_mods.map(mod => <ModCard mod={mod} />)}
