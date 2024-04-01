@@ -1,7 +1,7 @@
 use semver::Version;
 use serde::{Deserialize, Serialize};
 
-use crate::mod_man::ModInfo;
+use crate::mod_man::Mod;
 
 #[derive(Serialize)]
 pub struct AppInfo {
@@ -41,9 +41,9 @@ pub enum Request {
 #[derive(Serialize, Deserialize)]
 pub struct ModAction {
     /// The mods that will be disabled in the request.
-    to_uninstall: Vec<String>,
+    pub to_uninstall: Vec<String>,
     /// The mods that will be enabled in the request.
-    to_install: Vec<String>,
+    pub to_install: Vec<String>,
 }
 
 #[derive(Serialize)]
@@ -92,14 +92,17 @@ pub struct ModModel {
     pub is_enabled: bool
 }
 
-impl From<ModInfo> for ModModel {
-    fn from(value: ModInfo) -> Self {
+impl From<Mod> for ModModel {
+    fn from(value: Mod) -> Self {
+        let is_enabled = value.get_installed();       
+        let manifest = value.into_manifest(); 
+
         Self {
-            id: value.id,
-            name: value.name,
-            version: value.version,
-            description: value.description,
-            is_enabled: value.is_enabled
+            id: manifest.id,
+            name: manifest.name,
+            version: manifest.version,
+            description: manifest.description,
+            is_enabled
         }
     }
 }

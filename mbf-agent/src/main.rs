@@ -6,14 +6,14 @@ mod patching;
 mod bmbf_res;
 mod mod_man;
 
-use std::{collections::HashMap, io::{BufRead, BufReader, Cursor}, process::Command};
+use std::{io::{BufRead, BufReader, Cursor}, process::Command};
 
 use axml::AxmlReader;
 use bmbf_res::CoreModsError;
 use lockfile::Lockfile;
 use manifest::ManifestInfo;
-use mod_man::ModInfo;
-use requests::{AppInfo, CoreModsInfo, ModModel, Request, Response};
+use mod_man::ModManager;
+use requests::{AppInfo, CoreModsInfo, ModAction, ModModel, Request, Response};
 use anyhow::{anyhow, Context, Result};
 
 const APK_ID: &str = "com.beatgames.beatsaber";
@@ -23,15 +23,45 @@ fn handle_request(request: Request) -> Result<Response> {
     match request {
         Request::GetModStatus => handle_get_mod_status(),
         Request::Patch => handle_patch(),
+        Request::SetModsEnabled(action) => run_mod_action(action),
         _ => todo!()
     }
 }
 
+fn run_mod_action(action: ModAction) -> Result<Response> {
+    let mut mod_manager = mod_man::ModManager::new();
+    mod_manager.load_mods().context("Failed to load installed mods")?;
+
+    let mut log = String::new();
+
+    for to_install in action.to_install {
+       match mod_manager.install_mod(&to_install) {
+            Ok(_) => log.push_str(&format!("Installed {to_install}\n")),
+            Err(err) => log.push_str(&format!("Failed to install {to_install}: {err}\n"))
+       }
+    }
+
+    for to_uninstall in action.to_uninstall {
+        match mod_manager.install_mod(&to_uninstall) {
+             Ok(_) => log.push_str(&format!("Uninstalled {to_uninstall}\n")),
+             Err(err) => log.push_str(&format!("Failed to install {to_uninstall}: {err}\n"))
+        }
+     }
+
+    Ok(Response::ModInstallResult {
+        installed_mods: get_mod_models(mod_manager),
+        install_log: log,
+        full_success: true // TODO
+    })
+}
+
 fn handle_get_mod_status() -> Result<Response> {
-    let mods_status = mod_man::load_mod_info()?;
+    let mut mod_manager = mod_man::ModManager::new();
+    mod_manager.load_mods().context("Failed to load installed mods")?;
+
     let app_info = get_app_info()?;
     let core_mods = match &app_info {
-        Some(app_info) => get_core_mods_info(&app_info.version, &mods_status)?,
+        Some(app_info) => get_core_mods_info(&app_info.version, &mod_manager)?,
         None => None
     };
 
@@ -39,13 +69,17 @@ fn handle_get_mod_status() -> Result<Response> {
         app_info,
         core_mods,
         modloader_present: patching::get_modloader_path()?.exists(),
-        installed_mods: mods_status.into_values()
-            .map(|mod_json| ModModel::from(mod_json))
-            .collect()
+        installed_mods: get_mod_models(mod_manager)
     })
 }
 
-fn get_core_mods_info(apk_version: &str, mods_status: &HashMap<String, ModInfo>) -> Result<Option<CoreModsInfo>> {
+fn get_mod_models(mod_manager: ModManager) -> Vec<ModModel> {
+    mod_manager.into_mods()
+        .map(|mod_info| ModModel::from(mod_info))
+        .collect()
+}
+
+fn get_core_mods_info(apk_version: &str, mod_manager: &ModManager) -> Result<Option<CoreModsInfo>> {
     // Fetch the core mods from the resources repo
     let core_mods = match bmbf_res::fetch_core_mods() {
         Ok(mods) => mods,
@@ -57,9 +91,9 @@ fn get_core_mods_info(apk_version: &str, mods_status: &HashMap<String, ModInfo>)
     let all_core_mods_installed = match core_mods.get(apk_version) {
         Some(core_mods) => core_mods.mods
             .iter()
-            .all(|core_mod| match mods_status.get(&core_mod.id) {
+            .all(|core_mod| match mod_manager.get_mod(&core_mod.id) {
                 None => false,
-                Some(installed_version) => installed_version.version >= core_mod.version
+                Some(installed_version) => installed_version.manifest().version >= core_mod.version
             }),
         None => false
     };

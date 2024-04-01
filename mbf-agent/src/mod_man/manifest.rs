@@ -54,8 +54,6 @@ pub struct ModInfo {
     pub file_copies: Vec<FileCopy>,
     /// list of copy extensions registered for this specific mod
     pub copy_extensions: Vec<CopyExtension>,
-    #[serde(default = "bool::default")] // bool::default = false
-    pub is_enabled: bool,
 }
 
 impl Default for ModInfo {
@@ -78,8 +76,7 @@ impl Default for ModInfo {
             file_copies: Default::default(),
             copy_extensions: Default::default(),
             modloader: Some("Scotland2".into()),
-            late_mod_files: Default::default(),
-            is_enabled: false
+            late_mod_files: Default::default()
         }
     }
 }
