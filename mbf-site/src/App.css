@@ -10,7 +10,13 @@ body {
 }
 
 .initial {
+    color: white;
+    transition-duration: 1000ms;
+}
+
+h1:hover > .initial {
     color: #0090FF;
+    transition-duration: 1000ms;
 }
 
 .title {

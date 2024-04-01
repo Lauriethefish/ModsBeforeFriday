@@ -18,7 +18,8 @@ pub enum Request {
 #[serde(tag = "type")]
 pub enum Response {
     ModStatus {
-        app_info: Option<AppInfo>
+        app_info: Option<AppInfo>,
+        supported_versions: Vec<String>
     },
     Patched
 }
