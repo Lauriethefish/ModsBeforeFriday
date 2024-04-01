@@ -68,7 +68,7 @@ function DeviceModder(props: DeviceModderProps) {
              <h1>Installed Mods</h1><ModIcon stroke="white"/>
             </div>
 
-            {modStatus.installed_mods.map(mod => <ModCard mod={mod} />)}
+            {modStatus.installed_mods.map(mod => <ModCard mod={mod} key={mod.id}/>)}
         </>
     }   else    {
         return <PatchingMenu version={modStatus.app_info.version} onPatch={async () => {

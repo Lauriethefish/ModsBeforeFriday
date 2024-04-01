@@ -1,4 +1,3 @@
-import { useState } from "react";
 import './Slider.css';
 
 export interface SliderProps {
@@ -8,7 +7,7 @@ export interface SliderProps {
 
 export function Slider(props: SliderProps) {
     return <label className="switch">
-        <input type="checkbox" checked={props.on} onClick={() => props.valueChanged(!props.on)} />
+        <input type="checkbox" checked={props.on} onChange={_ => props.valueChanged(!props.on)} />
         <span className="slider"></span>
     </label>
 }
