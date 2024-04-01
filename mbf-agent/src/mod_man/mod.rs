@@ -43,6 +43,22 @@ impl ModManager {
         }
     }
 
+    pub fn mods_path(&self) -> impl AsRef<Path> {
+        QMODS_DIR
+    }
+
+    // Removes ALL mod and library files and deletes ALL mods from the current game.
+    pub fn wipe_all_mods(&mut self) -> Result<()> {
+        // Wipe absolutely everything: clean slate
+        self.mods.clear();
+        std::fs::remove_dir_all(LATE_MODS_DIR)?;
+        std::fs::remove_dir_all(EARLY_MODS_DIR)?;
+        std::fs::remove_dir_all(LIBS_DIR)?;
+        std::fs::remove_dir_all(QMODS_DIR)?;
+        create_mods_dir()?;
+        Ok(())
+    }
+
     pub fn into_mods(self) -> impl Iterator<Item = Mod> {
         self.mods.into_values()
     }
@@ -168,6 +184,7 @@ fn copy_stated_files(zip: &mut ZipFile<File>, files: &[String], to: impl AsRef<P
         let mut handle = std::fs::OpenOptions::new()
             .truncate(true)
             .create(true)
+            .write(true)
             .open(copy_to)?;
 
         handle.write_all(&contents)?;
@@ -188,12 +205,14 @@ fn delete_file_names(file_paths: &[String], within: impl AsRef<Path>) -> Result<
 
 fn create_mods_dir() -> Result<()> {
     std::fs::create_dir_all(QMODS_DIR)?;
+    std::fs::create_dir_all(LATE_MODS_DIR)?;
+    std::fs::create_dir_all(EARLY_MODS_DIR)?;
+    std::fs::create_dir_all(LIBS_DIR)?;
+
     Ok(())
 }
 
 fn list_dir_files(path: impl AsRef<Path>) -> Result<HashSet<String>> {
-    std::fs::create_dir_all(&path).context("Failed to create SOs directory")?;
-
     Ok(std::fs::read_dir(&path)?.filter_map(|file| match file {
         Ok(file) => file.file_name().into_string().ok(),
         Err(_) => None

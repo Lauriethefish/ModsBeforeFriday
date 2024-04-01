@@ -6,7 +6,7 @@ mod patching;
 mod bmbf_res;
 mod mod_man;
 
-use std::{io::{BufRead, BufReader, Cursor}, process::Command};
+use std::{fs::OpenOptions, io::{BufRead, BufReader, Cursor}, process::Command};
 
 use axml::AxmlReader;
 use bmbf_res::CoreModsError;
@@ -144,7 +144,54 @@ fn handle_patch() -> Result<Response> {
     patching::mod_current_apk().context("Failed to patch APK")?;
     patching::install_modloader().context("Failed to save modloader")?;
 
+    let mut mod_manager = ModManager::new();
+    mod_manager.wipe_all_mods().context("Failed to wipe existing mods")?;
+
+    install_core_mods(&mut mod_manager, get_app_info()?
+        .expect("Beat Saber should be installed after patching"))?;
+
+    mod_manager.load_mods().context("Failed to load core mods - is one invalid? If so, this is a BIG problem")?;
+    
+
     Ok(Response::Patched)
+}
+
+fn install_core_mods(mod_manager: &mut ModManager, app_info: AppInfo) -> Result<()> {
+    let core_mod_index = match bmbf_res::fetch_core_mods() {
+        Ok(core_mods) => core_mods,
+        // We do not care if it was fetching or parsing: this should succeed because otherwise the frontend would not permit us to get to this point.
+        Err(err) => return Err(match err {
+            CoreModsError::FetchError(e) => e,
+            CoreModsError::ParseError(e) => e
+        })
+    };
+
+    let core_mods = core_mod_index.get(&app_info.version)
+        .ok_or(anyhow!("No core mods existed for {}", app_info.version))?;
+
+    for core_mod in &core_mods.mods {
+        let save_path = mod_manager.mods_path().as_ref()
+            .join(format!("{}-v{}-CORE.qmod", core_mod.id, core_mod.version));
+
+        let mut resp_body = ureq::get(&core_mod.download_url)
+            .call()
+            .context("Failed to download core mod: is the connection working")?
+            .into_reader();
+
+        let mut writer = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .open(save_path).context("Failed to create core mod QMOD file")?;
+
+        std::io::copy(&mut resp_body, &mut writer).context("Failed to download core mod: was the WiFi connection lost?")?;
+    }
+
+    mod_manager.load_mods().context("Failed to load core mods - is one invalid? If so, this is a BIG problem")?;
+    for core_mod in &core_mods.mods {
+        mod_manager.install_mod(&core_mod.id)?;
+    }
+    
+    Ok(())
 }
 
 pub fn get_apk_path() -> Result<Option<String>> {
