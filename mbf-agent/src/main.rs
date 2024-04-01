@@ -8,7 +8,7 @@ mod bmbf_res;
 use std::{io::{BufRead, BufReader, Cursor}, process::Command};
 
 use axml::AxmlReader;
-use bmbf_res::CoreModIndex;
+use bmbf_res::CoreModsError;
 use manifest::ManifestInfo;
 use requests::{AppInfo, Request, Response};
 use anyhow::{anyhow, Context, Result};
@@ -23,13 +23,38 @@ fn handle_request(request: Request) -> Result<Response> {
 }
 
 fn handle_get_mod_status() -> Result<Response> {
-    // Fetch the core mods from the resources repo
-    let core_mods = bmbf_res::fetch_core_mods().context("Failed to access resources repo")?;
-    let supported_versions: Vec<String> = find_supported_versions(core_mods);
+    
 
+    Ok(Response::ModStatus { 
+        app_info: get_app_info()?,
+        supported_versions: get_supported_versions()?
+    })
+}
+
+fn get_supported_versions() -> Result<Option<Vec<String>>> {
+     // Fetch the core mods from the resources repo
+     let core_mods = match bmbf_res::fetch_core_mods() {
+        Ok(mods) => mods,
+        Err(CoreModsError::FetchError(_)) => return Ok(None),
+        Err(CoreModsError::ParseError(err)) => return Err(err)
+     };
+
+    let supported_versions: Vec<String> = core_mods.into_keys().filter(|version| {
+        let mut iter = version.split('.');
+        let _major = iter.next().unwrap();
+        let _minor = iter.next().unwrap();
+
+        _minor.parse::<i64>().expect("Invalid version in core mod index") >= 35
+    }).collect();
+
+    
+    Ok(Some(supported_versions))
+}
+
+fn get_app_info() -> Result<Option<AppInfo>> {
     let apk_path = match get_apk_path().context("Failed to find APK path")? {
         Some(path) => path,
-        None => return Ok(Response::ModStatus { app_info: None, supported_versions })
+        None => return Ok(None)
     };
 
     let apk_reader = std::fs::File::open(apk_path)?;
@@ -48,23 +73,10 @@ fn handle_get_mod_status() -> Result<Response> {
     let mut axml_reader = AxmlReader::new(&mut manifest_reader)?;
     let info = ManifestInfo::read(&mut axml_reader)?;
 
-    Ok(Response::ModStatus { 
-        app_info: Some(AppInfo {
-            is_modded,
-            version: info.package_version,
-        }),
-        supported_versions
-    })
-}
-
-fn find_supported_versions(index: CoreModIndex) -> Vec<String> {
-    index.into_keys().filter(|version| {
-        let mut iter = version.split('.');
-        let _major = iter.next().unwrap();
-        let _minor = iter.next().unwrap();
-
-        _minor.parse::<i64>().expect("Invalid version in core mod index") >= 35
-    }).collect()
+    Ok(Some(AppInfo {
+        is_modded,
+        version: info.package_version
+    }))    
 }
 
 fn handle_patch() -> Result<Response> {

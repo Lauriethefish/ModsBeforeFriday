@@ -5,10 +5,6 @@ body {
     color: white
 }
 
-.mainContainer {
-    padding: 15px
-}
-
 .initial {
     color: white;
     transition-duration: 1000ms;

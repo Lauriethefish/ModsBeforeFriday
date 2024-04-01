@@ -44,7 +44,7 @@ function ChooseDevice() {
       <DeviceModder device={chosenDevice} />
     </>
   } else if(authing) {
-    return <div className='container'>
+    return <div className='container mainContainer'>
       <h2>Allow connection in headset</h2>
       <p>Put on your headset and click <b>"Always allow from this computer"</b></p>
       <p>(You should only have to do this once.)</p>

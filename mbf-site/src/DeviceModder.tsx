@@ -31,23 +31,32 @@ function DeviceModder(props: DeviceModderProps) {
     }, [props.device]);
 
     if(isPatching) {
-        return <div className='container'>
+        return <div className='container mainContainer'>
             <h3>App is being patched.</h3>
             <p>This should only take a few seconds, but might take longer on a very slow connection.</p>
-        </div>
+        </div>;
     } else if(modStatus === null) {
-        return <div className='container'>
+        return <div className='container mainContainer'>
             <h2>Pulling data from the Quest</h2>
         </div>;
     }   else if(modStatus.app_info === null) {
-        return <div className='container'>
+        return <div className='container mainContainer'>
             <h1>Beat Saber is not installed</h1>
+            <p>Please install Beat Saber from the store and then refresh the page.</p>
+        </div>
+    }   else if (modStatus.supported_versions === null) {
+        return <div className='container mainContainer'>
+            <h1>No internet</h1>
+            <p>It seems as though <b>your Quest</b> has no internet connection.</p>
+            <p>To mod Beat Saber, MBF needs to download files such as a mod loader and several essential mods. 
+                <br />This occurs on your Quest's connection. Please make sure that WiFi is enabled, then refresh the page.</p>
         </div>
     }   else if(!(modStatus.supported_versions.includes(modStatus.app_info.version))) {
         return <NotSupported version={modStatus.app_info.version} supportedVersions={modStatus.supported_versions}/>
     }   else if(modStatus.app_info.is_modded)   {
-        return <div className='container'>
+        return <div className='container mainContainer'>
             <h1>App is modded</h1>
+            <p>Beat Saber is already modded on your Quest, and the version that's installed is compatible with mods.</p>
         </div>
     }   else    {
         return <PatchingMenu version={modStatus.app_info.version} onPatch={async () => {
@@ -69,7 +78,7 @@ interface NotSupportedProps {
 }
 
 function NotSupported(props: NotSupportedProps) {
-    return <div className='container'>
+    return <div className='container mainContainer'>
         <h1>Unsupported Version</h1>
         <p>You have Beat Saber v{props.version} installed, but this version has no support for mods!</p>
         <p>To install custom songs, one of the following versions is needed:</p>
@@ -85,7 +94,7 @@ interface PatchingMenuProps {
 }
 
 function PatchingMenu(props: PatchingMenuProps) {
-    return <div className='container installSongs'>
+    return <div className='container mainContainer'>
         <h1>Install Custom Songs</h1>
         <p>Your app has version: {props.version}, which is supported by mods!</p>
         <p>To get your game ready for custom songs, ModsBeforeFriday will next patch your Beat Saber app and install some essential mods.

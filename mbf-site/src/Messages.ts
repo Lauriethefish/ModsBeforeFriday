@@ -13,7 +13,7 @@ type Response = ModStatus;
 interface ModStatus {
     type: 'ModStatus',
     app_info: AppInfo | null,
-    supported_versions: string[]
+    supported_versions: string[] | null
 }
 
 interface AppInfo {

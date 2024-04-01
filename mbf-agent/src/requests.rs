@@ -18,8 +18,10 @@ pub enum Request {
 #[serde(tag = "type")]
 pub enum Response {
     ModStatus {
+        // None if Beat Saber is not installed.
         app_info: Option<AppInfo>,
-        supported_versions: Vec<String>
+        // None if an internet connection could not be established
+        supported_versions: Option<Vec<String>>
     },
     Patched
 }
