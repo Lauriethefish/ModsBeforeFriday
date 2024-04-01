@@ -6,14 +6,14 @@ mod patching;
 mod bmbf_res;
 mod mod_man;
 
-use std::{io::{BufRead, BufReader, Cursor}, process::Command};
+use std::{collections::HashMap, io::{BufRead, BufReader, Cursor}, process::Command};
 
 use axml::AxmlReader;
 use bmbf_res::CoreModsError;
 use lockfile::Lockfile;
 use manifest::ManifestInfo;
-use mod_man::Mod;
-use requests::{AppInfo, Request, Response};
+use mod_man::ModInfo;
+use requests::{AppInfo, CoreModsInfo, ModModel, Request, Response};
 use anyhow::{anyhow, Context, Result};
 
 const APK_ID: &str = "com.beatgames.beatsaber";
@@ -22,29 +22,47 @@ const LOCKFILE_PATH: &str = "/data/local/tmp/mbf.lock";
 fn handle_request(request: Request) -> Result<Response> {
     match request {
         Request::GetModStatus => handle_get_mod_status(),
-        Request::Patch => handle_patch()
+        Request::Patch => handle_patch(),
+        _ => todo!()
     }
 }
 
 fn handle_get_mod_status() -> Result<Response> {
-    
+    let mods_status = mod_man::load_mod_info()?;
+    let app_info = get_app_info()?;
+    let core_mods = match &app_info {
+        Some(app_info) => get_core_mods_info(&app_info.version, &mods_status)?,
+        None => None
+    };
 
     Ok(Response::ModStatus { 
-        app_info: get_app_info()?,
-        supported_versions: get_supported_versions()?,
-        installed_mods: mod_man::load_mod_info()?
-            .into_iter().map(|mod_json| Mod::from(mod_json))
+        app_info,
+        core_mods,
+        modloader_present: patching::get_modloader_path()?.exists(),
+        installed_mods: mods_status.into_values()
+            .map(|mod_json| ModModel::from(mod_json))
             .collect()
     })
 }
 
-fn get_supported_versions() -> Result<Option<Vec<String>>> {
-     // Fetch the core mods from the resources repo
-     let core_mods = match bmbf_res::fetch_core_mods() {
+fn get_core_mods_info(apk_version: &str, mods_status: &HashMap<String, ModInfo>) -> Result<Option<CoreModsInfo>> {
+    // Fetch the core mods from the resources repo
+    let core_mods = match bmbf_res::fetch_core_mods() {
         Ok(mods) => mods,
         Err(CoreModsError::FetchError(_)) => return Ok(None),
         Err(CoreModsError::ParseError(err)) => return Err(err)
-     };
+    };
+
+    // Check that all core mods are installed with an appropriate version
+    let all_core_mods_installed = match core_mods.get(apk_version) {
+        Some(core_mods) => core_mods.mods
+            .iter()
+            .all(|core_mod| match mods_status.get(&core_mod.id) {
+                None => false,
+                Some(installed_version) => installed_version.version >= core_mod.version
+            }),
+        None => false
+    };
 
     let supported_versions: Vec<String> = core_mods.into_keys().filter(|version| {
         let mut iter = version.split('.');
@@ -54,8 +72,10 @@ fn get_supported_versions() -> Result<Option<Vec<String>>> {
         _minor.parse::<i64>().expect("Invalid version in core mod index") >= 35
     }).collect();
 
-    
-    Ok(Some(supported_versions))
+    Ok(Some(CoreModsInfo {
+        supported_versions,
+        all_core_mods_installed
+    }))
 }
 
 fn get_app_info() -> Result<Option<AppInfo>> {

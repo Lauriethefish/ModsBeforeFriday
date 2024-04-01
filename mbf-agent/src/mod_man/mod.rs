@@ -1,11 +1,9 @@
 mod manifest;
-use std::path::Path;
+use std::{collections::{HashMap, HashSet}, path::Path};
 
 pub use manifest::*;
 
 use anyhow::{Context, Result, anyhow};
-use semver::Version;
-use serde::{Deserialize, Serialize};
 
 use crate::zip::ZipFile;
 
@@ -14,36 +12,16 @@ const LATE_MODS_DIR: &str = "/sdcard/ModData/com.beatgames.beatsaber/Modloader/e
 const EARLY_MODS_DIR: &str = "/sdcard/ModData/com.beatgames.beatsaber/Modloader/mods";
 const LIBS_DIR: &str = "/sdcard/ModData/com.beatgames.beatsaber/Modloader/libs";
 
-#[derive(Serialize, Deserialize)]
-pub struct Mod {
-    pub id: String,
-    pub name: String,
-    pub version: Version,
-    pub description: Option<String>,
-    pub is_enabled: bool
-}
-
-impl From<ModJson> for Mod {
-    fn from(value: ModJson) -> Self {
-        Self {
-            id: value.id,
-            name: value.name,
-            version: value.version,
-            description: value.description,
-            is_enabled: false
-        }
-    }
-}
-
 fn create_mods_dir() -> Result<()> {
     std::fs::create_dir_all(QMODS_DIR)?;
     Ok(())
 }
 
-pub fn load_mod_info() -> Result<Vec<ModJson>> {
+pub fn load_mod_info() -> Result<HashMap<String, ModInfo>> {
     create_mods_dir()?;
 
-    let mut result = Vec::new();
+    // TODO: Handle conflicting IDs
+    let mut result = HashMap::new();
     for stat in std::fs::read_dir(QMODS_DIR)? {
         let entry = match stat {
             Ok(entry) => entry,
@@ -54,13 +32,39 @@ pub fn load_mod_info() -> Result<Vec<ModJson>> {
             continue;
         }
 
-        result.push(read_mod_json(entry.path())?);
+        let mod_json = read_mod_json(entry.path())?;
+
+        result.insert(mod_json.id.clone(), mod_json);
     }
 
+    update_mods_status(result.values_mut()).context("Failed to check if mods were enabled")?;
     Ok(result)
 }
 
-fn read_mod_json(from: impl AsRef<Path>) -> Result<ModJson> {
+fn update_mods_status<'a>(mods: impl Iterator<Item = &'a mut ModInfo>) -> Result<()> {
+    let early_mod_files = list_dir_files(EARLY_MODS_DIR)?;
+    let late_mod_files = list_dir_files(LATE_MODS_DIR)?;
+    let libraries = list_dir_files(LIBS_DIR)?;
+
+    for mod_info in mods {
+        mod_info.is_enabled = mod_info.mod_files.iter().all(|file| early_mod_files.contains(file))
+            && mod_info.library_files.iter().all(|file| libraries.contains(file))
+            && mod_info.late_mod_files.iter().all(|file| late_mod_files.contains(file));
+    }
+
+    Ok(())
+}
+
+fn list_dir_files(path: impl AsRef<Path>) -> Result<HashSet<String>> {
+    std::fs::create_dir_all(&path).context("Failed to create SOs directory")?;
+
+    Ok(std::fs::read_dir(&path)?.filter_map(|file| match file {
+        Ok(file) => file.file_name().into_string().ok(),
+        Err(_) => None
+    }).collect())
+}
+
+fn read_mod_json(from: impl AsRef<Path>) -> Result<ModInfo> {
     let mod_file = std::fs::File::open(from).context("Failed to open mod archive")?;
     let mut zip = ZipFile::open(mod_file).context("Mod was invalid ZIP archive")?;
 

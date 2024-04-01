@@ -6,10 +6,10 @@
 use semver::{Version, VersionReq};
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 #[serde(default)] // skip missing fields
-pub struct ModJson {
+pub struct ModInfo {
     /// The Questpatcher version this mod.json was made for
     /// 1.1.0
     #[serde(rename(serialize = "_QPVersion", deserialize = "_QPVersion"))]
@@ -54,9 +54,11 @@ pub struct ModJson {
     pub file_copies: Vec<FileCopy>,
     /// list of copy extensions registered for this specific mod
     pub copy_extensions: Vec<CopyExtension>,
+    #[serde(default = "bool::default")] // bool::default = false
+    pub is_enabled: bool,
 }
 
-impl Default for ModJson {
+impl Default for ModInfo {
     fn default() -> Self {
         Self {
             schema_version: Version::new(1, 1, 0),
@@ -77,6 +79,7 @@ impl Default for ModJson {
             copy_extensions: Default::default(),
             modloader: Some("Scotland2".into()),
             late_mod_files: Default::default(),
+            is_enabled: false
         }
     }
 }

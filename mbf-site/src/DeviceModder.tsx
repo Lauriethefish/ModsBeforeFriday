@@ -45,20 +45,22 @@ function DeviceModder(props: DeviceModderProps) {
             <h1>Beat Saber is not installed</h1>
             <p>Please install Beat Saber from the store and then refresh the page.</p>
         </div>
-    }   else if (modStatus.supported_versions === null) {
+    }   else if (modStatus.core_mods === null) {
         return <div className='container mainContainer'>
             <h1>No internet</h1>
             <p>It seems as though <b>your Quest</b> has no internet connection.</p>
             <p>To mod Beat Saber, MBF needs to download files such as a mod loader and several essential mods. 
                 <br />This occurs on your Quest's connection. Please make sure that WiFi is enabled, then refresh the page.</p>
         </div>
-    }   else if(!(modStatus.supported_versions.includes(modStatus.app_info.version))) {
-        return <NotSupported version={modStatus.app_info.version} supportedVersions={modStatus.supported_versions}/>
+    }   else if(!(modStatus.core_mods.supported_versions.includes(modStatus.app_info.version))) {
+        return <NotSupported version={modStatus.app_info.version} supportedVersions={modStatus.core_mods.supported_versions}/>
     }   else if(modStatus.app_info.is_modded)   {
         return <>
             <div className='container mainContainer'>
                 <h1>App is modded</h1>
                 <p>Beat Saber is already modded on your Quest, and the version that's installed is compatible with mods.</p>
+
+                <InstallStatus modloaderReady={modStatus.modloader_present} coreModsReady={modStatus.core_mods.all_core_mods_installed} />
             </div>
 
             {modStatus.installed_mods.map(mod => <ModCard mod={mod} />)}
@@ -91,6 +93,27 @@ function NotSupported(props: NotSupportedProps) {
             {props.supportedVersions.map(ver => <li>{ver}</li>)}
         </ul>
     </div>
+}
+
+interface InstallStatusProps {
+    modloaderReady: boolean,
+    coreModsReady: boolean
+}
+
+function InstallStatus(props: InstallStatusProps) {
+    if(props.modloaderReady && props.coreModsReady) {
+        return <p>Everything should be ready to go! &#9989;</p>
+    }   else {
+        return <div>
+            <h3 className="warning">Problems found with your install:</h3>
+            <p>These must be fixed before custom songs will work!</p>
+            <ul>
+                {!props.modloaderReady && <li>Modloader not found &#10060;</li>}
+                {!props.coreModsReady && <li>Core mods missing or out of date &#10060;</li>}
+            </ul>
+            <button>Fix issues</button>
+        </div>
+    }
 }
 
 interface PatchingMenuProps {

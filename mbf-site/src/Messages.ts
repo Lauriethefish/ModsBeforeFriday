@@ -15,8 +15,14 @@ type Response = ModStatus;
 interface ModStatus {
     type: 'ModStatus',
     app_info: AppInfo | null,
-    supported_versions: string[] | null,
+    core_mods: CoreModsInfo | null,
+    modloader_present: boolean,
     installed_mods: Mod[]
+}
+
+interface CoreModsInfo {
+    supported_versions: string[],
+    all_core_mods_installed: boolean
 }
 
 interface AppInfo {
@@ -29,5 +35,6 @@ export type {
     GetModStatus,
     Response,
     ModStatus,
-    AppInfo
+    AppInfo,
+    CoreModsInfo
 }

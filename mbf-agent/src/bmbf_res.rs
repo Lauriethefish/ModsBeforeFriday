@@ -1,8 +1,9 @@
 //! Collection of types used to read the BMBF resources repository to fetch core mod information.
 
 
+use semver::Version;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap};
+use std::collections::HashMap;
 use anyhow::{Context, Result};
 
 #[derive(Deserialize)]
@@ -11,7 +12,7 @@ pub struct CoreMod {
     #[serde(rename = "id")]
     pub id: String,
     #[serde(rename = "version")]
-    pub version: String,
+    pub version: Version,
     #[serde(rename = "downloadLink")]
     pub download_url: String
 }

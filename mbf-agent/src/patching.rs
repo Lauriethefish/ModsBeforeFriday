@@ -68,12 +68,16 @@ fn save_obb(obb_dir: &Path, obb_backup_path: &Path) -> Result<PathBuf> {
     Err(anyhow!("Could not find an OBB to save"))
 }
 
-// Copies the modloader to the correct directory on the quest
-pub fn install_modloader() -> Result<()> {
+pub fn get_modloader_path() -> Result<PathBuf> {
     let modloaders_path = format!("/sdcard/ModData/{APK_ID}/Modloader/");
 
     std::fs::create_dir_all(&modloaders_path)?;
-    let loader_path = PathBuf::from(modloaders_path).join(MODLOADER_NAME);
+    Ok(PathBuf::from(modloaders_path).join(MODLOADER_NAME))
+}
+
+// Copies the modloader to the correct directory on the quest
+pub fn install_modloader() -> Result<()> {
+    let loader_path = get_modloader_path()?;
 
     let mut handle = OpenOptions::new()
         .create(true)
