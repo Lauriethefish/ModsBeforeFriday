@@ -18,7 +18,8 @@ export function ModCard(props: ModCardProps) {
 
         <p className='descriptionText'>{props.mod.description}</p>
 
-        <Slider on={enabled} valueChanged={value => setEnabled(value)}/>
-
+        <div className='modToggle'>
+            <Slider on={enabled} valueChanged={value => setEnabled(value)}/>
+        </div>
     </div>
 }

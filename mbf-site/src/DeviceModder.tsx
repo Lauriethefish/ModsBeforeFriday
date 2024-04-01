@@ -3,6 +3,7 @@ import { prepareAgent, runCommand } from "./Agent";
 import { useEffect, useState } from 'react';
 import { ModStatus } from './Messages';
 import './DeviceModder.css';
+import { ModCard } from './ModCard';
 
 interface DeviceModderProps {
     device: Adb
@@ -54,10 +55,14 @@ function DeviceModder(props: DeviceModderProps) {
     }   else if(!(modStatus.supported_versions.includes(modStatus.app_info.version))) {
         return <NotSupported version={modStatus.app_info.version} supportedVersions={modStatus.supported_versions}/>
     }   else if(modStatus.app_info.is_modded)   {
-        return <div className='container mainContainer'>
-            <h1>App is modded</h1>
-            <p>Beat Saber is already modded on your Quest, and the version that's installed is compatible with mods.</p>
-        </div>
+        return <>
+            <div className='container mainContainer'>
+                <h1>App is modded</h1>
+                <p>Beat Saber is already modded on your Quest, and the version that's installed is compatible with mods.</p>
+            </div>
+
+            {modStatus.installed_mods.map(mod => <ModCard mod={mod} />)}
+        </>
     }   else    {
         return <PatchingMenu version={modStatus.app_info.version} onPatch={async () => {
             setIsPatching(true);

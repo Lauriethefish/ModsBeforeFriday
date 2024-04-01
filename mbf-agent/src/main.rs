@@ -4,16 +4,20 @@ mod manifest;
 mod axml;
 mod patching;
 mod bmbf_res;
+mod mod_man;
 
 use std::{io::{BufRead, BufReader, Cursor}, process::Command};
 
 use axml::AxmlReader;
 use bmbf_res::CoreModsError;
+use lockfile::Lockfile;
 use manifest::ManifestInfo;
+use mod_man::Mod;
 use requests::{AppInfo, Request, Response};
 use anyhow::{anyhow, Context, Result};
 
 const APK_ID: &str = "com.beatgames.beatsaber";
+const LOCKFILE_PATH: &str = "/data/local/tmp/mbf.lock";
 
 fn handle_request(request: Request) -> Result<Response> {
     match request {
@@ -27,7 +31,10 @@ fn handle_get_mod_status() -> Result<Response> {
 
     Ok(Response::ModStatus { 
         app_info: get_app_info()?,
-        supported_versions: get_supported_versions()?
+        supported_versions: get_supported_versions()?,
+        installed_mods: mod_man::load_mod_info()?
+            .into_iter().map(|mod_json| Mod::from(mod_json))
+            .collect()
     })
 }
 
@@ -101,7 +108,9 @@ pub fn get_apk_path() -> Result<Option<String>> {
     }
 }
 
-fn main() -> anyhow::Result<()> {
+fn main() -> Result<()> {
+    let _lockfile = Lockfile::create(LOCKFILE_PATH).context("Failed to obtain lockfile - is MBF already open?")?;
+
     let mut reader = BufReader::new(std::io::stdin());
     let mut line = String::new();
     reader.read_line(&mut line)?;

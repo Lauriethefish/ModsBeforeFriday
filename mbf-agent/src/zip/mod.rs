@@ -81,9 +81,7 @@ impl<T: Read + Seek> ZipFile<T> {
         })
     }
 
-    /// Begins reading the file with the given name from the ZIP.
-    /// The file data can then be read using the `Read` implementation on this struct.
-    /// Returns Ok(None) if a file with the given name did not exist.
+    /// Reads the contents of the file with the given name from the ZIP.
     pub fn read_file(&mut self, name: &str) -> Result<Option<Vec<u8>>> {
         let cd_header = match self.entries.get(name) {
             Some(header) => header,
