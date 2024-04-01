@@ -37,7 +37,7 @@ function DeviceModder(props: DeviceModderProps) {
         </div>;
     } else if(modStatus === null) {
         return <div className='container mainContainer'>
-            <h2>Pulling data from the Quest</h2>
+            <h2>Checking Beat Saber installation</h2>
         </div>;
     }   else if(modStatus.app_info === null) {
         return <div className='container mainContainer'>
