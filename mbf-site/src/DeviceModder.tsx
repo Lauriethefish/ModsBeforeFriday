@@ -43,7 +43,6 @@ function DeviceModder(props: DeviceModderProps) {
     } else if(modStatus === null) {
         return <div className='container mainContainer'>
             <h2>Checking Beat Saber installation</h2>
-            <LogWindow events={logEvents} />
         </div>;
     }   else if(modStatus.app_info === null) {
         return <div className='container mainContainer'>

@@ -11,7 +11,7 @@ use crate::requests::Request;
 use anyhow::{Context, Result};
 use log::{error, Level};
 use requests::Response;
-use std::{io::{BufRead, BufReader, Write}, process::Command};
+use std::{fs::OpenOptions, io::{BufRead, BufReader, Write}, path::Path, process::Command};
 
 const APK_ID: &str = "com.beatgames.beatsaber";
 
@@ -29,6 +29,21 @@ pub fn get_apk_path() -> Result<Option<String>> {
             .trim_end()
             .to_owned()))
     }
+}
+
+fn download_file(to: impl AsRef<Path>, url: &str) -> Result<()> {
+    let mut resp_body = ureq::get(url)
+        .call()
+        .context("Failed to request file")?
+        .into_reader();
+
+    let mut writer = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .open(to).context("Failed to create destination file")?;
+
+    std::io::copy(&mut resp_body, &mut writer)?;
+    Ok(())
 }
 
 struct ResponseLogger {}

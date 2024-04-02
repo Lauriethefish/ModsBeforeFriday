@@ -83,8 +83,6 @@ pub enum Response {
     },
     ModInstallResult {
         installed_mods: Vec<ModModel>,
-        // A log of dependency resolution/which mods were installed and uninstalled.
-        install_log: String,
         // True if all the mods in the to_install part of ModAction are now installed, and the ones in to_uninstall are now uninstalled.
         full_success: bool
     },
@@ -107,17 +105,14 @@ pub struct ModModel {
     pub is_enabled: bool
 }
 
-impl From<Mod> for ModModel {
-    fn from(value: Mod) -> Self {
-        let is_enabled = value.get_installed();       
-        let manifest = value.into_manifest(); 
-
+impl From<&Mod> for ModModel {
+    fn from(value: &Mod) -> Self {
         Self {
-            id: manifest.id,
-            name: manifest.name,
-            version: manifest.version,
-            description: manifest.description,
-            is_enabled
+            id: value.manifest().id.clone(),
+            name: value.manifest().name.clone(),
+            version: value.manifest().version.clone(),
+            description: value.manifest().description.clone(),
+            is_enabled: value.installed()
         }
     }
 }

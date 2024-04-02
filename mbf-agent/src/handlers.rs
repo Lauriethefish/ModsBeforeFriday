@@ -1,12 +1,13 @@
-use std::{fs::OpenOptions, io::Cursor};
+use std::io::Cursor;
 
+use crate::download_file;
 use crate::{axml::AxmlReader, patching, zip::ZipFile};
 use crate::bmbf_res::CoreModsError;
 use crate::manifest::ManifestInfo;
 use crate::mod_man::ModManager;
 use crate::requests::{AppInfo, CoreModsInfo, ModAction, ModModel, Request, Response};
 use anyhow::{anyhow, Context, Result};
-use log::{info, warn};
+use log::{error, info, warn};
 
 pub fn handle_request(request: Request) -> Result<Response> {
     match request {
@@ -21,25 +22,22 @@ fn run_mod_action(action: ModAction) -> Result<Response> {
     let mut mod_manager = ModManager::new();
     mod_manager.load_mods().context("Failed to load installed mods")?;
 
-    let mut log = String::new();
-
     for to_install in action.to_install {
        match mod_manager.install_mod(&to_install) {
-            Ok(_) => log.push_str(&format!("Installed {to_install}\n")),
-            Err(err) => log.push_str(&format!("Failed to install {to_install}: {err}\n"))
+            Ok(_) => info!("Installed {to_install}"),
+            Err(err) => error!("Failed to install {to_install}: {err}")
        }
     }
 
     for to_uninstall in action.to_uninstall {
         match mod_manager.install_mod(&to_uninstall) {
-             Ok(_) => log.push_str(&format!("Uninstalled {to_uninstall}\n")),
-             Err(err) => log.push_str(&format!("Failed to install {to_uninstall}: {err}\n"))
+             Ok(_) => info!("Uninstalled {to_uninstall}"),
+             Err(err) => error!("Failed to install {to_uninstall}: {err}")
         }
      }
 
     Ok(Response::ModInstallResult {
         installed_mods: get_mod_models(mod_manager),
-        install_log: log,
         full_success: true // TODO
     })
 }
@@ -68,8 +66,8 @@ fn handle_get_mod_status() -> Result<Response> {
 }
 
 fn get_mod_models(mod_manager: ModManager) -> Vec<ModModel> {
-    mod_manager.into_mods()
-        .map(|mod_info| ModModel::from(mod_info))
+    mod_manager.get_mods()
+        .map(|mod_info| ModModel::from(&*(**mod_info).borrow()))
         .collect()
 }
 
@@ -88,7 +86,7 @@ fn get_core_mods_info(apk_version: &str, mod_manager: &ModManager) -> Result<Opt
             .iter()
             .all(|core_mod| match mod_manager.get_mod(&core_mod.id) {
                 None => false,
-                Some(installed_version) => installed_version.manifest().version >= core_mod.version
+                Some(installed_version) => installed_version.borrow().manifest().version >= core_mod.version
             }),
         None => false
     };
@@ -153,7 +151,7 @@ fn handle_patch() -> Result<Response> {
 }
 
 fn install_core_mods(mod_manager: &mut ModManager, app_info: AppInfo) -> Result<()> {
-    info!("Installing core mods");
+    info!("Preparing core mods");
     let core_mod_index = match crate::bmbf_res::fetch_core_mods() {
         Ok(core_mods) => core_mods,
         // We do not care if it was fetching or parsing: this should succeed because otherwise the frontend would not permit us to get to this point.
@@ -171,17 +169,7 @@ fn install_core_mods(mod_manager: &mut ModManager, app_info: AppInfo) -> Result<
         let save_path = mod_manager.mods_path().as_ref()
             .join(format!("{}-v{}-CORE.qmod", core_mod.id, core_mod.version));
 
-        let mut resp_body = ureq::get(&core_mod.download_url)
-            .call()
-            .context("Failed to download core mod: is the connection working")?
-            .into_reader();
-
-        let mut writer = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .open(save_path).context("Failed to create core mod QMOD file")?;
-
-        std::io::copy(&mut resp_body, &mut writer).context("Failed to download core mod: was the WiFi connection lost?")?;
+        download_file(save_path, &core_mod.download_url).context("Failed to download core mod")?;
     }
 
     info!("Loading and installing core mods");
