@@ -69,8 +69,7 @@ function logFromAgent(log: Log) {
   }
 }
 
-
-async function sendRequest(adb: Adb, request: Request): Promise<Response> {
+async function sendRequest(adb: Adb, request: Request, eventSink: ((event: Log) => void) | null = null): Promise<Response> {
   let command_buffer = encodeUtf8(JSON.stringify(request) + "\n");
 
   let agentProcess = await adb.subprocess.shell(AgentPath);
@@ -111,7 +110,11 @@ async function sendRequest(adb: Adb, request: Request): Promise<Response> {
       // Parse each newline separated message as a Response
       const msg_obj = JSON.parse(messages[i]) as Response;
       if(msg_obj.type === "Log") {
-        logFromAgent(msg_obj as Log);
+        const log_obj = msg_obj as Log;
+        logFromAgent(log_obj);
+        if(eventSink != null) {
+          eventSink(log_obj);
+        }
       } else  {
         // The final message is the only one that isn't of type `log`.
         // This contains the actual response data

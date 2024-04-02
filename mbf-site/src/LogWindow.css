@@ -1,0 +1,21 @@
+#logWindow {
+    background-color: #111111;
+    border-radius: 5px;
+    padding: 10px;
+
+    min-height: 30rem;
+    overflow: auto;
+    width: auto;
+}
+
+.logItem {
+    margin: 0;
+    padding: 0;
+    font-family: Consolas;
+    word-break: break-word;
+}
+
+@font-face {
+    font-family: Consolas;
+    src: local('Consolas'), format("ttf"), url("./fonts/Consolas.ttf")
+}

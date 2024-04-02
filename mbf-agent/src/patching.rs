@@ -86,6 +86,7 @@ pub fn get_modloader_path() -> Result<PathBuf> {
 // Copies the modloader to the correct directory on the quest
 pub fn install_modloader() -> Result<()> {
     let loader_path = get_modloader_path()?;
+    info!("Installing modloader to {loader_path:?}");
 
     let mut handle = OpenOptions::new()
         .create(true)

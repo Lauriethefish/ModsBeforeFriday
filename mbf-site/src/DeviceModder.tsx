@@ -1,10 +1,11 @@
 import { Adb } from '@yume-chan/adb';
 import { prepareAgent, runCommand } from "./Agent";
 import { useEffect, useState } from 'react';
-import { ModStatus } from './Messages';
+import { Log, ModStatus } from './Messages';
 import './DeviceModder.css';
 import { ModCard } from './ModCard';
 import { ReactComponent as ModIcon } from './mod-icon.svg'
+import { LogWindow, useLog } from './LogWindow';
 
 interface DeviceModderProps {
     device: Adb
@@ -18,15 +19,16 @@ async function loadModStatus(device: Adb) {
     }) as unknown as ModStatus;
 }
 
-async function patchApp(device: Adb) {
+async function patchApp(device: Adb, addLogEvent: (event: Log) => void) {
     await runCommand(device, {
         type: 'Patch'
-    });
+    }, addLogEvent);
 }
 
 function DeviceModder(props: DeviceModderProps) {
     const [modStatus, setModStatus] = useState(null as ModStatus | null);
     const [isPatching, setIsPatching] = useState(false);
+    const [logEvents, addLogEvent] = useLog();
 
     useEffect(() => {
         loadModStatus(props.device).then(data => setModStatus(data));
@@ -34,12 +36,14 @@ function DeviceModder(props: DeviceModderProps) {
 
     if(isPatching) {
         return <div className='container mainContainer'>
-            <h3>App is being patched.</h3>
-            <p>This should only take a few seconds, but might take longer on a very slow connection.</p>
+            <h3>Mods are being set up.</h3>
+            <p>This should only take a few minutes, but might take longer on a very slow connection.</p>
+            <LogWindow events={logEvents} />
         </div>;
     } else if(modStatus === null) {
         return <div className='container mainContainer'>
             <h2>Checking Beat Saber installation</h2>
+            <LogWindow events={logEvents} />
         </div>;
     }   else if(modStatus.app_info === null) {
         return <div className='container mainContainer'>
@@ -74,7 +78,7 @@ function DeviceModder(props: DeviceModderProps) {
         return <PatchingMenu version={modStatus.app_info.version} onPatch={async () => {
             setIsPatching(true);
             try {
-                await patchApp(props.device);
+                await patchApp(props.device, addLogEvent);
                 modStatus.app_info!.is_modded = true;
                 setModStatus(modStatus);
             }   finally {
