@@ -2,7 +2,8 @@ interface Mod {
     id: string,
     name: string,
     description: string | null,
-    version: string
+    version: string,
+    is_enabled: boolean
 }
 
 export type {

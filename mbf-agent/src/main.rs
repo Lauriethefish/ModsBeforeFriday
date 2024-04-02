@@ -6,7 +6,7 @@ mod patching;
 mod bmbf_res;
 mod mod_man;
 
-use std::{fs::OpenOptions, io::{BufRead, BufReader, Cursor}, process::Command};
+use std::{fs::OpenOptions, io::{BufRead, BufReader, Cursor, Write}, process::Command};
 
 use axml::AxmlReader;
 use bmbf_res::CoreModsError;
@@ -220,5 +220,7 @@ fn main() -> Result<()> {
 
     let resp = handle_request(req)?;
     serde_json::to_writer(std::io::stdout(), &resp)?;
+    std::io::stdout().flush()?;
+    println!();
     Ok(())
 }

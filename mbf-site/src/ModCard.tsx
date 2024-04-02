@@ -8,7 +8,7 @@ interface ModCardProps {
 }
 
 export function ModCard(props: ModCardProps) {
-    const [enabled, setEnabled] = useState(false);
+    const [enabled, setEnabled] = useState(props.mod.is_enabled);
 
     return <div className="container modCard">
         <div className='modName'>
@@ -19,7 +19,10 @@ export function ModCard(props: ModCardProps) {
         <p className='descriptionText'>{props.mod.description}</p>
 
         <div className='modToggle'>
-            <Slider on={enabled} valueChanged={value => setEnabled(value)}/>
+            <Slider on={enabled} valueChanged={value => {
+                setEnabled(value);
+                props.mod.is_enabled = value;
+            }}/>
         </div>
     </div>
 }
