@@ -54,6 +54,15 @@ pub struct CoreModsInfo {
 }
 
 #[derive(Serialize)]
+pub enum LogLevel {
+    Error,
+    Warn,
+    Info,
+    Debug,
+    Trace
+}
+
+#[derive(Serialize)]
 #[serde(tag = "type")]
 pub enum Response {
     ModStatus {
@@ -78,6 +87,12 @@ pub enum Response {
         install_log: String,
         // True if all the mods in the to_install part of ModAction are now installed, and the ones in to_uninstall are now uninstalled.
         full_success: bool
+    },
+    // Sent to relay progress information during the modding process.
+    // This will NOT be the final message sent.
+    Log {
+        message: String,
+        level: LogLevel
     },
     Patched
 }

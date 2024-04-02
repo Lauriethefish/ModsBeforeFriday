@@ -1,6 +1,6 @@
 import { AdbSync, AdbSyncWriteOptions, Adb, encodeUtf8 } from '@yume-chan/adb';
 import { ConsumableReadableStream, Consumable, DecodeUtf8Stream, ConcatStringStream } from '@yume-chan/stream-extra';
-import { Request } from "./Messages";
+import { Request, Response, Log } from "./Messages";
 
 const AgentPath: string = "/data/local/tmp/mbf-agent";
 
@@ -26,26 +26,47 @@ async function saveAgent(sync: AdbSync) {
 
 async function prepareAgent(adb: Adb) {
   const sync = await adb.sync();
+  console.group("Pushing agent");
   try {
     console.log("Removing existing agent");
     await adb.subprocess.spawnAndWait("rm " + AgentPath)
     console.log("Writing new agent")
     await saveAgent(sync);
     await adb.subprocess.spawnAndWait("chmod +x " + AgentPath);
+
+    console.log("Agent is ready");
   } finally {
     sync.dispose();
+    console.groupEnd();
   }
-
-  console.log("Agent is ready");
 }
   
 async function downloadAgent(): Promise<Uint8Array> {
-    const resp: Response = await fetch("./mbf-agent/mbf-agent");
+    const resp = await fetch("./mbf-agent/mbf-agent");
     if(resp.body === null) {
         throw new Error("Agent response had no body")
     }
 
     return new Uint8Array(await resp.arrayBuffer());
+}
+
+function logFromAgent(log: Log) {
+  switch(log.level) {
+    case 'Error':
+      console.error(log.message);
+      break;
+    case 'Warn':
+      console.warn(log.message);
+      break;
+    case 'Debug':
+      console.debug(log.message);
+      break;
+    case 'Info':
+      console.info(log.message);
+      break;
+    case 'Trace':
+      console.trace(log.message);
+  }
 }
 
 
@@ -61,19 +82,60 @@ async function sendRequest(adb: Adb, request: Request): Promise<Response> {
     stdin.releaseLock();
   }
 
-  console.log("Waiting for exit");
-  const code = await agentProcess.exit;
-  if(code === 0) {
-    console.log("Parsing output");
-    return JSON.parse(await agentProcess.stdout
-      .pipeThrough(new DecodeUtf8Stream())
-      .pipeThrough(new ConcatStringStream()));
+  let exited = false;
+  agentProcess.exit.then(() => exited = true);
+
+  const reader = agentProcess.stdout
+    // TODO: Not totally sure if this will handle non-ASCII correctly.
+    // Doesn't seem to consider that a chunk might not be valid UTF-8 on its own
+    .pipeThrough(new DecodeUtf8Stream())
+    .getReader();
+  
+  console.group("Agent Request");
+  let buffer = "";
+  let response: Response | null = null;
+  while(!exited) {
+    const result = await reader.read();
+    const receivedStr = result.value;
+    if(receivedStr === undefined) {
+      continue;
+    }
+
+    // TODO: This is fairly inefficient in terms of memory usage
+    // (although we aren't receiving a huge amount of data so this might be OK)
+    buffer += receivedStr;
+    const messages = buffer.split("\n");
+    buffer = messages[messages.length - 1];
+
+    for(let i = 0; i < messages.length - 1; i++) {
+      // Parse each newline separated message as a Response
+      const msg_obj = JSON.parse(messages[i]) as Response;
+      if(msg_obj.type === "Log") {
+        logFromAgent(msg_obj as Log);
+      } else  {
+        // The final message is the only one that isn't of type `log`.
+        // This contains the actual response data
+        response = msg_obj;
+      }
+    }
+  }
+  console.groupEnd();
+
+  
+  if((await agentProcess.exit) === 0) {
+    // If the agent exited with code 0 but gave no response, an error occured during serving the request.
+    // This will have already been logged.
+    if(response === null) {
+      throw new Error("Received error response from agent");
+    }
+    return response;
   } else  {
-    console.log("Parsing error output")
-    throw new Error("Received error response from agent: " + 
-    await agentProcess.stderr
-      .pipeThrough(new DecodeUtf8Stream())
-      .pipeThrough(new ConcatStringStream()))
+    // If the agent exited with a non-zero code then it failed to actually write a response to stdout
+    // Alternatively, the agent might be corrupt.
+    throw new Error("Failed to invoke agent: is the executable corrupt?" + 
+      await agentProcess.stderr
+        .pipeThrough(new DecodeUtf8Stream())
+        .pipeThrough(new ConcatStringStream()))
   }
 }
 

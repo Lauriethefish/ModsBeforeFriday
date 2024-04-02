@@ -1,6 +1,7 @@
 use std::{fs::{File, OpenOptions}, io::{Cursor, Seek, Write}, path::{Path, PathBuf}, process::Command};
 
 use anyhow::{Context, Result, anyhow};
+use log::info;
 use crate::{axml::{AxmlReader, AxmlWriter}, zip};
 use crate::manifest::{ManifestMod, ResourceIds};
 use crate::zip::{signing, FileCompression, ZipFile};
@@ -23,15 +24,20 @@ pub fn mod_current_apk() -> Result<()> {
     let temp_path = Path::new(TEMP_PATH);
     std::fs::create_dir_all(TEMP_PATH)?;
 
+    info!("Copying APK to temporary location");
     let temp_apk_path = temp_path.join("mbf-tmp.apk");
     std::fs::copy(apk_path, &temp_apk_path).context("Failed to copy APK to temp")?;
+
+    info!("Patching APK at {:?}", temp_path);
     patch_apk_in_place(&temp_apk_path)?;
 
     let obb_dir = PathBuf::from(format!("/sdcard/Android/obb/{APK_ID}/"));
     let obb_backup = temp_path.join("backup.obb");
 
+    info!("Saving OBB file");
     let obb_restore_path = save_obb(&obb_dir, &obb_backup)?;
 
+    info!("Reinstalling modded app");
     Command::new("pm")
         .args(["uninstall", APK_ID])
         .output()
@@ -43,9 +49,11 @@ pub fn mod_current_apk() -> Result<()> {
         .context("Failed to install modded APK")?;
 
     // Cannot use a `rename` since the mount points are different
+    info!("Restoring OBB file");
     std::fs::create_dir_all(obb_dir)?;
     std::fs::copy(&obb_backup, &obb_restore_path)?;
     std::fs::remove_file(obb_backup)?;
+    std::fs::remove_file(temp_apk_path)?;
     Ok(())
 }
 

@@ -453,6 +453,7 @@ dependencies = [
  "byteorder",
  "crc",
  "libflate",
+ "log",
  "pem",
  "rand",
  "rasn",

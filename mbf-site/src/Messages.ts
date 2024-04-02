@@ -10,7 +10,7 @@ interface Patch {
     type: 'Patch'
 }
 
-type Response = ModStatus;
+type Response = ModStatus | Log;
 
 interface ModStatus {
     type: 'ModStatus',
@@ -30,11 +30,20 @@ interface AppInfo {
     is_modded: boolean
 }
 
+interface Log {
+    type: 'Log',
+    message: string,
+    level: LogLevel
+}
+
+type LogLevel = "Error" | "Warn" | "Info" | "Debug" | "Trace";
+
 export type {
     Request,
     GetModStatus,
     Response,
     ModStatus,
     AppInfo,
-    CoreModsInfo
+    CoreModsInfo,
+    Log
 }
