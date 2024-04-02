@@ -17,4 +17,3 @@ serde = { version = "1.0.197", features = ["derive"] }
 serde_json = "1.0.115"
 semver = { version = "1.0.22", features = ["serde"] }
 ureq = "2.9.6"
-lockfile = "0.4.0"

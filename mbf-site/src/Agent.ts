@@ -52,7 +52,7 @@ async function downloadAgent(): Promise<Uint8Array> {
 async function sendRequest(adb: Adb, request: Request): Promise<Response> {
   let command_buffer = encodeUtf8(JSON.stringify(request) + "\n");
 
-  let agentProcess = await adb.subprocess.spawn(AgentPath);
+  let agentProcess = await adb.subprocess.shell(AgentPath);
 
   const stdin = agentProcess.stdin.getWriter();
   try {

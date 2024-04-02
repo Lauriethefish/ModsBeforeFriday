@@ -10,14 +10,12 @@ use std::{fs::OpenOptions, io::{BufRead, BufReader, Cursor, Write}, process::Com
 
 use axml::AxmlReader;
 use bmbf_res::CoreModsError;
-use lockfile::Lockfile;
 use manifest::ManifestInfo;
 use mod_man::ModManager;
 use requests::{AppInfo, CoreModsInfo, ModAction, ModModel, Request, Response};
 use anyhow::{anyhow, Context, Result};
 
 const APK_ID: &str = "com.beatgames.beatsaber";
-const LOCKFILE_PATH: &str = "/data/local/tmp/mbf.lock";
 
 fn handle_request(request: Request) -> Result<Response> {
     match request {
@@ -210,8 +208,6 @@ pub fn get_apk_path() -> Result<Option<String>> {
 }
 
 fn main() -> Result<()> {
-    let _lockfile = Lockfile::create(LOCKFILE_PATH).context("Failed to obtain lockfile - is MBF already open?")?;
-
     let mut reader = BufReader::new(std::io::stdin());
     let mut line = String::new();
     reader.read_line(&mut line)?;

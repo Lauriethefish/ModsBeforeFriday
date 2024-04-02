@@ -440,12 +440,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ec2a862134d2a7d32d7983ddcdd1c4923530833c9f2ea1a44fc5fa473989058"
 
 [[package]]
-name = "lockfile"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5be1cf190319c74ba3e45923624626ae2e43fe42ad7e60ff38ded81044c37630"
-
-[[package]]
 name = "log"
 version = "0.4.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -459,7 +453,6 @@ dependencies = [
  "byteorder",
  "crc",
  "libflate",
- "lockfile",
  "pem",
  "rand",
  "rasn",
