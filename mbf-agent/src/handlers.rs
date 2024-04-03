@@ -98,10 +98,14 @@ fn get_core_mods_info(apk_version: &str, mod_manager: &ModManager) -> Result<Opt
             .iter()
             .all(|core_mod| match mod_manager.get_mod(&core_mod.id) {
                 None => false,
-                Some(installed_version) => installed_version.borrow().manifest().version >= core_mod.version
+                Some(installed_version) => {
+                    let installed_ref = installed_version.borrow();
+                    installed_ref.manifest().version >= core_mod.version && installed_ref.installed()
+                }
             }),
         None => false
     };
+    info!("All core mods installed: {}", all_core_mods_installed);
 
     let supported_versions: Vec<String> = core_mods.into_keys().filter(|version| {
         let mut iter = version.split('.');
