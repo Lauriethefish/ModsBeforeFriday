@@ -6,6 +6,7 @@ import { AdbDaemonTransport, Adb } from '@yume-chan/adb';
 
 import AdbWebCredentialStore from "@yume-chan/adb-credential-web";
 import DeviceModder from './DeviceModder';
+import { Modal } from './components/Modal';
 
 async function connect(
   setAuthing: () => void): Promise<Adb | null> {

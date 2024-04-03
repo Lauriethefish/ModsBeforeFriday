@@ -150,6 +150,7 @@ impl ModManager {
                         self.install_dependency(&dep, true)?;
                     }   else if !dep_ref.installed {
                         // Must install the dependency
+                        info!("Dependency {} was not installed, reinstalling", dep.id);
                         drop(dep_ref);
                         self.install_mod(&dep.id)?;
                     }
@@ -196,11 +197,29 @@ impl ModManager {
 
     /// Uninstalls a mod without handling dependencies
     /// i.e. just deletes the necessary files.
-    fn uninstall_unchecked(&self, to_remove: &mut Mod) -> Result<()> {
-        delete_file_names(&to_remove.manifest.mod_files, EARLY_MODS_DIR)?;
-        delete_file_names(&to_remove.manifest.library_files, LIBS_DIR)?;
-        delete_file_names(&to_remove.manifest.late_mod_files, LATE_MODS_DIR)?;
+    fn uninstall_unchecked(&self, id: &str) -> Result<()> {
+        // Gather a set of all library SOs being used by other mods.
+        let mut retained_libs = HashSet::new();
+        for (other_id, other_mod) in &self.mods {
+            if other_id == id {
+                continue;
+            }
 
+            for lib_path in other_mod.borrow()
+                .manifest
+                .library_files
+                .iter() 
+            {
+                retained_libs.insert(get_so_name(&lib_path).to_string());
+            }
+        }
+
+        let mut to_remove = (**self.mods.get(id).unwrap()).borrow_mut();
+        delete_file_names(&to_remove.manifest.mod_files, HashSet::new(), EARLY_MODS_DIR)?;
+        delete_file_names(&to_remove.manifest.late_mod_files, HashSet::new(), LATE_MODS_DIR)?;
+        // Only delete libraries not in use (!)
+        delete_file_names(&to_remove.manifest.library_files, retained_libs, LIBS_DIR)?;
+        
         for copy in &to_remove.manifest.file_copies {
             let dest_path = Path::new(&copy.destination);
             if dest_path.exists() {
@@ -218,19 +237,25 @@ impl ModManager {
         let mod_rc = self.mods.get(id)
             .ok_or(anyhow!("Could not uninstall mod with ID {id} as it did not exist"))?
             .clone();
-        let mut to_remove = (*mod_rc).borrow_mut();
+        let to_remove = (*mod_rc).borrow();
         info!("Uninstalling {} v{}", to_remove.manifest.id, to_remove.manifest.version);
+        drop(to_remove); // Avoid other code that needs the mod from panicking
 
         // Uninstall all depending mods
-        for (id, m) in self.mods.iter() {
+        for (other_id, m) in self.mods.iter() {
+            if other_id == id {
+                continue;
+            }
+
             let m_ref = (**m).borrow();
             if m_ref.installed && m_ref.manifest.dependencies.iter().any(|dep| &dep.id == id) {
-                info!("Uninstalling dependant mod {}", m_ref.manifest.id);
-                self.uninstall_mod(id)?;
+                info!("Uninstalling dependant mod {}", other_id);
+                drop(m_ref);
+                self.uninstall_mod(other_id)?;
             }
         }
 
-        self.uninstall_unchecked(&mut to_remove)?;
+        self.uninstall_unchecked(id)?;
         Ok(())
     }
 
@@ -263,10 +288,7 @@ impl ModManager {
         // by allowing remove_mod to run a regular uninstall
         if upgrading {
             info!("Removing existing version of dependency");
-            let existing_version = self.mods.get(&dep.id)
-                .expect("Cannot upgrade dependency as it's not already installed.");
-
-            self.uninstall_unchecked(&mut (**existing_version).borrow_mut())?;
+            self.uninstall_unchecked(&dep.id)?;
             self.remove_mod(&dep.id)?;
         }
         self.mods.insert(dep.id.clone(), Rc::new(RefCell::new(loaded_dep)));
@@ -326,6 +348,27 @@ impl ModManager {
     }
 }
 
+fn get_so_name(path: &str) -> &str {
+    path.split('/').last().unwrap()
+}
+
+// Deletes the files corresponding to the given SO files in a QMOD from the given folder
+// (i.e. will only consider the SO file name, not the full path in the ZIP)
+// `exclude` is a set of all of the SO file names that must not be deleted, (as they are being used by another mod).
+fn delete_file_names(file_paths: &[String], exclude: HashSet<String>, within: impl AsRef<Path>) -> Result<()> {
+    for path in file_paths {
+        let file_name = get_so_name(path);
+        if exclude.contains(file_name) {
+            continue;
+        }
+
+        let stored_path = within.as_ref().join(file_name);
+        std::fs::remove_file(stored_path)?;
+    }
+
+    Ok(())
+}
+
 // Copies all of the files with names in `files` to the path `to/{file name not including directory in ZIP}`
 fn copy_stated_files(zip: &mut ZipFile<File>, files: &[String], to: impl AsRef<Path>) -> Result<()> {
     for file in files {
@@ -338,16 +381,6 @@ fn copy_stated_files(zip: &mut ZipFile<File>, files: &[String], to: impl AsRef<P
         let copy_to = to.as_ref().join(file_name);
 
         zip.extract_file_to(file, copy_to).context("Failed to extract mod SO")?;
-    }
-
-    Ok(())
-}
-
-fn delete_file_names(file_paths: &[String], within: impl AsRef<Path>) -> Result<()> {
-    for path in file_paths {
-        let file_name = path.split('/').last().unwrap();
-        let stored_path = within.as_ref().join(file_name);
-        std::fs::remove_file(stored_path)?;
     }
 
     Ok(())

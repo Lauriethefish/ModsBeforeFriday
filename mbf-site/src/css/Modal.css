@@ -1,0 +1,22 @@
+@keyframes modalAppear {
+    from { opacity: 0 }
+    to { opacity: 1 }
+}
+
+.modalBackground {
+    z-index: 2;
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    left: 0;
+    top: 0;
+    background-color: rgba(0, 0, 0, 0.8);
+    animation-name: modalAppear;
+    animation-duration: 500ms
+}
+
+.modal {
+    margin: auto;
+    background-color: #1f1f1f;
+    margin-top: 5rem;
+}

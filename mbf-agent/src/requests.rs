@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use semver::Version;
 use serde::{Deserialize, Serialize};
 
@@ -29,8 +31,10 @@ pub enum Request {
     /// This will also attempt to download and install dependencies, upgrade dependencies and will uninstall any
     /// depending mods of mods that have been disabled.
     /// 
-    /// Returns a ModInstallResult response.
-    SetModsEnabled(ModAction),
+    /// Returns a `Mods` response.
+    SetModsEnabled {
+        statuses: HashMap<String, bool>
+    },
 
     /// - Patches Beat Saber to add support for modloaders.
     /// - Saves the modloader to the appropriate locaiton on the Quest.
@@ -39,14 +43,6 @@ pub enum Request {
     /// If the app is already patched, it will not be patched again.
     /// Returns a `Mods`` response to update the frontend with the newly installed core mods.
     Patch
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct ModAction {
-    /// The mods that will be disabled in the request.
-    pub to_uninstall: Vec<String>,
-    /// The mods that will be enabled in the request.
-    pub to_install: Vec<String>,
 }
 
 #[derive(Serialize)]
@@ -84,17 +80,12 @@ pub enum Response {
     Mods {
         installed_mods: Vec<ModModel>
     },
-    ModInstallResult {
-        installed_mods: Vec<ModModel>,
-        // True if all the mods in the to_install part of ModAction are now installed, and the ones in to_uninstall are now uninstalled.
-        full_success: bool
-    },
     // Sent to relay progress information during the modding process.
     // This will NOT be the final message sent.
     Log {
         message: String,
         level: LogLevel
-    },
+    }
 }
 
 /// The trimmed version of the ModInfo type that is sent to the web client.

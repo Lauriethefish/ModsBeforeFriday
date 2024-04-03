@@ -8,7 +8,12 @@ interface Patch {
     type: 'Patch'
 }
 
-type Request = GetModStatus | Patch;
+interface SetModsEnabled {
+    type: 'SetModsEnabled',
+    statuses: { [id: string]: boolean } 
+}
+
+type Request = GetModStatus | Patch | SetModsEnabled;
 
 interface Mods {
     type: 'Mods',

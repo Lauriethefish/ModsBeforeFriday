@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import '../css/LogWindow.css';
 import { Log } from '../Messages';
 import '../fonts/Consolas.ttf';
@@ -29,7 +29,14 @@ export function useLog(): [events: Log[], addEvent: (event: Log) => void] {
 }
 
 export function LogWindow(props: LogWindowProps) {
+    let bottomDiv: Element | null = null;
+    useEffect(() => {
+        bottomDiv?.scrollIntoView();
+    })
+
     return <div id="logWindow">
         {props.events.map((event, idx) => <p className="logItem" key={idx}>{event.message}</p>)}
+
+        <div ref={element => { bottomDiv = element }}/>
     </div>
 }

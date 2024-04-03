@@ -3,7 +3,7 @@
     border-radius: 5px;
     padding: 10px;
 
-    min-height: 30rem;
+    height: 30rem;
     overflow: auto;
     width: auto;
 }

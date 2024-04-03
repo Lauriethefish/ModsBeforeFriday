@@ -108,7 +108,12 @@ async function sendRequest(adb: Adb, request: Request, eventSink: ((event: Log) 
 
     for(let i = 0; i < messages.length - 1; i++) {
       // Parse each newline separated message as a Response
-      const msg_obj = JSON.parse(messages[i]) as Response;
+      let msg_obj: Response;
+      try {
+        msg_obj = JSON.parse(messages[i]) as Response;
+      } catch(e) {
+        throw new Error("Agent message " + messages[i] + " was not valid JSON");
+      }
       if(msg_obj.type === "Log") {
         const log_obj = msg_obj as Log;
         logFromAgent(log_obj);

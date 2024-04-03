@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::io::Cursor;
 
 use crate::download_file;
@@ -5,7 +6,7 @@ use crate::{axml::AxmlReader, patching, zip::ZipFile};
 use crate::external_res::CoreModsError;
 use crate::manifest::ManifestInfo;
 use crate::mod_man::ModManager;
-use crate::requests::{AppInfo, CoreModsInfo, ModAction, ModModel, Request, Response};
+use crate::requests::{AppInfo, CoreModsInfo, ModModel, Request, Response};
 use anyhow::{anyhow, Context, Result};
 use log::{error, info, warn};
 
@@ -13,32 +14,43 @@ pub fn handle_request(request: Request) -> Result<Response> {
     match request {
         Request::GetModStatus => handle_get_mod_status(),
         Request::Patch => handle_patch(),
-        Request::SetModsEnabled(action) => run_mod_action(action),
+        Request::SetModsEnabled {
+            statuses
+        } => run_mod_action(statuses),
         _ => todo!()
     }
 }
 
-fn run_mod_action(action: ModAction) -> Result<Response> {
+fn run_mod_action(statuses: HashMap<String, bool>) -> Result<Response> {
     let mut mod_manager = ModManager::new();
     mod_manager.load_mods().context("Failed to load installed mods")?;
 
-    for to_install in action.to_install {
-       match mod_manager.install_mod(&to_install) {
-            Ok(_) => info!("Installed {to_install}"),
-            Err(err) => error!("Failed to install {to_install}: {err}")
-       }
+    for (id, new_status) in statuses {
+        let mod_rc = match mod_manager.get_mod(&id) {
+            Some(m) => m,
+            None => {
+                error!("Mod with ID {id} did not exist");
+                continue;
+            }
+        };
+
+        let already_installed = mod_rc.borrow().installed();
+        if new_status && !already_installed {
+            match mod_manager.install_mod(&id) {
+                Ok(_) => info!("Installed {id}"),
+                Err(err) => error!("Failed to install {id}: {err}")
+            }
+        }   else if !new_status && already_installed {
+            match mod_manager.uninstall_mod(&id) {
+                Ok(_) => info!("Uninstalled {id}"),
+                Err(err) => error!("Failed to install {id}: {err}")
+            }
+        }
+        
     }
 
-    for to_uninstall in action.to_uninstall {
-        match mod_manager.install_mod(&to_uninstall) {
-             Ok(_) => info!("Uninstalled {to_uninstall}"),
-             Err(err) => error!("Failed to install {to_uninstall}: {err}")
-        }
-     }
-
-    Ok(Response::ModInstallResult {
+    Ok(Response::Mods {
         installed_mods: get_mod_models(mod_manager),
-        full_success: true // TODO
     })
 }
 

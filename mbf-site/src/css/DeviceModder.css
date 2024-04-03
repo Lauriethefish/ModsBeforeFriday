@@ -20,3 +20,28 @@ h2 {
     justify-content: center;
     gap: 10px;
 }
+
+#modMenuTitle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: row;
+    gap: 10px;
+}
+
+#syncButton {
+    padding: 5%;
+    background-color: #e22424;
+    font-size: x-large;
+}
+
+#syncButton:hover {
+    background-color: #ff0000;
+}
+
+#syncing {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 40rem;
+}

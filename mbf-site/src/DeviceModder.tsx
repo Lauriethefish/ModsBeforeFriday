@@ -8,6 +8,7 @@ import { ReactComponent as ModIcon } from './icons/mod-icon.svg'
 import { LogWindow, useLog } from './components/LogWindow';
 import { Mod } from './Models';
 import { Mods } from './Messages';
+import { Modal } from './components/Modal';
 
 interface DeviceModderProps {
     device: Adb
@@ -24,6 +25,15 @@ async function loadModStatus(device: Adb) {
 async function patchApp(device: Adb, addLogEvent: (event: Log) => void): Promise<Mod[]> {
     let response = await runCommand(device, {
         type: 'Patch'
+    }, addLogEvent);
+
+    return (response as Mods).installed_mods;
+}
+
+async function setModStatuses(device: Adb, changesRequested: { [id: string]: boolean }, addLogEvent: (event: Log) => void): Promise<Mod[]> {
+    let response = await runCommand(device, {
+        type: 'SetModsEnabled',
+        statuses: changesRequested
     }, addLogEvent);
 
     return (response as Mods).installed_mods;
@@ -63,11 +73,7 @@ function DeviceModder(props: DeviceModderProps) {
                 <InstallStatus modloaderReady={modStatus.modloader_present} coreModsReady={modStatus.core_mods.all_core_mods_installed} />
             </div>
 
-            <div className='container horizontalCenter'>
-                <h1>Installed Mods</h1><ModIcon stroke="white"/>
-            </div>
-
-            {modStatus.installed_mods.map(mod => <ModCard mod={mod} key={mod.id}/>)}
+            <ModManager initialMods={modStatus.installed_mods} device={props.device}/>
         </>
     }   else    {
         return <PatchingMenu
@@ -166,5 +172,66 @@ function PatchingMenu(props: PatchingMenuProps) {
     }
 }
 
+interface ModManagerProps {
+    initialMods: Mod[],
+    device: Adb
+}
+
+function ModManager(props: ModManagerProps) {
+    const [mods, setMods] = useState(props.initialMods);
+    const [changes, setChanges] = useState({} as { [id: string]: boolean });
+    const [isWorking, setWorking] = useState(false);
+    const [logEvents, addLogEvent] = useLog();
+    sortById(mods);
+
+    return <>
+        <div className='horizontalCenter'>
+            <div className='container horizontalCenter'>
+                <h1>Installed Mods</h1>
+                <ModIcon stroke="white"/>
+            </div>
+
+            {Object.keys(changes).length > 0 && <div>
+                <button id="syncButton" onClick={async () => {
+                    setChanges({});
+                    console.log("Installing mods, statuses requested: " + JSON.stringify(changes));
+                    try {
+                        setWorking(true);
+                        setMods(await setModStatuses(props.device, changes, addLogEvent));
+                    }   finally {
+                        setWorking(false);
+                    }
+                }}>Sync Changes</button>
+            </div>}
+        </div>
+        {mods.map(mod => <ModCard
+            mod={mod}
+            key={mod.id}
+            onEnabledChanged={enabled => {
+                const newChanges = { ...changes };
+                newChanges[mod.id] = enabled;
+                setChanges(newChanges);
+            }}/>
+        )}
+        <Modal isVisible={isWorking}>
+            <div id="syncing">
+                <h1>Syncing Mods...</h1>
+                <LogWindow events={logEvents} />
+            </div>
+        </Modal>
+    </>
+}
+
+function sortById(mods: Mod[]) {
+    mods.sort((a, b) => {
+        if(a.id > b.id) {
+            return 1;
+        }   else if(a.id < b.id) {
+            return -1;
+        }   else    {
+            return 0;
+        }
+    })
+}
 
 export default DeviceModder;

@@ -4,12 +4,11 @@ import { Mod } from '../Models'
 import { Slider } from './Slider';
 
 interface ModCardProps {
-    mod: Mod
+    mod: Mod,
+    onEnabledChanged: (enabled: boolean) => void
 }
 
 export function ModCard(props: ModCardProps) {
-    const [enabled, setEnabled] = useState(props.mod.is_enabled);
-
     return <div className="container modCard">
         <div className='modName'>
             <p className='nameText'>{props.mod.name}</p>
@@ -19,8 +18,8 @@ export function ModCard(props: ModCardProps) {
         <p className='descriptionText'>{props.mod.description}</p>
 
         <div className='modToggle'>
-            <Slider on={enabled} valueChanged={value => {
-                setEnabled(value);
+            <Slider on={props.mod.is_enabled} valueChanged={value => {
+                props.onEnabledChanged(value);
                 props.mod.is_enabled = value;
             }}/>
         </div>
