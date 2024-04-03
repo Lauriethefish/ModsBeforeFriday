@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import 'css/ModCard.css';
+import '../css/ModCard.css';
 import { Mod } from '../Models'
 import { Slider } from './Slider';
 

@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import 'css/LogWindow.css';
+import '../css/LogWindow.css';
 import { Log } from '../Messages';
-import './fonts/Consolas.ttf';
+import '../fonts/Consolas.ttf';
 
 interface LogWindowProps {
     events: Log[]

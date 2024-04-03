@@ -37,7 +37,7 @@ pub enum Request {
     /// - Wipes any existing mods.
     /// - Installs the core mods for the current version.
     /// If the app is already patched, it will not be patched again.
-    /// Returns a Mods response to update the frontend with the newly installed core mods.
+    /// Returns a `Mods`` response to update the frontend with the newly installed core mods.
     Patch
 }
 

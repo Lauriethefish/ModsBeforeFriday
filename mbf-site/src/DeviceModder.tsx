@@ -4,8 +4,10 @@ import { useEffect, useState } from 'react';
 import { Log, ModStatus } from './Messages';
 import './css/DeviceModder.css';
 import { ModCard } from './components/ModCard';
-import { ReactComponent as ModIcon } from './mod-icon.svg'
+import { ReactComponent as ModIcon } from './icons/mod-icon.svg'
 import { LogWindow, useLog } from './components/LogWindow';
+import { Mod } from './Models';
+import { Mods } from './Messages';
 
 interface DeviceModderProps {
     device: Adb
@@ -19,28 +21,22 @@ async function loadModStatus(device: Adb) {
     }) as unknown as ModStatus;
 }
 
-async function patchApp(device: Adb, addLogEvent: (event: Log) => void) {
-    await runCommand(device, {
+async function patchApp(device: Adb, addLogEvent: (event: Log) => void): Promise<Mod[]> {
+    let response = await runCommand(device, {
         type: 'Patch'
     }, addLogEvent);
+
+    return (response as Mods).installed_mods;
 }
 
 function DeviceModder(props: DeviceModderProps) {
     const [modStatus, setModStatus] = useState(null as ModStatus | null);
-    const [isPatching, setIsPatching] = useState(false);
-    const [logEvents, addLogEvent] = useLog();
 
     useEffect(() => {
         loadModStatus(props.device).then(data => setModStatus(data));
     }, [props.device]);
 
-    if(isPatching) {
-        return <div className='container mainContainer'>
-            <h3>Mods are being set up.</h3>
-            <p>This should only take a few minutes, but might take longer on a very slow connection.</p>
-            <LogWindow events={logEvents} />
-        </div>;
-    } else if(modStatus === null) {
+    if(modStatus === null) {
         return <div className='container mainContainer'>
             <h2>Checking Beat Saber installation</h2>
         </div>;
@@ -68,22 +64,29 @@ function DeviceModder(props: DeviceModderProps) {
             </div>
 
             <div className='container horizontalCenter'>
-             <h1>Installed Mods</h1><ModIcon stroke="white"/>
+                <h1>Installed Mods</h1><ModIcon stroke="white"/>
             </div>
 
             {modStatus.installed_mods.map(mod => <ModCard mod={mod} key={mod.id}/>)}
         </>
     }   else    {
-        return <PatchingMenu version={modStatus.app_info.version} onPatch={async () => {
-            setIsPatching(true);
-            try {
-                await patchApp(props.device, addLogEvent);
-                modStatus.app_info!.is_modded = true;
-                setModStatus(modStatus);
-            }   finally {
-                setIsPatching(false);
-            }
-        }}/>
+        return <PatchingMenu
+            device={props.device}
+            app_version={modStatus.app_info.version}
+            onCompleted={mods => {
+                console.log("App is now patched, moving into mods menu");
+                setModStatus({
+                    'type': 'ModStatus',
+                    app_info: {
+                        is_modded: true,
+                        version: modStatus.app_info!.version
+                    },
+                    core_mods: modStatus.core_mods,
+                    modloader_present: true,
+                    installed_mods: mods
+                });
+            }}
+        />
     }
 }
 
@@ -125,23 +128,42 @@ function InstallStatus(props: InstallStatusProps) {
 }
 
 interface PatchingMenuProps {
-    version: string,
-    onPatch: () => void
+    app_version: string,
+    device: Adb,
+    onCompleted: (installed_mods: Mod[]) => void
 }
 
 function PatchingMenu(props: PatchingMenuProps) {
-    return <div className='container mainContainer'>
-        <h1>Install Custom Songs</h1>
-        <p>Your app has version: {props.version}, which is supported by mods!</p>
-        <p>To get your game ready for custom songs, ModsBeforeFriday will next patch your Beat Saber app and install some essential mods.
-        Once this is done, you will be able to manage your custom songs <b>inside the game.</b></p>
+    const [isPatching, setIsPatching] = useState(false);
+    const [logEvents, addLogEvent] = useLog();
 
-        <h2 className='warning'>READ CAREFULLY</h2>
-        <p>Mods and custom songs are not supported by Beat Games. You may experience bugs and crashes that you wouldn't in a vanilla game.</p>
-        <b>In addition, by modding the game you will lose access to both vanilla leaderboards and vanilla multiplayer.</b> (Modded leaderboards/servers are available.)
+    if(!isPatching) {
+        return <div className='container mainContainer'>
+            <h1>Install Custom Songs</h1>
+            <p>Your app has version: {props.app_version}, which is supported by mods!</p>
+            <p>To get your game ready for custom songs, ModsBeforeFriday will next patch your Beat Saber app and install some essential mods.
+            Once this is done, you will be able to manage your custom songs <b>inside the game.</b></p>
 
-        <button className="modButton" onClick={props.onPatch}>Mod the app</button>
-    </div>
+            <h2 className='warning'>READ CAREFULLY</h2>
+            <p>Mods and custom songs are not supported by Beat Games. You may experience bugs and crashes that you wouldn't in a vanilla game.</p>
+            <b>In addition, by modding the game you will lose access to both vanilla leaderboards and vanilla multiplayer.</b> (Modded leaderboards/servers are available.)
+
+            <button className="modButton" onClick={async () => {
+                setIsPatching(true);
+                try {
+                    props.onCompleted(await patchApp(props.device, addLogEvent));
+                } catch(e) {
+                    // TODO: Add a modal or somesuch for this.
+                }
+            }}>Mod the app</button>
+        </div>
+    }   else    {
+        return <div className='container mainContainer'>
+            <h1>App is being patched</h1>
+            <p>This should only take a few minutes, but might take up to 10 on a very slow internet connection.</p>
+            <LogWindow events={logEvents}/>
+        </div>
+    }
 }
 
 

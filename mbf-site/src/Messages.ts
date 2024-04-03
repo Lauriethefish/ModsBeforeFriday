@@ -1,7 +1,5 @@
 import { Mod } from "./Models";
 
-type Request = GetModStatus | Patch;
-
 interface GetModStatus {
     type: 'GetModStatus'
 }
@@ -10,7 +8,12 @@ interface Patch {
     type: 'Patch'
 }
 
-type Response = ModStatus | Log;
+type Request = GetModStatus | Patch;
+
+interface Mods {
+    type: 'Mods',
+    installed_mods: Mod[]
+}
 
 interface ModStatus {
     type: 'ModStatus',
@@ -19,6 +22,8 @@ interface ModStatus {
     modloader_present: boolean,
     installed_mods: Mod[]
 }
+
+type Response = ModStatus | Log | Mods;
 
 interface CoreModsInfo {
     supported_versions: string[],
@@ -45,5 +50,6 @@ export type {
     ModStatus,
     AppInfo,
     CoreModsInfo,
-    Log
+    Log,
+    Mods
 }

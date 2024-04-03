@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import 'css/App.css';
+import './css/App.css';
 import { AdbDaemonWebUsbConnection, AdbDaemonWebUsbDeviceManager } from '@yume-chan/adb-daemon-webusb';
 import { AdbDaemonTransport, Adb } from '@yume-chan/adb';
 
