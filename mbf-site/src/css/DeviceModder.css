@@ -10,10 +10,6 @@ h2 {
     margin-top: 10px;
 }
 
-.warning {
-    color: red
-}
-
 .horizontalCenter {
     display: flex;
     align-items: center;

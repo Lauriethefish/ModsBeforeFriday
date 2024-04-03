@@ -38,3 +38,7 @@ button:hover {
     background-color: #0030E0;
     transition-duration: 200ms;
 }
+
+.warning {
+    color: red
+}

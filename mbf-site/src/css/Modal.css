@@ -20,3 +20,11 @@
     background-color: #1f1f1f;
     margin-top: 5rem;
 }
+
+#errorTitle {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+}
