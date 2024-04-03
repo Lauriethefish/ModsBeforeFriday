@@ -1,7 +1,7 @@
 mod manifest;
-use std::{cell::RefCell, collections::{HashMap, HashSet}, fs::File, io::Write, path::{Path, PathBuf}, rc::Rc};
+use std::{cell::RefCell, collections::{HashMap, HashSet}, fs::File, path::{Path, PathBuf}, rc::Rc};
 
-use log::{error, info};
+use log::{error, info, warn};
 pub use manifest::*;
 
 use anyhow::{Context, Result, anyhow};
@@ -100,10 +100,7 @@ impl ModManager {
         let mod_file = std::fs::File::open(&from).context("Failed to open mod archive")?;
         let mut zip = ZipFile::open(mod_file).context("Mod was invalid ZIP archive")?;
 
-        let json_data = match zip.read_file("mod.json")? {
-            Some(data) => data,
-            None => return Err(anyhow!("Mod contained no mod.json manifest"))
-        };
+        let json_data = zip.read_file("mod.json").context("Mod had no mod.json manifest")?;
 
         let manifest = serde_json::from_slice(&json_data)?;
         Ok(Mod {
@@ -175,6 +172,23 @@ impl ModManager {
         copy_stated_files(&mut to_install.zip, &to_install.manifest.mod_files, EARLY_MODS_DIR)?;
         copy_stated_files(&mut to_install.zip, &to_install.manifest.library_files, LIBS_DIR)?;
         copy_stated_files(&mut to_install.zip, &to_install.manifest.late_mod_files, LATE_MODS_DIR)?;
+
+        for file_copy in &to_install.manifest.file_copies {
+            if !to_install.zip.contains_file(&file_copy.name) {
+                warn!("Could not install file copy {} as it did not exist in the QMOD", file_copy.name);
+                continue;
+            }
+
+            let dest_path = Path::new(&file_copy.destination);
+            match dest_path.parent() {
+                Some(parent) => std::fs::create_dir_all(parent)
+                    .context("Failed to create destination directory for file copy")?,
+                None => {}
+            }
+
+            to_install.zip.extract_file_to(&file_copy.name, &file_copy.destination)
+                .context("Failed to extract file copy")?;
+        }
         to_install.installed = true;
 
         Ok(())
@@ -192,6 +206,13 @@ impl ModManager {
         delete_file_names(&to_remove.manifest.mod_files, EARLY_MODS_DIR)?;
         delete_file_names(&to_remove.manifest.library_files, LIBS_DIR)?;
         delete_file_names(&to_remove.manifest.late_mod_files, LATE_MODS_DIR)?;
+
+        for copy in &to_remove.manifest.file_copies {
+            let dest_path = Path::new(&copy.destination);
+            if dest_path.exists() {
+                std::fs::remove_file(dest_path).context("Failed to delete copied file")?;
+            }
+        }
         to_remove.installed = false;
 
         Ok(())
@@ -293,7 +314,6 @@ impl ModManager {
                         existing_dep.version_range
                     )
                 },
-                // we good
                 None => {}
             }
         }
@@ -305,21 +325,15 @@ impl ModManager {
 // Copies all of the files with names in `files` to the path `to/{file name not including directory in ZIP}`
 fn copy_stated_files(zip: &mut ZipFile<File>, files: &[String], to: impl AsRef<Path>) -> Result<()> {
     for file in files {
-        // TODO: Create a new Zip method to avoid reading the whole SO into memory
-        let contents = match zip.read_file(file)? {
-            Some(contents) => contents,
-            None => continue // No file existed, skip
-        };
+        if !zip.contains_file(file) {
+            warn!("Could not install file {file} as it wasn't found in the QMOD");
+            continue;
+        }
+
         let file_name = file.split('/').last().unwrap();
-
         let copy_to = to.as_ref().join(file_name);
-        let mut handle = std::fs::OpenOptions::new()
-            .truncate(true)
-            .create(true)
-            .write(true)
-            .open(copy_to)?;
 
-        handle.write_all(&contents)?;
+        zip.extract_file_to(file, copy_to).context("Failed to extract mod SO")?;
     }
 
     Ok(())

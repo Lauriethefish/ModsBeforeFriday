@@ -119,10 +119,7 @@ fn patch_apk_in_place(path: impl AsRef<Path>) -> Result<()> {
 }
 
 fn patch_manifest(zip: &mut ZipFile<File>) -> Result<()> {
-    let contents = match zip.read_file("AndroidManifest.xml")? {
-        Some(manifest) => manifest,
-        None => return Err(anyhow!("No manifest found within the APK"))
-    };
+    let contents = zip.read_file("AndroidManifest.xml").context("APK had no manifest")?;
     let mut cursor = Cursor::new(contents);
     let mut reader = AxmlReader::new(&mut cursor).context("Failed to read AXML manifest")?;
     let mut data_output = Cursor::new(Vec::new());

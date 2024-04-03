@@ -118,10 +118,7 @@ fn get_app_info() -> Result<Option<AppInfo>> {
         .iter_entry_names()
         .any(|entry| entry.contains("modded"));
 
-    let manifest = match apk.read_file("AndroidManifest.xml")? {
-        Some(contents) => contents,
-        None => return Err(anyhow!("Manifest not found in APK"))
-    };
+    let manifest = apk.read_file("AndroidManifest.xml").context("Failed to read manifest")?;
     let mut manifest_reader = Cursor::new(manifest);
 
     let mut axml_reader = AxmlReader::new(&mut manifest_reader)?;

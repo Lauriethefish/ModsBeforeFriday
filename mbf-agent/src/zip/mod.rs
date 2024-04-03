@@ -1,4 +1,4 @@
-use std::{fs::File, io::{Read, Seek, SeekFrom, Write, Cursor}, collections::HashMap};
+use std::{collections::HashMap, fs::File, io::{Cursor, Read, Seek, SeekFrom, Write}, path::Path};
 use byteorder::{ReadBytesExt, LE};
 use anyhow::{Result, anyhow, Context};
 use crc::{Crc, Algorithm};
@@ -82,30 +82,53 @@ impl<T: Read + Seek> ZipFile<T> {
     }
 
     /// Reads the contents of the file with the given name from the ZIP.
-    pub fn read_file(&mut self, name: &str) -> Result<Option<Vec<u8>>> {
+    pub fn read_file(&mut self, name: &str) -> Result<Vec<u8>> {
+        let mut buffer: Vec<u8> = vec![];
+        let mut cursor = Cursor::new(buffer);
+
+        self.read_file_contents(name, &mut cursor)?;
+        Ok(cursor.into_inner())
+    }
+
+    /// Extracts a file from the ZIP to a particular path.
+    pub fn extract_file_to(&mut self, name: &str, to: impl AsRef<Path>) -> Result<()> {
+        let mut handle = std::fs::OpenOptions::new()
+            .truncate(true)
+            .create(true)
+            .write(true)
+            .open(to)
+            .context("Failed to create extracted file at")?;
+
+        self.read_file_contents(name, &mut handle)?;
+        Ok(())
+    }
+
+    pub fn read_file_contents(&mut self, name: &str, write_to: &mut impl Write) -> Result<()> {
         let cd_header = match self.entries.get(name) {
             Some(header) => header,
-            None => return Ok(None)
+            None => return Err(anyhow!("File with name {name} did not exist"))
         };
 
         self.file.seek(SeekFrom::Start(cd_header.local_header_offset as u64))?;
         let _ = LocalFileHeader::read(&mut self.file).context("Invalid local file header")?;
         // TODO: Verify CRC32, file name, and other attributes match?
 
-        let mut buffer = vec![0u8; cd_header.uncompressed_len as usize];
+        let mut compressed_contents = (&mut self.file)
+            .take(cd_header.compressed_len as u64);
         match cd_header.compression_method {
             FileCompression::Deflate => {
                 // Limit the bytes to be decompressed
-                let mut decoder = deflate::Decoder::new((&mut self.file)
-                    .take(cd_header.compressed_len as u64));
+                let mut decoder = deflate::Decoder::new(compressed_contents);
 
-                decoder.read_exact(&mut buffer)?;
+                std::io::copy(&mut decoder, write_to)?;
             },
-            FileCompression::Store => self.file.read_exact(&mut buffer)?,
+            FileCompression::Store => {
+                std::io::copy(&mut compressed_contents, write_to)?;
+            },
             FileCompression::Unsupported(method) => return Err(anyhow!("Compression method `{method}` not supported for reading"))
         };
 
-        Ok(Some(buffer))
+        Ok(())
     }
 
     /// Returns an iterator over the entries within the ZIP file.
