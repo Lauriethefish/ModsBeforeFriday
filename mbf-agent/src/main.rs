@@ -11,6 +11,7 @@ use crate::requests::Request;
 use anyhow::{Context, Result};
 use log::{error, Level};
 use requests::Response;
+use serde::{Deserialize, Serialize};
 use std::{fs::OpenOptions, io::{BufRead, BufReader, Write}, path::Path, process::Command};
 
 const APK_ID: &str = "com.beatgames.beatsaber";
@@ -44,6 +45,15 @@ fn download_file(to: impl AsRef<Path>, url: &str) -> Result<()> {
 
     std::io::copy(&mut resp_body, &mut writer)?;
     Ok(())
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+struct ModTag {
+    patcher_name: String,
+    patcher_version: Option<String>,
+    modloader_name: String,
+    modloader_version: Option<String>
 }
 
 struct ResponseLogger {}

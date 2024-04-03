@@ -2,7 +2,7 @@ use std::{fs::{File, OpenOptions}, io::{Cursor, Seek, Write}, path::{Path, PathB
 
 use anyhow::{Context, Result, anyhow};
 use log::{info, warn};
-use crate::{axml::{AxmlReader, AxmlWriter}, external_res, requests::AppInfo, zip};
+use crate::{axml::{AxmlReader, AxmlWriter}, external_res, requests::AppInfo, zip, ModTag};
 use crate::manifest::{ManifestMod, ResourceIds};
 use crate::zip::{signing, FileCompression, ZipFile};
 
@@ -20,7 +20,7 @@ pub fn mod_current_apk(app_info: &AppInfo) -> Result<()> {
     let temp_path = Path::new(TEMP_PATH);
     std::fs::create_dir_all(TEMP_PATH)?;
 
-    info!("Downloading unstripped libunity.so");
+    info!("Downloading unstripped libunity.so (this could take a minute)");
     let libunity_path = save_libunity(temp_path, app_info).context("Failed to save libunity.so")?;
 
     info!("Copying APK to temporary location");
@@ -134,7 +134,13 @@ fn patch_apk_in_place(path: impl AsRef<Path>, libunity_path: Option<PathBuf>) ->
 
     zip.delete_file(LIB_MAIN_PATH);
     zip.write_file(LIB_MAIN_PATH, &mut Cursor::new(LIB_MAIN), FileCompression::Deflate)?;
-    zip.write_file("ModsBeforeFriday.modded", &mut Cursor::new([]), FileCompression::Store)?;
+    add_modded_tag(&mut zip, ModTag {
+        patcher_name: "ModsBeforeFriday".to_string(),
+        patcher_version: Some("0.1.0".to_string()), // TODO: Get this from the frontend maybe?
+        modloader_name: "Scotland2".to_string(), // TODO: This should really be Libmainloader because SL2 isn't inside the APK
+        modloader_version: Some("0.1.4".to_string())
+    })?;
+
     match libunity_path {
         Some(unity_path) => {
             let mut unity_stream = File::open(unity_path)?;
@@ -146,6 +152,15 @@ fn patch_apk_in_place(path: impl AsRef<Path>, libunity_path: Option<PathBuf>) ->
 
     zip.save_and_sign_v2(&cert, &priv_key).context("Failed to save APK")?;
 
+    Ok(())
+}
+
+fn add_modded_tag(to: &mut ZipFile<File>, tag: ModTag) -> Result<()> {
+    let saved_tag = serde_json::to_vec_pretty(&tag)?;
+    to.write_file("modded.json",
+        &mut Cursor::new(saved_tag),
+        FileCompression::Deflate
+    )?;
     Ok(())
 }
 

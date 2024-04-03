@@ -114,6 +114,8 @@ fn get_app_info() -> Result<Option<AppInfo>> {
     let apk_reader = std::fs::File::open(&apk_path)?;
     let mut apk = ZipFile::open(apk_reader).context("Failed to read APK as ZIP")?;
 
+    // TODO: this detects all modded tags... including QuestLoader which should not be supported
+    // TODO: Properly detect an invalid modloader and prompt the user to reinstall their game.
     let is_modded = apk
         .iter_entry_names()
         .any(|entry| entry.contains("modded"));
