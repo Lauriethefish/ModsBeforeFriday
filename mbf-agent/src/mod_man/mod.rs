@@ -143,7 +143,7 @@ impl ModManager {
         for dep in &to_install.manifest.dependencies {
             match self.mods.get(&dep.id) {
                 Some(existing_dep) => {
-                    let dep_ref = existing_dep.borrow();
+                    let dep_ref = (**existing_dep).borrow();
                     if !dep.version_range.matches(&dep_ref.manifest.version) {
                         info!("Dependency {} is out of date, got version {} but need {}", dep.id, dep_ref.manifest.version, dep.version_range);
                         drop(dep_ref);
@@ -196,13 +196,7 @@ impl ModManager {
 
     /// Uninstalls a mod without handling dependencies
     /// i.e. just deletes the necessary files.
-    fn uninstall_unchecked(&self, id: &str) -> Result<()> {
-        let mod_rc = self.mods.get(id)
-            .ok_or(anyhow!("Could not uninstall mod with ID {id} as it did not exist"))?
-            .clone();
-
-        let mut to_remove = (*mod_rc).borrow_mut();
-
+    fn uninstall_unchecked(&self, to_remove: &mut Mod) -> Result<()> {
         delete_file_names(&to_remove.manifest.mod_files, EARLY_MODS_DIR)?;
         delete_file_names(&to_remove.manifest.library_files, LIBS_DIR)?;
         delete_file_names(&to_remove.manifest.late_mod_files, LATE_MODS_DIR)?;
@@ -221,17 +215,22 @@ impl ModManager {
     /// Uninstalls the mod with the given ID.
     /// This will uninstall dependant mods if necessary
     pub fn uninstall_mod(&self, id: &str) -> Result<()> {
+        let mod_rc = self.mods.get(id)
+            .ok_or(anyhow!("Could not uninstall mod with ID {id} as it did not exist"))?
+            .clone();
+        let mut to_remove = (*mod_rc).borrow_mut();
+        info!("Uninstalling {} v{}", to_remove.manifest.id, to_remove.manifest.version);
+
         // Uninstall all depending mods
         for (id, m) in self.mods.iter() {
-            let m_ref = m.borrow();
+            let m_ref = (**m).borrow();
             if m_ref.installed && m_ref.manifest.dependencies.iter().any(|dep| &dep.id == id) {
+                info!("Uninstalling dependant mod {}", m_ref.manifest.id);
                 self.uninstall_mod(id)?;
             }
-
-
         }
 
-        self.uninstall_unchecked(id)?;
+        self.uninstall_unchecked(&mut to_remove)?;
         Ok(())
     }
 
@@ -264,8 +263,11 @@ impl ModManager {
         // by allowing remove_mod to run a regular uninstall
         if upgrading {
             info!("Removing existing version of dependency");
+            let existing_version = self.mods.get(&dep.id)
+                .expect("Cannot upgrade dependency as it's not already installed.");
+
+            self.uninstall_unchecked(&mut (**existing_version).borrow_mut())?;
             self.remove_mod(&dep.id)?;
-            self.uninstall_unchecked(&dep.id)?;
         }
         self.mods.insert(dep.id.clone(), Rc::new(RefCell::new(loaded_dep)));
         self.install_mod(&dep.id)?;
@@ -275,11 +277,13 @@ impl ModManager {
     pub fn remove_mod(&mut self, id: &str) -> Result<()> {
         match self.mods.get(id) {
             Some(to_remove) => {
-                let path_to_delete = to_remove.borrow().loaded_from.clone();
-                if to_remove.borrow().installed {
+                let to_remove_ref = (**to_remove).borrow();
+                let path_to_delete = to_remove_ref.loaded_from.clone();
+                if to_remove_ref.installed {
                     self.uninstall_mod(id)?;
                 }
 
+                drop(to_remove_ref);
                 self.mods.remove(id);
 
                 std::fs::remove_file(path_to_delete)?;
@@ -295,7 +299,7 @@ impl ModManager {
     fn check_dependency_compatibility(&self, dep_id: &str, new_version: &Version) -> bool {
         let mut all_compatible = true;
         for (_, existing_mod) in &self.mods {
-            let mod_ref = existing_mod.borrow();
+            let mod_ref = (**existing_mod).borrow();
             // We don't care about uninstalled mods, since they have no invariants to preserve.
             if !mod_ref.installed {
                 continue;

@@ -666,20 +666,6 @@ fn read_utf16_len(data: &mut impl Read) -> Result<u32> {
     Ok(length)
 }
 
-// Writes the given length as the varint used to represent the length of a UTF16 string in AXML
-fn write_utf16_len(data: &mut impl Write, len: usize) -> Result<()> {
-    if len > 0x7FFFFFFF {
-        return Err(anyhow!("String length greater than max permitted size"));
-    }
-
-    if len > 0x7FFF {
-        let last_2 = (len >> 16) | 0x8000;
-        data.write_u16::<LE>(last_2 as u16)?;
-    }
-    data.write_u16::<LE>(len as u16)?;
-    Ok(())
-}
-
 // Writes the given length as the varint used to represent the length of a UTF8 string in AXML
 fn write_utf8_len(data: &mut impl Write, len: usize) -> Result<()> {
     if len > 0x7FFF {
