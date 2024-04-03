@@ -145,12 +145,9 @@ fn handle_patch() -> Result<Response> {
     mod_manager.wipe_all_mods().context("Failed to wipe existing mods")?;
 
     install_core_mods(&mut mod_manager, get_app_info()?
-        .expect("Beat Saber should be installed after patching"))?;
+        .expect("Beat Saber should be installed after patching"))?;    
 
-    mod_manager.load_mods().context("Failed to load core mods - is one invalid? If so, this is a BIG problem")?;
-    
-
-    Ok(Response::Patched)
+    Ok(Response::Mods { installed_mods: get_mod_models(mod_manager) })
 }
 
 fn install_core_mods(mod_manager: &mut ModManager, app_info: AppInfo) -> Result<()> {

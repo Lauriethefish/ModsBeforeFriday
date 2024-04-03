@@ -29,7 +29,7 @@ pub enum Request {
     /// This will also attempt to download and install dependencies, upgrade dependencies and will uninstall any
     /// depending mods of mods that have been disabled.
     /// 
-    /// If two changes conflict, one of the changes will be kept and an error log will be provided.
+    /// Returns a ModInstallResult response.
     SetModsEnabled(ModAction),
 
     /// - Patches Beat Saber to add support for modloaders.
@@ -37,6 +37,7 @@ pub enum Request {
     /// - Wipes any existing mods.
     /// - Installs the core mods for the current version.
     /// If the app is already patched, it will not be patched again.
+    /// Returns a Mods response to update the frontend with the newly installed core mods.
     Patch
 }
 
@@ -94,7 +95,6 @@ pub enum Response {
         message: String,
         level: LogLevel
     },
-    Patched
 }
 
 /// The trimmed version of the ModInfo type that is sent to the web client.

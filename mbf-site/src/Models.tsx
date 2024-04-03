@@ -6,18 +6,21 @@ interface Mod {
     is_enabled: boolean
 }
 
-export type {
-    Mod
-}
-
-export interface CoreMod {
+interface CoreMod {
     id: string,
     downloadLink: string,
     verison: string
 }
 
-export interface VersionedCoreMods {
+interface VersionedCoreMods {
     mods: [CoreMod]
 }
 
-export type CoreModIndex = { [version: string]: VersionedCoreMods }
+type CoreModIndex = { [version: string]: VersionedCoreMods }
+
+export type {
+    Mod,
+    CoreMod,
+    VersionedCoreMods,
+    CoreModIndex
+}

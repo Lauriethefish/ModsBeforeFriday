@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import './LogWindow.css';
-import { Log } from './Messages';
+import 'css/LogWindow.css';
+import { Log } from '../Messages';
 import './fonts/Consolas.ttf';
 
 interface LogWindowProps {

@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import './ModCard.css';
-import { Mod } from './Models'
+import 'css/ModCard.css';
+import { Mod } from '../Models'
 import { Slider } from './Slider';
 
 interface ModCardProps {

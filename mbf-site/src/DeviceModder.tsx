@@ -2,10 +2,10 @@ import { Adb } from '@yume-chan/adb';
 import { prepareAgent, runCommand } from "./Agent";
 import { useEffect, useState } from 'react';
 import { Log, ModStatus } from './Messages';
-import './DeviceModder.css';
-import { ModCard } from './ModCard';
+import './css/DeviceModder.css';
+import { ModCard } from './components/ModCard';
 import { ReactComponent as ModIcon } from './mod-icon.svg'
-import { LogWindow, useLog } from './LogWindow';
+import { LogWindow, useLog } from './components/LogWindow';
 
 interface DeviceModderProps {
     device: Adb
