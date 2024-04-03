@@ -12,7 +12,7 @@ use anyhow::{Context, Result};
 use log::{error, Level};
 use requests::Response;
 use serde::{Deserialize, Serialize};
-use std::{fs::OpenOptions, io::{BufRead, BufReader, Write}, path::Path, process::Command};
+use std::{fs::OpenOptions, io::{BufRead, BufReader, Write}, panic, path::Path, process::Command};
 
 const APK_ID: &str = "com.beatgames.beatsaber";
 
@@ -100,9 +100,17 @@ fn main() -> Result<()> {
     reader.read_line(&mut line)?;
     let req: Request = serde_json::from_str(&line)?;
 
-    match handlers::handle_request(req) {
-        Ok(resp) => write_response(resp)?,
-        Err(err) => error!("Request failed: {err:?}")
+    // Set a panic hook that writes the panic as a JSON Log
+    // (we don't do this in catch_unwind as we get an `Any` there, which doesn't implement Display)
+    panic::set_hook(Box::new(|info| error!("Request failed due to a panic!: {info}")));
+
+    match std::panic::catch_unwind(|| handlers::handle_request(req)) {
+        Ok(resp) => match resp {
+            Ok(resp) => write_response(resp)?,
+            Err(err) => error!("Request failed: {err:?}")
+        },
+        Err(_) => {} // Panic will be outputted above
     };
+
     Ok(())
 }
