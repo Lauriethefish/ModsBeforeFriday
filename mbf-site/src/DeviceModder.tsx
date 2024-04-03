@@ -187,7 +187,7 @@ function ModManager(props: ModManagerProps) {
     return <>
         <div className='horizontalCenter'>
             <div className='container horizontalCenter'>
-                <h1>Installed Mods</h1>
+                <h1>Mods</h1>
                 <ModIcon stroke="white"/>
             </div>
 
