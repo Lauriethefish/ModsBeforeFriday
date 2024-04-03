@@ -2,7 +2,7 @@ use std::io::Cursor;
 
 use crate::download_file;
 use crate::{axml::AxmlReader, patching, zip::ZipFile};
-use crate::bmbf_res::CoreModsError;
+use crate::external_res::CoreModsError;
 use crate::manifest::ManifestInfo;
 use crate::mod_man::ModManager;
 use crate::requests::{AppInfo, CoreModsInfo, ModAction, ModModel, Request, Response};
@@ -74,7 +74,7 @@ fn get_mod_models(mod_manager: ModManager) -> Vec<ModModel> {
 fn get_core_mods_info(apk_version: &str, mod_manager: &ModManager) -> Result<Option<CoreModsInfo>> {
     // Fetch the core mods from the resources repo
     info!("Fetching core mod index");
-    let core_mods = match crate::bmbf_res::fetch_core_mods() {
+    let core_mods = match crate::external_res::fetch_core_mods() {
         Ok(mods) => mods,
         Err(CoreModsError::FetchError(_)) => return Ok(None),
         Err(CoreModsError::ParseError(err)) => return Err(err)
@@ -111,7 +111,7 @@ fn get_app_info() -> Result<Option<AppInfo>> {
         None => return Ok(None)
     };
 
-    let apk_reader = std::fs::File::open(apk_path)?;
+    let apk_reader = std::fs::File::open(&apk_path)?;
     let mut apk = ZipFile::open(apk_reader).context("Failed to read APK as ZIP")?;
 
     let is_modded = apk
@@ -126,12 +126,16 @@ fn get_app_info() -> Result<Option<AppInfo>> {
 
     Ok(Some(AppInfo {
         is_modded,
-        version: info.package_version
+        version: info.package_version,
+        path: apk_path
     }))    
 }
 
 fn handle_patch() -> Result<Response> {
-    patching::mod_current_apk().context("Failed to patch APK")?;
+    let app_info = get_app_info()?
+        .ok_or(anyhow!("Cannot patch when app not installed"))?;
+
+    patching::mod_current_apk(&app_info).context("Failed to patch APK")?;
     patching::install_modloader().context("Failed to save modloader")?;
 
     let mut mod_manager = ModManager::new();
@@ -149,14 +153,7 @@ fn handle_patch() -> Result<Response> {
 
 fn install_core_mods(mod_manager: &mut ModManager, app_info: AppInfo) -> Result<()> {
     info!("Preparing core mods");
-    let core_mod_index = match crate::bmbf_res::fetch_core_mods() {
-        Ok(core_mods) => core_mods,
-        // We do not care if it was fetching or parsing: this should succeed because otherwise the frontend would not permit us to get to this point.
-        Err(err) => return Err(match err {
-            CoreModsError::FetchError(e) => e,
-            CoreModsError::ParseError(e) => e
-        })
-    };
+    let core_mod_index = crate::external_res::fetch_core_mods()?;
 
     let core_mods = core_mod_index.get(&app_info.version)
         .ok_or(anyhow!("No core mods existed for {}", app_info.version))?;

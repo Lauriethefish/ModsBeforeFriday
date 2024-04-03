@@ -3,7 +3,7 @@ mod zip;
 mod manifest;
 mod axml;
 mod patching;
-mod bmbf_res;
+mod external_res;
 mod mod_man;
 mod handlers;
 
@@ -92,7 +92,7 @@ fn main() -> Result<()> {
 
     match handlers::handle_request(req) {
         Ok(resp) => write_response(resp)?,
-        Err(err) => error!("Request failed: {err}")
+        Err(err) => error!("Request failed: {err:?}")
     };
     Ok(())
 }

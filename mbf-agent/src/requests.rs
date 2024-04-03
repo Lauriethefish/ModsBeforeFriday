@@ -6,7 +6,9 @@ use crate::mod_man::Mod;
 #[derive(Serialize)]
 pub struct AppInfo {
     pub is_modded: bool,
-    pub version: String
+    pub version: String,
+    #[serde(skip_serializing)]
+    pub path: String
 }
 
 

@@ -83,8 +83,7 @@ impl<T: Read + Seek> ZipFile<T> {
 
     /// Reads the contents of the file with the given name from the ZIP.
     pub fn read_file(&mut self, name: &str) -> Result<Vec<u8>> {
-        let mut buffer: Vec<u8> = vec![];
-        let mut cursor = Cursor::new(buffer);
+        let mut cursor = Cursor::new(vec![]);
 
         self.read_file_contents(name, &mut cursor)?;
         Ok(cursor.into_inner())

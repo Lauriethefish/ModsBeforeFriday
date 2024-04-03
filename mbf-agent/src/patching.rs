@@ -1,8 +1,8 @@
 use std::{fs::{File, OpenOptions}, io::{Cursor, Seek, Write}, path::{Path, PathBuf}, process::Command};
 
 use anyhow::{Context, Result, anyhow};
-use log::info;
-use crate::{axml::{AxmlReader, AxmlWriter}, zip};
+use log::{info, warn};
+use crate::{axml::{AxmlReader, AxmlWriter}, external_res, requests::AppInfo, zip};
 use crate::manifest::{ManifestMod, ResourceIds};
 use crate::zip::{signing, FileCompression, ZipFile};
 
@@ -12,24 +12,23 @@ const MODLOADER: &[u8] = include_bytes!("libsl2.so");
 const MODLOADER_NAME: &str = "libsl2.so";
 
 const LIB_MAIN_PATH: &str = "lib/arm64-v8a/libmain.so";
+const LIB_UNITY_PATH: &str = "lib/arm64-v8a/libunity.so";
 const APK_ID: &str = "com.beatgames.beatsaber";
 const TEMP_PATH: &str = "/data/local/tmp/mbf-tmp";
 
-pub fn mod_current_apk() -> Result<()> {
-    let apk_path = match crate::get_apk_path().context("Failed to get APK path")? {
-        Some(path) => path,
-        None => return Err(anyhow!("App not installed"))
-    };
-
+pub fn mod_current_apk(app_info: &AppInfo) -> Result<()> {
     let temp_path = Path::new(TEMP_PATH);
     std::fs::create_dir_all(TEMP_PATH)?;
 
+    info!("Downloading unstripped libunity.so");
+    let libunity_path = save_libunity(temp_path, app_info).context("Failed to save libunity.so")?;
+
     info!("Copying APK to temporary location");
     let temp_apk_path = temp_path.join("mbf-tmp.apk");
-    std::fs::copy(apk_path, &temp_apk_path).context("Failed to copy APK to temp")?;
+    std::fs::copy(&app_info.path, &temp_apk_path).context("Failed to copy APK to temp")?;
 
     info!("Patching APK at {:?}", temp_path);
-    patch_apk_in_place(&temp_apk_path)?;
+    patch_apk_in_place(&temp_apk_path, libunity_path)?;
 
     let obb_dir = PathBuf::from(format!("/sdcard/Android/obb/{APK_ID}/"));
     let obb_backup = temp_path.join("backup.obb");
@@ -48,13 +47,37 @@ pub fn mod_current_apk() -> Result<()> {
         .output()
         .context("Failed to install modded APK")?;
 
+    info!("Granting external storage permission");
+    Command::new("appops")
+        .args(["set", "--uid", APK_ID, "MANAGE_EXTERNAL_STORAGE", "allow"])
+        .output()?;
+
     // Cannot use a `rename` since the mount points are different
     info!("Restoring OBB file");
     std::fs::create_dir_all(obb_dir)?;
     std::fs::copy(&obb_backup, &obb_restore_path)?;
     std::fs::remove_file(obb_backup)?;
     std::fs::remove_file(temp_apk_path)?;
+
     Ok(())
+}
+
+fn save_libunity(temp_path: impl AsRef<Path>, app_info: &AppInfo) -> Result<Option<PathBuf>> {
+    let mut libunity_stream = match external_res::get_libunity_stream(APK_ID, &app_info.version)? {
+        Some(stream) => stream,
+        None => return Ok(None) // No libunity for this version
+    };
+
+    let libunity_path = temp_path.as_ref().join("libunity.so");
+    let mut libunity_handle = OpenOptions::new()
+        .truncate(true)
+        .write(true)
+        .create(true)
+        .open(&libunity_path)?;
+
+    std::io::copy(&mut libunity_stream, &mut libunity_handle)?;
+
+    Ok(Some(libunity_path))
 }
 
 // Moves the OBB file to a backup location and returns the path that the OBB needs to be restored to
@@ -96,7 +119,7 @@ pub fn install_modloader() -> Result<()> {
     Ok(())
 }
 
-fn patch_apk_in_place(path: impl AsRef<Path>) -> Result<()> {
+fn patch_apk_in_place(path: impl AsRef<Path>, libunity_path: Option<PathBuf>) -> Result<()> {
     let file = OpenOptions::new()
         .read(true)
         .write(true)
@@ -112,6 +135,14 @@ fn patch_apk_in_place(path: impl AsRef<Path>) -> Result<()> {
     zip.delete_file(LIB_MAIN_PATH);
     zip.write_file(LIB_MAIN_PATH, &mut Cursor::new(LIB_MAIN), FileCompression::Deflate)?;
     zip.write_file("ModsBeforeFriday.modded", &mut Cursor::new([]), FileCompression::Store)?;
+    match libunity_path {
+        Some(unity_path) => {
+            let mut unity_stream = File::open(unity_path)?;
+            zip.write_file(LIB_UNITY_PATH, &mut unity_stream, FileCompression::Deflate)?;
+        },
+        None => warn!("No unstripped unity added to the APK! This might cause issues later")
+    }
+
 
     zip.save_and_sign_v2(&cert, &priv_key).context("Failed to save APK")?;
 
