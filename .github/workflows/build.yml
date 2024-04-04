@@ -1,0 +1,34 @@
+name: "Compile and deploy"
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    name: Build and deploy site
+    runs-on: ubuntu-latest
+    env:
+      CC_aarch64-linux-android: /home/runner/android-ndk-r26c/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android31-clang
+      AR_aarch64-linux-android: /home/runner/android-ndk-r26c/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with: 
+          target: aarch64-linux-android
+      - uses: mskelton/setup-yarn@v1
+        with:
+          node-version: '20.x'
+      - name: Download NDK
+        run: wget https://dl.google.com/android/repository/android-ndk-r26c-linux.zip -q -O ndk.zip
+      - name: Extract NDK
+        run: unzip ndk.zip -d /home/runner/ 
+      - name: Create cargo config
+        run: |
+          echo '[target.aarch64-linux-android]
+          ar = "${{ env.AR_aarch64-linux-android }}"
+          linker = "${{ env.CC_aarch64-linux-android }}"' > /home/runner/.cargo/config.toml
+      - name: Output cargo config
+        run: cat /home/runner/.cargo/config.toml
+      - name: Build agent
+        run: cargo build --manifest-path=mbf-agent/Cargo.toml --target aarch64-linux-android --release
