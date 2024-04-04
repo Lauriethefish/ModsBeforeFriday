@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { ReactComponent as AlertIcon } from '../icons/alert-triangle.svg'
+import AlertIcon from '../icons/alert-triangle.svg'
 
 import '../css/Modal.css';
 
@@ -32,7 +32,7 @@ interface ErrorModalProps {
 export function ErrorModal(props: ErrorModalProps) {
     return <Modal isVisible={props.isVisible}>
         <div id="errorTitle">
-            <AlertIcon fill="white"/>
+            <img src={AlertIcon} alt="A warning triangle" />
             <h1>{props.title}</h1>
         </div>
         <p>{props.description}</p>

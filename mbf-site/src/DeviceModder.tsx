@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { LogMsg, ModLoader, ModStatus } from './Messages';
 import './css/DeviceModder.css';
 import { ModCard } from './components/ModCard';
-import { ReactComponent as ModIcon } from './icons/mod-icon.svg'
+import ModIcon from './icons/mod-icon.svg'
 import { LogWindow, useLog } from './components/LogWindow';
 import { Mod } from './Models';
 import { Mods } from './Messages';
@@ -234,7 +234,7 @@ function ModManager(props: ModManagerProps) {
         <div className='horizontalCenter'>
             <div className='container horizontalCenter'>
                 <h1>Mods</h1>
-                <ModIcon stroke="white"/>
+                <img src={ModIcon} alt="A plug and its socket, disconnected." />
             </div>
 
             {Object.keys(changes).length > 0 && <div>
