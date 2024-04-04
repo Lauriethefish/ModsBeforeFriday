@@ -1,6 +1,7 @@
 import { AdbSync, AdbSyncWriteOptions, Adb, encodeUtf8 } from '@yume-chan/adb';
 import { ConsumableReadableStream, Consumable, DecodeUtf8Stream, ConcatStringStream } from '@yume-chan/stream-extra';
-import { Request, Response, LogMsg } from "./Messages";
+import { Request, Response, LogMsg, ModStatus, Mods } from "./Messages";
+import { Mod } from './Models';
 
 const AgentPath: string = "/data/local/tmp/mbf-agent";
 
@@ -69,7 +70,9 @@ function logFromAgent(log: LogMsg) {
   }
 }
 
-async function sendRequest(adb: Adb, request: Request, eventSink: ((event: LogMsg) => void) | null = null): Promise<Response> {
+type LogEventSink = ((event: LogMsg) => void) | null;
+
+async function sendRequest(adb: Adb, request: Request, eventSink: LogEventSink = null): Promise<Response> {
   let command_buffer = encodeUtf8(JSON.stringify(request) + "\n");
 
   let agentProcess = await adb.subprocess.shell(AgentPath);
@@ -153,7 +156,92 @@ async function sendRequest(adb: Adb, request: Request, eventSink: ((event: LogMs
   }
 }
 
+// Gets the status of mods from the quest, i.e. whether the app is patched, and what mods are currently installed.
+async function loadModStatus(device: Adb): Promise<ModStatus> {
+  await prepareAgent(device);
+
+  return await sendRequest(device, {
+      type: 'GetModStatus'
+  }) as ModStatus;
+}
+
+// Tells the backend to attempt to uninstall/install the given mods, depending on the new install status provided in `changesRequested`.
+async function setModStatuses(device: Adb,
+  changesRequested: { [id: string]: boolean },
+  eventSink: LogEventSink = null): Promise<Mod[]> {
+  let response = await sendRequest(device, {
+      type: 'SetModsEnabled',
+      statuses: changesRequested
+  }, eventSink);
+
+  return (response as Mods).installed_mods;
+}
+
+async function removeMod(device: Adb,
+  mod_id: string,
+  eventSink: LogEventSink = null) {
+  let response = await sendRequest(device, {
+      type: 'RemoveMod',
+      id: mod_id
+  }, eventSink);
+
+  return (response as Mods).installed_mods;
+}
+
+// Instructs the agent to patch the app, adding the modloader and installing the core mods.
+// Updates the ModStatus `beforePatch` to reflect the state of the installation after patching.
+// (will not patch if the APK is already modded - will just extract the modloader and install core mods.)
+async function patchApp(device: Adb,
+  beforePatch: ModStatus,
+  eventSink: LogEventSink = null): Promise<ModStatus> {
+  let response = await sendRequest(device, {
+      type: 'Patch'
+  }, eventSink);
+
+  // Return the new mod status assumed after patching
+  // (patching should fail if any of this is not the case)
+  return {
+      'type': 'ModStatus',
+      app_info: {
+          loader_installed: 'Scotland2',
+          version: beforePatch.app_info!.version
+      },
+      core_mods: {
+          all_core_mods_installed: true,
+          supported_versions: beforePatch.core_mods!.supported_versions
+      },
+      modloader_present: true,
+      installed_mods: (response as Mods).installed_mods
+  };
+}
+
+// Instructs the agent to download and install any missing/outdated core mods, as well as push the modloader to the required location.
+// Should fix many common issues with an install.
+async function quickFix(device: Adb,
+  beforeFix: ModStatus,
+  eventSink: LogEventSink = null): Promise<ModStatus> {
+  let response = await sendRequest(device, {
+      type: 'QuickFix'
+  }, eventSink);
+
+  // Update the mod status to reflect the fixed installation
+  return {
+      'type': 'ModStatus',
+      app_info: beforeFix.app_info,
+      core_mods: {
+          all_core_mods_installed: true,
+          supported_versions: beforeFix.core_mods!.supported_versions,
+      },
+      installed_mods: (response as Mods).installed_mods,
+      modloader_present: true
+  }
+}
+
 export {
   prepareAgent,
-  sendRequest as runCommand
+  loadModStatus,
+  setModStatuses,
+  removeMod,
+  patchApp,
+  quickFix
 };

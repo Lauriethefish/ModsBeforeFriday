@@ -10,13 +10,6 @@ h2 {
     margin-top: 10px;
 }
 
-.horizontalCenter {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-}
-
 #modMenuTitle {
     display: flex;
     align-items: center;
