@@ -1,6 +1,6 @@
 import { AdbSync, AdbSyncWriteOptions, Adb, encodeUtf8 } from '@yume-chan/adb';
 import { ConsumableReadableStream, Consumable, DecodeUtf8Stream, ConcatStringStream } from '@yume-chan/stream-extra';
-import { Request, Response, Log } from "./Messages";
+import { Request, Response, LogMsg } from "./Messages";
 
 const AgentPath: string = "/data/local/tmp/mbf-agent";
 
@@ -50,7 +50,7 @@ async function downloadAgent(): Promise<Uint8Array> {
     return new Uint8Array(await resp.arrayBuffer());
 }
 
-function logFromAgent(log: Log) {
+function logFromAgent(log: LogMsg) {
   switch(log.level) {
     case 'Error':
       console.error(log.message);
@@ -69,7 +69,7 @@ function logFromAgent(log: Log) {
   }
 }
 
-async function sendRequest(adb: Adb, request: Request, eventSink: ((event: Log) => void) | null = null): Promise<Response> {
+async function sendRequest(adb: Adb, request: Request, eventSink: ((event: LogMsg) => void) | null = null): Promise<Response> {
   let command_buffer = encodeUtf8(JSON.stringify(request) + "\n");
 
   let agentProcess = await adb.subprocess.shell(AgentPath);
@@ -114,11 +114,16 @@ async function sendRequest(adb: Adb, request: Request, eventSink: ((event: Log) 
       } catch(e) {
         throw new Error("Agent message " + messages[i] + " was not valid JSON");
       }
-      if(msg_obj.type === "Log") {
-        const log_obj = msg_obj as Log;
+      if(msg_obj.type === "LogMsg") {
+        const log_obj = msg_obj as LogMsg;
         logFromAgent(log_obj);
         if(eventSink != null) {
           eventSink(log_obj);
+        }
+
+        // Errors need to be thrown later in the function
+        if(msg_obj.level === 'Error') {
+          response = msg_obj;
         }
       } else  {
         // The final message is the only one that isn't of type `log`.
@@ -129,14 +134,15 @@ async function sendRequest(adb: Adb, request: Request, eventSink: ((event: Log) 
   }
   console.groupEnd();
 
-  
   if((await agentProcess.exit) === 0) {
-    // If the agent exited with code 0 but gave no response, an error occured during serving the request.
-    // This will have already been logged.
     if(response === null) {
       throw new Error("Received error response from agent");
+    } else if(response.type === 'LogMsg') {
+      const log = response as LogMsg;
+      throw new Error("Received error from backend: `" + log.message + "`");
+    } else  {
+      return response;
     }
-    return response;
   } else  {
     // If the agent exited with a non-zero code then it failed to actually write a response to stdout
     // Alternatively, the agent might be corrupt.

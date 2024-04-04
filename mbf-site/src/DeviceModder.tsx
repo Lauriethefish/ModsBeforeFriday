@@ -1,28 +1,28 @@
 import { Adb } from '@yume-chan/adb';
 import { prepareAgent, runCommand } from "./Agent";
 import { useEffect, useState } from 'react';
-import { Log, ModStatus } from './Messages';
+import { LogMsg, ModStatus } from './Messages';
 import './css/DeviceModder.css';
 import { ModCard } from './components/ModCard';
 import { ReactComponent as ModIcon } from './icons/mod-icon.svg'
 import { LogWindow, useLog } from './components/LogWindow';
 import { Mod } from './Models';
 import { Mods } from './Messages';
-import { Modal } from './components/Modal';
+import { ErrorModal, Modal } from './components/Modal';
 
 interface DeviceModderProps {
     device: Adb
 }
 
-async function loadModStatus(device: Adb) {
+async function loadModStatus(device: Adb): Promise<ModStatus> {
     await prepareAgent(device);
 
     return await runCommand(device, {
         type: 'GetModStatus'
-    }) as unknown as ModStatus;
+    }) as ModStatus;
 }
 
-async function patchApp(device: Adb, addLogEvent: (event: Log) => void): Promise<Mod[]> {
+async function patchApp(device: Adb, addLogEvent: (event: LogMsg) => void): Promise<Mod[]> {
     let response = await runCommand(device, {
         type: 'Patch'
     }, addLogEvent);
@@ -30,7 +30,7 @@ async function patchApp(device: Adb, addLogEvent: (event: Log) => void): Promise
     return (response as Mods).installed_mods;
 }
 
-async function setModStatuses(device: Adb, changesRequested: { [id: string]: boolean }, addLogEvent: (event: Log) => void): Promise<Mod[]> {
+async function setModStatuses(device: Adb, changesRequested: { [id: string]: boolean }, addLogEvent: (event: LogMsg) => void): Promise<Mod[]> {
     let response = await runCommand(device, {
         type: 'SetModsEnabled',
         statuses: changesRequested
@@ -49,7 +49,7 @@ function DeviceModder(props: DeviceModderProps) {
     if(modStatus === null) {
         return <div className='container mainContainer'>
             <h2>Checking Beat Saber installation</h2>
-        </div>;
+        </div>
     }   else if(modStatus.app_info === null) {
         return <div className='container mainContainer'>
             <h1>Beat Saber is not installed</h1>
@@ -142,6 +142,7 @@ interface PatchingMenuProps {
 function PatchingMenu(props: PatchingMenuProps) {
     const [isPatching, setIsPatching] = useState(false);
     const [logEvents, addLogEvent] = useLog();
+    const [patchingError, setPatchingError] = useState(null as string | null);
 
     if(!isPatching) {
         return <div className='container mainContainer'>
@@ -159,9 +160,16 @@ function PatchingMenu(props: PatchingMenuProps) {
                 try {
                     props.onCompleted(await patchApp(props.device, addLogEvent));
                 } catch(e) {
-                    // TODO: Add a modal or somesuch for this.
+                    setPatchingError(String(e));
+                    setIsPatching(false);
                 }
             }}>Mod the app</button>
+
+            <ErrorModal
+                isVisible={patchingError != null}
+                title={"Failed to install mods"}
+                description={'An error occured while patching ' + patchingError}
+                onClose={() => setPatchingError(null)}/>
         </div>
     }   else    {
         return <div className='container mainContainer'>
@@ -182,6 +190,7 @@ function ModManager(props: ModManagerProps) {
     const [changes, setChanges] = useState({} as { [id: string]: boolean });
     const [isWorking, setWorking] = useState(false);
     const [logEvents, addLogEvent] = useLog();
+    const [modError, setModError] = useState(null as string | null);
     sortById(mods);
 
     return <>
@@ -197,8 +206,23 @@ function ModManager(props: ModManagerProps) {
                     console.log("Installing mods, statuses requested: " + JSON.stringify(changes));
                     try {
                         setWorking(true);
-                        setMods(await setModStatuses(props.device, changes, addLogEvent));
-                    }   finally {
+                        const updatedMods = await setModStatuses(props.device, changes, addLogEvent);
+
+                        let allSuccesful = true;
+                        updatedMods.forEach(m => {
+                            if(m.id in changes && m.is_enabled !== changes[m.id]) {
+                                allSuccesful = false;
+                            }
+                        })
+                        setMods(updatedMods);
+
+                        if(!allSuccesful) {
+                            setModError("Not all the selected mods were successfully installed/uninstalled."
+                            + "\nThis happens because two changes were made that conflict, e.g. trying to install a mod but uninstall one of its dependencies.");
+                        }
+                    }   catch(e) {
+                        setModError(String(e));
+                    }  finally {
                         setWorking(false);
                     }
                 }}>Sync Changes</button>
@@ -219,6 +243,10 @@ function ModManager(props: ModManagerProps) {
                 <LogWindow events={logEvents} />
             </div>
         </Modal>
+        <ErrorModal isVisible={modError != null}
+            title={"Failed to sync mods"}
+            description={modError!}
+            onClose={() => setModError(null)} />
     </>
 }
 

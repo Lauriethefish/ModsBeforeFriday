@@ -65,7 +65,7 @@ impl log::Log for ResponseLogger {
 
     fn log(&self, record: &log::Record) {
         // Ignore errors, logging should be infallible and we don't want to panic
-        let _result = write_response(Response::Log {
+        let _result = write_response(Response::LogMsg {
             message: format!("{}", record.args()),
             level: match record.level() {
                 Level::Debug => requests::LogLevel::Debug,

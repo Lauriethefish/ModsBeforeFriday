@@ -25,7 +25,8 @@ export function Modal(props: ModalProps) {
 interface ErrorModalProps {
     isVisible: boolean,
     title: string,
-    description: string
+    description: string,
+    onClose: () => void
 }
 
 export function ErrorModal(props: ErrorModalProps) {
@@ -35,5 +36,7 @@ export function ErrorModal(props: ErrorModalProps) {
             <h1>{props.title}</h1>
         </div>
         <p>{props.description}</p>
+
+        <button id="okButton" onClick={props.onClose}>OK</button>
     </Modal>
 }

@@ -1,16 +1,16 @@
 import { useEffect, useState } from 'react';
 import '../css/LogWindow.css';
-import { Log } from '../Messages';
+import { LogMsg } from '../Messages';
 import '../fonts/Consolas.ttf';
 
 interface LogWindowProps {
-    events: Log[]
+    events: LogMsg[]
 }
 
 // Convenience function to set up the state necessary for a logging window.
-export function useLog(): [events: Log[], addEvent: (event: Log) => void] {
+export function useLog(): [events: LogMsg[], addEvent: (event: LogMsg) => void] {
     // This is a little cursed but gets the job done for now.
-    let [logEvents, setLogEvents] = useState([] as Log[]);
+    let [logEvents, setLogEvents] = useState([] as LogMsg[]);
 
     return [
         logEvents,

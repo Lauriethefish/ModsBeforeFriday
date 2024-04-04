@@ -19,6 +19,7 @@
     margin: auto;
     background-color: #1f1f1f;
     margin-top: 5rem;
+    max-width: min(30rem, 95%);
 }
 
 #errorTitle {
@@ -27,4 +28,11 @@
     align-items: center;
     justify-content: center;
     gap: 15px;
+}
+
+#okButton {
+    margin: 0 auto;
+    display: block;
+    padding: 3%;
+    min-width: 4rem;
 }

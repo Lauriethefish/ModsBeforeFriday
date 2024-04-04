@@ -82,7 +82,7 @@ pub enum Response {
     },
     // Sent to relay progress information during the modding process.
     // This will NOT be the final message sent.
-    Log {
+    LogMsg {
         message: String,
         level: LogLevel
     }

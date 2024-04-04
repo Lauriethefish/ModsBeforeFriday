@@ -28,7 +28,13 @@ interface ModStatus {
     installed_mods: Mod[]
 }
 
-type Response = ModStatus | Log | Mods;
+interface LogMsg {
+    type: 'LogMsg',
+    message: string,
+    level: LogLevel
+}
+
+type Response = LogMsg | ModStatus | Mods;
 
 interface CoreModsInfo {
     supported_versions: string[],
@@ -40,12 +46,6 @@ interface AppInfo {
     is_modded: boolean
 }
 
-interface Log {
-    type: 'Log',
-    message: string,
-    level: LogLevel
-}
-
 type LogLevel = "Error" | "Warn" | "Info" | "Debug" | "Trace";
 
 export type {
@@ -55,6 +55,6 @@ export type {
     ModStatus,
     AppInfo,
     CoreModsInfo,
-    Log,
+    LogMsg,
     Mods
 }
