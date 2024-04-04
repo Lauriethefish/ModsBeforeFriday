@@ -24,7 +24,7 @@ export function ModCard(props: ModCardProps) {
 
         <div className='modControls'>
             <div id="removeMod" onClick={() => setRequestRemove(true)}>
-                <img src={TrashCan} />
+                <img src={TrashCan} alt="Remove mod icon" />
             </div>
             <Slider on={props.mod.is_enabled} valueChanged={value => {
                 props.onEnabledChanged(value);

@@ -28,7 +28,7 @@ export function ModManager(props: ModManagerProps) {
         <div className='horizontalCenter'>
             <div className='container horizontalCenter'>
                 <h1>Mods</h1>
-                <img src={ModIcon} alt="A plug and its socket, disconnected." />
+                <img src={ModIcon} />
             </div>
 
             {Object.keys(changes).length > 0 && <div>
