@@ -9,3 +9,10 @@ ModsBeforeFriday is a modding tool for Beat Saber on Quest that works entirely w
 
 ## Compilation Instructions
 ... coming soon
+
+### TODO List
+- Make the "fix issues" button actually do something.
+- Switch to vite (didn't realise that create-react-app wasn't maintained)
+- Add actions and build instructions
+- Do some beta testing
+- Deploy
