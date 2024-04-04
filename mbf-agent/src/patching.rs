@@ -7,8 +7,8 @@ use crate::manifest::{ManifestMod, ResourceIds};
 use crate::zip::{signing, FileCompression, ZipFile};
 
 const DEBUG_CERT_PEM: &[u8] = include_bytes!("debug_cert.pem");
-const LIB_MAIN: &[u8] = include_bytes!("libmain.so");
-const MODLOADER: &[u8] = include_bytes!("libsl2.so");
+const LIB_MAIN: &[u8] = include_bytes!("../libs/libmain.so");
+const MODLOADER: &[u8] = include_bytes!("../libs/libsl2.so");
 const MODLOADER_NAME: &str = "libsl2.so";
 const MOD_TAG_PATH: &str = "modded.json";
 

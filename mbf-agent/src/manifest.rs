@@ -70,6 +70,9 @@ impl ManifestMod {
         }
     }
 
+    /// May be used in the future to add features, e.g. hand tracking.
+    /// Currently not supported.
+    #[allow(unused)]
     pub fn with_feature(mut self, feature: &str) -> Self {
         self.queued_features.push(feature.into());
         self

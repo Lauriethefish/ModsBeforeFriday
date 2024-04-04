@@ -266,9 +266,11 @@ impl ZipFile<File> {
         Ok(())
     }
 
-    // Saves the ZIP central directory.
-    // If this is not called, any newly written files or deleted files will not be respected in the final archive.
+    /// Saves the ZIP central directory.
+    /// If this is not called, any newly written files or deleted files will not be respected in the final archive.
     /// The CD is NOT automatically saved on drop.
+    /// Currently, this project doesn't save any ZIP files without signing them, but this is kept in-case this is needed in the future.
+    #[allow(unused)]
     pub fn save(mut self) -> Result<()> {
         // Remove existing CD and EOCD
         self.file.set_len(self.end_of_entries_offset as u64)?;
