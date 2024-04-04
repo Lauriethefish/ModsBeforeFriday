@@ -43,7 +43,7 @@ async function prepareAgent(adb: Adb) {
 }
   
 async function downloadAgent(): Promise<Uint8Array> {
-    const resp = await fetch("./mbf-agent/mbf-agent");
+    const resp = await fetch("/mbf-agent");
     if(resp.body === null) {
         throw new Error("Agent response had no body")
     }

@@ -1,7 +1,7 @@
 $SkipReinstall=$args[0]
 
 Write-Output "Building"
-cargo build --release --target aarch64-linux-android
+./build
 $PROGRAM = "./target/aarch64-linux-android/release/mbf-agent"
 $QUEST_LOC = "/data/local/tmp/mbf-agent"
 Write-Output "Pushing"
