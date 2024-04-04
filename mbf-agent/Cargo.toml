@@ -18,3 +18,6 @@ serde_json = "1.0.115"
 semver = { version = "1.0.22", features = ["serde"] }
 ureq = "2.9.6"
 log = "0.4.21"
+
+[build-dependencies]
+ureq = "2.9.6"
