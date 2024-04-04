@@ -16,6 +16,7 @@ interface DeviceModderProps {
     quit: (err: unknown | null) => void
 }
 
+// Gets the status of mods from the quest, i.e. whether the app is patched, and what mods are currently installed.
 async function loadModStatus(device: Adb): Promise<ModStatus> {
     await prepareAgent(device);
 
@@ -24,12 +25,51 @@ async function loadModStatus(device: Adb): Promise<ModStatus> {
     }) as ModStatus;
 }
 
-async function patchApp(device: Adb, addLogEvent: (event: LogMsg) => void): Promise<Mod[]> {
+// Instructs the agent to patch the app, adding the modloader and installing the core mods.
+// Updates the ModStatus `beforePatch` to reflect the state of the installation after patching.
+// (will not patch if the APK is already modded - will just extract the modloader and install core mods.)
+async function patchApp(device: Adb,
+    beforePatch: ModStatus,
+    addLogEvent: (event: LogMsg) => void): Promise<ModStatus> {
     let response = await runCommand(device, {
         type: 'Patch'
     }, addLogEvent);
 
-    return (response as Mods).installed_mods;
+    // Return the new mod status assumed after patching
+    // (patching should fail if any of this is not the case)
+    return {
+        'type': 'ModStatus',
+        app_info: {
+            loader_installed: 'Scotland2',
+            version: beforePatch.app_info!.version
+        },
+        core_mods: {
+            all_core_mods_installed: true,
+            supported_versions: beforePatch.core_mods!.supported_versions
+        },
+        modloader_present: true,
+        installed_mods: (response as Mods).installed_mods
+    };
+}
+
+async function quickFix(device: Adb,
+    beforeFix: ModStatus,
+    addLogEvent: (event: LogMsg) => void): Promise<ModStatus> {
+    let response = await runCommand(device, {
+        type: 'QuickFix'
+    }, addLogEvent);
+
+    // Update the mod status to reflect the fixed installation
+    return {
+        'type': 'ModStatus',
+        app_info: beforeFix.app_info,
+        core_mods: {
+            all_core_mods_installed: true,
+            supported_versions: beforeFix.core_mods!.supported_versions,
+        },
+        installed_mods: (response as Mods).installed_mods,
+        modloader_present: true
+    }
 }
 
 async function setModStatuses(device: Adb, changesRequested: { [id: string]: boolean }, addLogEvent: (event: LogMsg) => void): Promise<Mod[]> {
@@ -80,10 +120,17 @@ function DeviceModder(props: DeviceModderProps) {
                     <h1>App is modded</h1>
                     <p>Beat Saber is already modded on your Quest, and the version that's installed is compatible with mods.</p>
 
-                    <InstallStatus modloaderReady={modStatus.modloader_present} coreModsReady={modStatus.core_mods.all_core_mods_installed} />
+                    <InstallStatus
+                        modStatus={modStatus}
+                        device={device}
+                        onFixed={status => setModStatus(status)}
+                    />
                 </div>
 
-                <ModManager initialMods={modStatus.installed_mods} device={device}/>
+                <ModManager mods={modStatus.installed_mods}
+                    setMods={mods => setModStatus({ ...modStatus, installed_mods: mods })}
+                    device={device} 
+                />
             </>
         }   else    {
             return <IncompatibleLoader device={device} loader={loader} quit={() => quit(null)} />
@@ -91,23 +138,8 @@ function DeviceModder(props: DeviceModderProps) {
     }   else   {
         return <PatchingMenu
             device={device}
-            app_version={modStatus.app_info.version}
-            onCompleted={mods => {
-                console.log("App is now patched, moving into mods menu");
-                setModStatus({
-                    'type': 'ModStatus',
-                    app_info: {
-                        loader_installed: 'Scotland2',
-                        version: modStatus.app_info!.version
-                    },
-                    core_mods: {
-                        all_core_mods_installed: true,
-                        supported_versions: modStatus.core_mods!.supported_versions
-                    },
-                    modloader_present: true,
-                    installed_mods: mods
-                });
-            }}
+            modStatus={modStatus}
+            onCompleted={modStatus => setModStatus(modStatus)}
         />
     }
 }
@@ -129,30 +161,60 @@ function NotSupported(props: NotSupportedProps) {
 }
 
 interface InstallStatusProps {
-    modloaderReady: boolean,
-    coreModsReady: boolean
+    modStatus: ModStatus
+    onFixed: (newStatus: ModStatus) => void,
+    device: Adb
 }
 
 function InstallStatus(props: InstallStatusProps) {
-    if(props.modloaderReady && props.coreModsReady) {
+    const { modStatus, onFixed, device } = props;
+
+    const [logEvents, addLogEvent] = useLog();
+    const [error, setError] = useState(null as string | null);
+    const [fixing, setFixing] = useState(false);
+
+    if(modStatus.modloader_present && modStatus.core_mods?.all_core_mods_installed) {
         return <p>Everything should be ready to go! &#9989;</p>
     }   else {
         return <div>
             <h3 className="warning">Problems found with your install:</h3>
             <p>These must be fixed before custom songs will work!</p>
             <ul>
-                {!props.modloaderReady && <li>Modloader not found &#10060;</li>}
-                {!props.coreModsReady && <li>Core mods missing or out of date &#10060;</li>}
+                {!modStatus.modloader_present && 
+                    <li>Modloader not found &#10060;</li>}
+                {!modStatus.core_mods?.all_core_mods_installed && 
+                    <li>Core mods missing or out of date &#10060;</li>}
             </ul>
-            <button>Fix issues</button>
+            <button onClick={async () => {
+                try {
+                    setFixing(true);
+                    onFixed(await quickFix(device, modStatus, addLogEvent));
+                }   catch(e) {
+                    setError(String(e));
+                }   finally {
+                    setFixing(false);
+                }
+            }}>Fix issues</button>
+
+            <Modal isVisible={fixing}>
+                <div className='syncingWindow'>
+                    <h1>Fixing issues</h1>
+                    <LogWindow events={logEvents} />
+                </div>
+            </Modal>
+
+            <ErrorModal title="Failed to fix issues"
+                description={error!}
+                isVisible={error != null}
+                onClose={() => setError(null)} />
         </div>
     }
 }
 
 interface PatchingMenuProps {
-    app_version: string,
+    modStatus: ModStatus
     device: Adb,
-    onCompleted: (installed_mods: Mod[]) => void
+    onCompleted: (newStatus: ModStatus) => void
 }
 
 function PatchingMenu(props: PatchingMenuProps) {
@@ -160,10 +222,11 @@ function PatchingMenu(props: PatchingMenuProps) {
     const [logEvents, addLogEvent] = useLog();
     const [patchingError, setPatchingError] = useState(null as string | null);
 
+    const { onCompleted, modStatus, device } = props;
     if(!isPatching) {
         return <div className='container mainContainer'>
             <h1>Install Custom Songs</h1>
-            <p>Your app has version: {props.app_version}, which is supported by mods!</p>
+            <p>Your app has version: {props.modStatus.app_info?.version}, which is supported by mods!</p>
             <p>To get your game ready for custom songs, ModsBeforeFriday will next patch your Beat Saber app and install some essential mods.
             Once this is done, you will be able to manage your custom songs <b>inside the game.</b></p>
 
@@ -174,7 +237,7 @@ function PatchingMenu(props: PatchingMenuProps) {
             <button className="modButton" onClick={async () => {
                 setIsPatching(true);
                 try {
-                    props.onCompleted(await patchApp(props.device, addLogEvent));
+                    onCompleted(await patchApp(device, modStatus, addLogEvent));
                 } catch(e) {
                     setPatchingError(String(e));
                     setIsPatching(false);
@@ -218,12 +281,14 @@ function IncompatibleLoader(props: IncompatibleLoaderProps) {
 }
 
 interface ModManagerProps {
-    initialMods: Mod[],
+    mods: Mod[],
+    setMods: (mods: Mod[]) => void
     device: Adb
 }
 
 function ModManager(props: ModManagerProps) {
-    const [mods, setMods] = useState(props.initialMods);
+    const { mods, setMods } = props;
+    
     const [changes, setChanges] = useState({} as { [id: string]: boolean });
     const [isWorking, setWorking] = useState(false);
     const [logEvents, addLogEvent] = useLog();
@@ -275,7 +340,7 @@ function ModManager(props: ModManagerProps) {
             }}/>
         )}
         <Modal isVisible={isWorking}>
-            <div id="syncing">
+            <div className='syncingWindow'>
                 <h1>Syncing Mods...</h1>
                 <LogWindow events={logEvents} />
             </div>

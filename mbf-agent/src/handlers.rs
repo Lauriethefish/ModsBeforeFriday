@@ -17,6 +17,7 @@ pub fn handle_request(request: Request) -> Result<Response> {
         Request::SetModsEnabled {
             statuses
         } => run_mod_action(statuses),
+        Request::QuickFix => handle_quick_fix(),
         _ => todo!()
     }
 }
@@ -144,6 +145,20 @@ fn get_app_info() -> Result<Option<AppInfo>> {
         version: info.package_version,
         path: apk_path
     }))    
+}
+
+fn handle_quick_fix() -> Result<Response> {
+    let app_info = get_app_info()?
+        .ok_or(anyhow!("Cannot quick fix when app is not installed"))?;
+
+    let mut mod_manager = ModManager::new();
+
+    // Reinstall missing core mods and overwrite the modloader with the one contained within the executable.
+    install_core_mods(&mut mod_manager, app_info)?;
+    patching::install_modloader()?;
+    Ok(Response::Mods {
+        installed_mods: get_mod_models(mod_manager)
+    })
 }
 
 fn handle_patch() -> Result<Response> {

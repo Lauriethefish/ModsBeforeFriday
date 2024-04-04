@@ -36,13 +36,17 @@ pub enum Request {
         statuses: HashMap<String, bool>
     },
 
-    /// - Patches Beat Saber to add support for modloaders.
-    /// - Saves the modloader to the appropriate locaiton on the Quest.
+    /// - Patches Beat Saber to add support for modloaders. (will not patch again if the app is already modded)
+    /// - Saves the modloader to the appropriate locatioon on the Quest.
     /// - Wipes any existing mods.
     /// - Installs the core mods for the current version.
-    /// If the app is already patched, it will not be patched again.
-    /// Returns a `Mods`` response to update the frontend with the newly installed core mods.
-    Patch
+    /// Returns a `Mods` response to update the frontend with the newly installed core mods.
+    Patch,
+
+    /// Reinstalls any core mods that are misssing/out of date and overwrites the modloader in case it is corrupt.
+    /// Should fix most issues with any installation.
+    /// Returns a `Mods` response containing the newly installed mods.
+    QuickFix,
 }
 
 #[derive(Serialize)]

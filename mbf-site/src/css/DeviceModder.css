@@ -35,7 +35,7 @@ h2 {
     background-color: #ff0000;
 }
 
-#syncing {
+.syncingWindow {
     display: flex;
     flex-direction: column;
     gap: 10px;

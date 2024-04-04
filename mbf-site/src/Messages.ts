@@ -13,7 +13,11 @@ interface SetModsEnabled {
     statuses: { [id: string]: boolean } 
 }
 
-type Request = GetModStatus | Patch | SetModsEnabled;
+interface QuickFix {
+    type: 'QuickFix'
+}
+
+type Request = GetModStatus | Patch | SetModsEnabled | QuickFix;
 
 interface Mods {
     type: 'Mods',
