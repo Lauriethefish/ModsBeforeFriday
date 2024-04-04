@@ -41,9 +41,11 @@ interface CoreModsInfo {
     all_core_mods_installed: boolean
 }
 
+type ModLoader = "Scotland2" | "QuestLoader" | "Unknown";
+
 interface AppInfo {
     version: string,
-    is_modded: boolean
+    loader_installed: ModLoader | null
 }
 
 type LogLevel = "Error" | "Warn" | "Info" | "Debug" | "Trace";
@@ -56,5 +58,6 @@ export type {
     AppInfo,
     CoreModsInfo,
     LogMsg,
-    Mods
+    Mods,
+    ModLoader
 }

@@ -7,7 +7,7 @@ use crate::mod_man::Mod;
 
 #[derive(Serialize)]
 pub struct AppInfo {
-    pub is_modded: bool,
+    pub loader_installed: Option<ModLoader>,
     pub version: String,
     #[serde(skip_serializing)]
     pub path: String
@@ -59,6 +59,13 @@ pub enum LogLevel {
     Info,
     Debug,
     Trace
+}
+
+#[derive(Serialize)]
+pub enum ModLoader {
+    Scotland2,
+    QuestLoader,
+    Unknown
 }
 
 #[derive(Serialize)]

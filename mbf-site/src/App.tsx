@@ -42,8 +42,11 @@ function ChooseDevice() {
 
   if(chosenDevice !== null) {
     return <>
-      <DeviceModder device={chosenDevice} unrecoverableError={(err) => {
-        setConnectError(String(err));
+      <DeviceModder device={chosenDevice} quit={(err) => {
+        if(err != null) {
+          setConnectError(String(err));
+        }
+        chosenDevice.close().catch(err => console.warn("Failed to close device " + err));
         setChosenDevice(null);
       }} />
     </>

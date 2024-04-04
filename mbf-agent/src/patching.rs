@@ -2,7 +2,7 @@ use std::{fs::{File, OpenOptions}, io::{Cursor, Seek, Write}, path::{Path, PathB
 
 use anyhow::{Context, Result, anyhow};
 use log::{info, warn};
-use crate::{axml::{AxmlReader, AxmlWriter}, external_res, requests::AppInfo, zip, ModTag};
+use crate::{axml::{AxmlReader, AxmlWriter}, external_res, requests::{AppInfo, ModLoader}, zip, ModTag};
 use crate::manifest::{ManifestMod, ResourceIds};
 use crate::zip::{signing, FileCompression, ZipFile};
 
@@ -10,6 +10,7 @@ const DEBUG_CERT_PEM: &[u8] = include_bytes!("debug_cert.pem");
 const LIB_MAIN: &[u8] = include_bytes!("libmain.so");
 const MODLOADER: &[u8] = include_bytes!("libsl2.so");
 const MODLOADER_NAME: &str = "libsl2.so";
+const MOD_TAG_PATH: &str = "modded.json";
 
 const LIB_MAIN_PATH: &str = "lib/arm64-v8a/libmain.so";
 const LIB_UNITY_PATH: &str = "lib/arm64-v8a/libunity.so";
@@ -138,7 +139,7 @@ fn patch_apk_in_place(path: impl AsRef<Path>, libunity_path: Option<PathBuf>) ->
         patcher_name: "ModsBeforeFriday".to_string(),
         patcher_version: Some("0.1.0".to_string()), // TODO: Get this from the frontend maybe?
         modloader_name: "Scotland2".to_string(), // TODO: This should really be Libmainloader because SL2 isn't inside the APK
-        modloader_version: Some("0.1.4".to_string())
+        modloader_version: None // Temporary, but this field is universally considered to be option so this should be OK.
     })?;
 
     match libunity_path {
@@ -157,11 +158,38 @@ fn patch_apk_in_place(path: impl AsRef<Path>, libunity_path: Option<PathBuf>) ->
 
 fn add_modded_tag(to: &mut ZipFile<File>, tag: ModTag) -> Result<()> {
     let saved_tag = serde_json::to_vec_pretty(&tag)?;
-    to.write_file("modded.json",
+    to.write_file(MOD_TAG_PATH,
         &mut Cursor::new(saved_tag),
         FileCompression::Deflate
     )?;
     Ok(())
+}
+
+pub fn get_modloader_installed(apk: &mut ZipFile<File>) -> Result<Option<ModLoader>> {
+    if apk.contains_file(MOD_TAG_PATH) {
+        let tag_data = apk.read_file(MOD_TAG_PATH).context("Failed to read mod tag")?;
+        let mod_tag: ModTag = match serde_json::from_slice(&tag_data) {
+            Ok(tag) => tag,
+            Err(err) => {
+                warn!("Mod tag was invalid JSON: {err}... Assuming unknown modloader");
+                return Ok(Some(ModLoader::Unknown))
+            }
+        };
+
+        Ok(Some(if mod_tag.modloader_name.eq_ignore_ascii_case("QuestLoader") {
+            ModLoader::QuestLoader
+        }   else if mod_tag.modloader_name.eq_ignore_ascii_case("Scotland2") {
+            // TODO: It's a bit problematic that "Scotland2" is the standard for the contents of modded.json
+            // (Since the actual loader inside the APK is libmainloader, which could load any modloader, not just SL2).
+            ModLoader::Scotland2
+        }   else {
+            ModLoader::Unknown
+        }))
+    }   else if apk.iter_entry_names().any(|entry| entry.contains("modded")) {
+        Ok(Some(ModLoader::Unknown))
+    }   else {
+        Ok(None)
+    }
 }
 
 fn patch_manifest(zip: &mut ZipFile<File>) -> Result<()> {

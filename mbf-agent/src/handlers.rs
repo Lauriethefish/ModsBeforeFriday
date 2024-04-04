@@ -131,11 +131,7 @@ fn get_app_info() -> Result<Option<AppInfo>> {
     let apk_reader = std::fs::File::open(&apk_path)?;
     let mut apk = ZipFile::open(apk_reader).context("Failed to read APK as ZIP")?;
 
-    // TODO: this detects all modded tags... including QuestLoader which should not be supported
-    // TODO: Properly detect an invalid modloader and prompt the user to reinstall their game.
-    let is_modded = apk
-        .iter_entry_names()
-        .any(|entry| entry.contains("modded"));
+    let modloader = patching::get_modloader_installed(&mut apk)?;
 
     let manifest = apk.read_file("AndroidManifest.xml").context("Failed to read manifest")?;
     let mut manifest_reader = Cursor::new(manifest);
@@ -144,7 +140,7 @@ fn get_app_info() -> Result<Option<AppInfo>> {
     let info = ManifestInfo::read(&mut axml_reader)?;
 
     Ok(Some(AppInfo {
-        is_modded,
+        loader_installed: modloader,
         version: info.package_version,
         path: apk_path
     }))    

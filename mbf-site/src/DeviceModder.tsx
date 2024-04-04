@@ -1,7 +1,7 @@
 import { Adb } from '@yume-chan/adb';
 import { prepareAgent, runCommand } from "./Agent";
 import { useEffect, useState } from 'react';
-import { LogMsg, ModStatus } from './Messages';
+import { LogMsg, ModLoader, ModStatus } from './Messages';
 import './css/DeviceModder.css';
 import { ModCard } from './components/ModCard';
 import { ReactComponent as ModIcon } from './icons/mod-icon.svg'
@@ -12,7 +12,8 @@ import { ErrorModal, Modal } from './components/Modal';
 
 interface DeviceModderProps {
     device: Adb,
-    unrecoverableError: (err: unknown) => void
+    // Quits back to the main menu, optionally giving an error that caused the quit.
+    quit: (err: unknown | null) => void
 }
 
 async function loadModStatus(device: Adb): Promise<ModStatus> {
@@ -40,14 +41,18 @@ async function setModStatuses(device: Adb, changesRequested: { [id: string]: boo
     return (response as Mods).installed_mods;
 }
 
+async function uninstallBeatSaber(device: Adb) {
+    await device.subprocess.spawnAndWait("pm uninstall com.beatgames.beatsaber");
+}
+
 function DeviceModder(props: DeviceModderProps) {
     const [modStatus, setModStatus] = useState(null as ModStatus | null);
-    const { device, unrecoverableError } = props;
+    const { device, quit } = props;
     useEffect(() => {
         loadModStatus(device)
             .then(data => setModStatus(data))
-            .catch(err => unrecoverableError(err));
-    }, [device, unrecoverableError]);
+            .catch(err => quit(err));
+    }, [device, quit]);
 
     if(modStatus === null) {
         return <div className='container mainContainer'>
@@ -67,18 +72,23 @@ function DeviceModder(props: DeviceModderProps) {
         </div>
     }   else if(!(modStatus.core_mods.supported_versions.includes(modStatus.app_info.version))) {
         return <NotSupported version={modStatus.app_info.version} supportedVersions={modStatus.core_mods.supported_versions}/>
-    }   else if(modStatus.app_info.is_modded)   {
-        return <>
-            <div className='container mainContainer'>
-                <h1>App is modded</h1>
-                <p>Beat Saber is already modded on your Quest, and the version that's installed is compatible with mods.</p>
+    }   else if(modStatus.app_info.loader_installed !== null)   {
+        let loader = modStatus.app_info.loader_installed;
+        if(loader === 'Scotland2') {
+            return <>
+                <div className='container mainContainer'>
+                    <h1>App is modded</h1>
+                    <p>Beat Saber is already modded on your Quest, and the version that's installed is compatible with mods.</p>
 
-                <InstallStatus modloaderReady={modStatus.modloader_present} coreModsReady={modStatus.core_mods.all_core_mods_installed} />
-            </div>
+                    <InstallStatus modloaderReady={modStatus.modloader_present} coreModsReady={modStatus.core_mods.all_core_mods_installed} />
+                </div>
 
-            <ModManager initialMods={modStatus.installed_mods} device={device}/>
-        </>
-    }   else    {
+                <ModManager initialMods={modStatus.installed_mods} device={device}/>
+            </>
+        }   else    {
+            return <IncompatibleLoader device={device} loader={loader} quit={() => quit(null)} />
+        }
+    }   else   {
         return <PatchingMenu
             device={device}
             app_version={modStatus.app_info.version}
@@ -87,10 +97,13 @@ function DeviceModder(props: DeviceModderProps) {
                 setModStatus({
                     'type': 'ModStatus',
                     app_info: {
-                        is_modded: true,
+                        loader_installed: 'Scotland2',
                         version: modStatus.app_info!.version
                     },
-                    core_mods: modStatus.core_mods,
+                    core_mods: {
+                        all_core_mods_installed: true,
+                        supported_versions: modStatus.core_mods!.supported_versions
+                    },
                     modloader_present: true,
                     installed_mods: mods
                 });
@@ -181,6 +194,27 @@ function PatchingMenu(props: PatchingMenuProps) {
             <LogWindow events={logEvents}/>
         </div>
     }
+}
+
+interface IncompatibleLoaderProps {
+    loader: ModLoader,
+    device: Adb,
+    quit: () => void
+}
+
+function IncompatibleLoader(props: IncompatibleLoaderProps) {
+    const { loader, device, quit } = props;
+    return <div className='container mainContainer'>
+        <h1>Incompatible Modloader</h1>
+        <p>Your app is patched with {loader === 'QuestLoader' ? "the QuestLoader" : "an unknown"} modloader, which isn't supported by MBF.</p>
+        <p>You will need to uninstall your app and reinstall the latest vanilla version so that the app can be re-patched with Scotland2.</p>
+        <p>Do not be alarmed! Your custom songs will not be lost.</p>
+
+        <button onClick={async () => {
+            await uninstallBeatSaber(device);
+            quit();
+        }}>Uninstall Beat Saber</button>
+    </div>
 }
 
 interface ModManagerProps {
