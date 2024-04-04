@@ -24,8 +24,29 @@
     font-weight: 500;
 }
 
-.modToggle {
+.modControls {
     margin-left: auto;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+#removeMod {
+    background-color: rgb(145, 6, 6);
+    padding: 3px;
+    border-radius: 4px;
+    transition-duration: 100ms;
+}
+
+#removeMod > img {
+    width: 30px;
+}
+
+#removeMod:hover {
+    background-color: rgb(209, 10, 10);
+    transition-duration: 100ms;
 }
 
 .idVersionText {

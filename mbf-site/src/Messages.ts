@@ -17,7 +17,12 @@ interface QuickFix {
     type: 'QuickFix'
 }
 
-type Request = GetModStatus | Patch | SetModsEnabled | QuickFix;
+interface RemoveMod {
+    type: 'RemoveMod',
+    id: string
+}
+
+type Request = GetModStatus | Patch | SetModsEnabled | QuickFix | RemoveMod;
 
 interface Mods {
     type: 'Mods',

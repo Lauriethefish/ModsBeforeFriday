@@ -24,9 +24,6 @@ pub enum Request {
     /// - The core mods that need to be installed.
     /// - Whether the modloader is in the correct place
     GetModStatus,
-    /// Checks which mods are installed and whether the files needed for each mod are copied correctly.
-    /// If a new mod is pushed via ADB, this will attempt to load the mod, and will relay back any problems with the mod.
-    GetMods,
     /// Installs or uninstalls any number of mods.
     /// This will also attempt to download and install dependencies, upgrade dependencies and will uninstall any
     /// depending mods of mods that have been disabled.
@@ -35,7 +32,18 @@ pub enum Request {
     SetModsEnabled {
         statuses: HashMap<String, bool>
     },
+    // TODO: Make these lists to allow importing multiple mods at once?
 
+    /// Removes the mod with the given ID, which will uninstall dependant mods.
+    /// Returns a Mods message containing the mods now installed.
+    RemoveMod {
+        id: String
+    },
+    /// Imports a mod from the given path on the quest.
+    /// Returns a Mods message containing the mods now installed.
+    Import {
+        from_path: String
+    },
     /// - Patches Beat Saber to add support for modloaders. (will not patch again if the app is already modded)
     /// - Saves the modloader to the appropriate locatioon on the Quest.
     /// - Wipes any existing mods.

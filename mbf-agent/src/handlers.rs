@@ -18,7 +18,8 @@ pub fn handle_request(request: Request) -> Result<Response> {
             statuses
         } => run_mod_action(statuses),
         Request::QuickFix => handle_quick_fix(),
-        _ => todo!()
+        Request::Import { from_path } => handle_import(from_path),
+        Request::RemoveMod { id } => handle_remove_mod(id),
     }
 }
 
@@ -147,11 +148,53 @@ fn get_app_info() -> Result<Option<AppInfo>> {
     }))    
 }
 
+fn handle_import(from_path: String) -> Result<Response> {
+    // Load the installed mods.
+    let mut mod_manager = ModManager::new();
+    mod_manager.load_mods()?;
+
+    match mod_manager.try_load_new_mod(from_path.clone().into()) {
+        Ok(id) => {
+            // A bit of a hack here: when installing mods, 
+            // we don't want to copy the unvalidated mod to the QMODs directory,
+            // so we load it from a temporary directory.
+
+            // If the mod loads successfully, we then need to *unload it* so that the file is not in use, then copy it to the mods directory.
+            let new_path = mod_manager.get_unique_mod_path(&id);
+            let installed_mods = get_mod_models(mod_manager); // Drops the mod_manager/the mod file handles
+
+            // Copy to a new patch in the mods directory
+            std::fs::copy(&from_path, new_path)?;
+            std::fs::remove_file(from_path)?;
+
+            Ok(Response::Mods {
+                installed_mods
+            })
+        },
+        Err(err) => {
+            std::fs::remove_file(from_path)?;
+
+            Err(err)
+        }
+    }
+}
+
+fn handle_remove_mod(id: String) -> Result<Response> {
+    let mut mod_manager = ModManager::new();
+    mod_manager.load_mods()?;
+    mod_manager.remove_mod(&id)?;
+
+    Ok(Response::Mods {
+        installed_mods: get_mod_models(mod_manager)
+    })
+}
+
 fn handle_quick_fix() -> Result<Response> {
     let app_info = get_app_info()?
         .ok_or(anyhow!("Cannot quick fix when app is not installed"))?;
 
     let mut mod_manager = ModManager::new();
+    mod_manager.load_mods()?;
 
     // Reinstall missing core mods and overwrite the modloader with the one contained within the executable.
     install_core_mods(&mut mod_manager, app_info)?;
@@ -171,6 +214,7 @@ fn handle_patch() -> Result<Response> {
     let mut mod_manager = ModManager::new();
     info!("Wiping all existing mods");
     mod_manager.wipe_all_mods().context("Failed to wipe existing mods")?;
+    mod_manager.load_mods()?; // Should load no mods.
 
     install_core_mods(&mut mod_manager, get_app_info()?
         .expect("Beat Saber should be installed after patching"))?;    
@@ -185,12 +229,15 @@ fn install_core_mods(mod_manager: &mut ModManager, app_info: AppInfo) -> Result<
     let core_mods = core_mod_index.get(&app_info.version)
         .ok_or(anyhow!("No core mods existed for {}", app_info.version))?;
 
+
     for core_mod in &core_mods.mods {
         info!("Downloading {} v{}", core_mod.id, core_mod.version);
         let save_path = mod_manager.mods_path().as_ref()
             .join(format!("{}-v{}-CORE.qmod", core_mod.id, core_mod.version));
 
-        download_file(save_path, &core_mod.download_url).context("Failed to download core mod")?;
+        download_file(&save_path, &core_mod.download_url).context("Failed to download core mod")?;
+        mod_manager.try_load_new_mod(save_path)?;
+        
     }
 
     info!("Loading and installing core mods");

@@ -81,6 +81,15 @@ async function setModStatuses(device: Adb, changesRequested: { [id: string]: boo
     return (response as Mods).installed_mods;
 }
 
+async function removeMod(device: Adb, mod_id: string, addLogEvent: (event: LogMsg) => void) {
+    let response = await runCommand(device, {
+        type: 'RemoveMod',
+        id: mod_id
+    }, addLogEvent);
+
+    return (response as Mods).installed_mods;
+}
+
 async function uninstallBeatSaber(device: Adb) {
     await device.subprocess.spawnAndWait("pm uninstall com.beatgames.beatsaber");
 }
@@ -333,6 +342,16 @@ function ModManager(props: ModManagerProps) {
         {mods.map(mod => <ModCard
             mod={mod}
             key={mod.id}
+            onRemoved={async () => {
+                setWorking(true);
+                try {
+                    setMods(await removeMod(props.device, mod.id, addLogEvent));
+                }   catch(e) {
+                    setModError(String(e));
+                }   finally {
+                    setWorking(false);
+                }
+            }}
             onEnabledChanged={enabled => {
                 const newChanges = { ...changes };
                 newChanges[mod.id] = enabled;

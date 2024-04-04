@@ -37,6 +37,26 @@ export function ErrorModal(props: ErrorModalProps) {
         </div>
         <p>{props.description}</p>
 
-        <button id="okButton" onClick={props.onClose}>OK</button>
+        <div className="confirmButtons">
+            <button onClick={props.onClose}>OK</button>
+        </div>
+    </Modal>
+}
+
+interface ConfirmModalProps {
+    isVisible: boolean,
+    onConfirm: () => void,
+    onDeny: () => void,
+    children: ReactNode
+}
+
+export function ConfirmModal(props: ConfirmModalProps) {
+    return <Modal isVisible={props.isVisible}>
+        <h1>Confirm</h1>
+        {props.children}
+        <div className="confirmButtons">
+            <button onClick={props.onConfirm}>Yes</button>
+            <button onClick={props.onDeny}>No</button>
+        </div>
     </Modal>
 }

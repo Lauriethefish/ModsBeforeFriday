@@ -30,8 +30,14 @@
     gap: 15px;
 }
 
-#okButton {
-    margin: 0 auto;
+.confirmButtons {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    gap: 10px;
+}
+
+.confirmButtons > button {
     display: block;
     padding: 3%;
     min-width: 4rem;

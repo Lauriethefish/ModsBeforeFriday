@@ -147,7 +147,7 @@ impl ModManager {
                     if !dep.version_range.matches(&dep_ref.manifest.version) {
                         info!("Dependency {} is out of date, got version {} but need {}", dep.id, dep_ref.manifest.version, dep.version_range);
                         drop(dep_ref);
-                        self.install_dependency(&dep, true)?;
+                        self.install_dependency(&dep)?;
                     }   else if !dep_ref.installed {
                         // Must install the dependency
                         info!("Dependency {} was not installed, reinstalling", dep.id);
@@ -156,9 +156,8 @@ impl ModManager {
                     }
                 },
                 None => {
-                    // Install dependency
                     info!("Dependency {} was not found: installing now", dep.id);
-                    self.install_dependency(&dep, false)?;
+                    self.install_dependency(&dep)?;
                 }
             }
         }
@@ -259,9 +258,9 @@ impl ModManager {
         Ok(())
     }
 
-    fn install_dependency(&mut self, dep: &ModDependency, upgrading: bool) -> Result<()> {
+    fn install_dependency(&mut self, dep: &ModDependency) -> Result<()> {
         // Find a path to save the dependency
-        let save_path = self.mods_path().as_ref().join(format!("{}-DEP.qmod", dep.id));
+        let save_path = self.get_unique_mod_path(&dep.id);
 
         let link = match &dep.mod_link {
             Some(link) => link,
@@ -270,30 +269,58 @@ impl ModManager {
 
         info!("Downloading dependency from {}", link);
         download_file(&save_path, &link).context("Failed to download dependency")?;
-        let loaded_dep = Self::load_mod_from(save_path.clone())?;
+
 
         // TODO: check ID matches
+        match self.try_load_new_mod(save_path.clone()) {
+            Ok(_) => {},
+            Err(err) => {
+                // Adding the dependency failed so it has been dropped. Therefore, delete the saved dependancy.
+                std::fs::remove_file(save_path)?;
 
-        // Now we must carefully check that existing installed mods are compatible with this dependency!
-        if upgrading {
-            if !self.check_dependency_compatibility(&dep.id, &loaded_dep.manifest.version) {
-                drop(loaded_dep);
-                std::fs::remove_file(&save_path)?;
-
-                return Err(anyhow!("Could not install dependency {}", dep.id))
+                return Err(err);
             }
         }
-
-        // Remove existing dependency, unchecked as we don't want to nuke any dependencies
-        // by allowing remove_mod to run a regular uninstall
-        if upgrading {
-            info!("Removing existing version of dependency");
-            self.uninstall_unchecked(&dep.id)?;
-            self.remove_mod(&dep.id)?;
-        }
-        self.mods.insert(dep.id.clone(), Rc::new(RefCell::new(loaded_dep)));
+        
         self.install_mod(&dep.id)?;
         Ok(())
+    }
+
+    pub fn try_load_new_mod(&mut self, from: PathBuf) -> Result<String> {
+        let loaded_mod = Self::load_mod_from(from.clone())?;
+
+        // Check that upgrading the mod to the new version is actually safe
+        let id = loaded_mod.manifest.id.clone();
+        if self.mods.contains_key(&id) {
+            if !self.check_dependency_compatibility(&id, &loaded_mod.manifest.version) {
+                return Err(anyhow!("Could not upgrade {} to v{}", id, loaded_mod.manifest.version))
+            }
+
+            // Remove the existing version of the mod, 
+            // unchecked as we don't want to nuke any dependant mods or any of its dependencies; we have established that the upgrade is safe.
+            // by allowing remove_mod to run a regular uninstall
+            info!("Removing existing version of mod");
+            self.uninstall_unchecked(&id)?;
+            self.remove_mod(&id)?;
+        }
+        self.mods.insert(id.clone(), Rc::new(RefCell::new(loaded_mod)));
+
+        Ok(id)
+    }
+
+    pub fn get_unique_mod_path(&self, id: &str) -> PathBuf {
+        let mut i = 0;
+        loop {
+            let path = self.mods_path()
+                .as_ref()
+                .join(Path::new(&format!("{id}_{i}.qmod")));
+
+            if !path.exists() {
+                break path;
+            }
+
+            i += 1;
+        }
     }
 
     pub fn remove_mod(&mut self, id: &str) -> Result<()> {
@@ -301,11 +328,12 @@ impl ModManager {
             Some(to_remove) => {
                 let to_remove_ref = (**to_remove).borrow();
                 let path_to_delete = to_remove_ref.loaded_from.clone();
-                if to_remove_ref.installed {
-                    self.uninstall_mod(id)?;
-                }
+                let installed = to_remove_ref.installed;
 
                 drop(to_remove_ref);
+                if installed {
+                    self.uninstall_mod(id)?;
+                }
                 self.mods.remove(id);
 
                 std::fs::remove_file(path_to_delete)?;
