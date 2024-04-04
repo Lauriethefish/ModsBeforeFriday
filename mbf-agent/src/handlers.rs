@@ -56,6 +56,7 @@ fn run_mod_action(statuses: HashMap<String, bool>) -> Result<Response> {
 
 fn handle_get_mod_status() -> Result<Response> {
     info!("Loading installed mods");
+
     let mut mod_manager = ModManager::new();
     mod_manager.load_mods().context("Failed to load installed mods")?;
 

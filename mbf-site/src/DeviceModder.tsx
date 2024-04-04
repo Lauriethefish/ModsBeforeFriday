@@ -11,7 +11,8 @@ import { Mods } from './Messages';
 import { ErrorModal, Modal } from './components/Modal';
 
 interface DeviceModderProps {
-    device: Adb
+    device: Adb,
+    unrecoverableError: (err: unknown) => void
 }
 
 async function loadModStatus(device: Adb): Promise<ModStatus> {
@@ -41,10 +42,12 @@ async function setModStatuses(device: Adb, changesRequested: { [id: string]: boo
 
 function DeviceModder(props: DeviceModderProps) {
     const [modStatus, setModStatus] = useState(null as ModStatus | null);
-
+    const { device, unrecoverableError } = props;
     useEffect(() => {
-        loadModStatus(props.device).then(data => setModStatus(data));
-    }, [props.device]);
+        loadModStatus(device)
+            .then(data => setModStatus(data))
+            .catch(err => unrecoverableError(err));
+    }, [device, unrecoverableError]);
 
     if(modStatus === null) {
         return <div className='container mainContainer'>
@@ -73,11 +76,11 @@ function DeviceModder(props: DeviceModderProps) {
                 <InstallStatus modloaderReady={modStatus.modloader_present} coreModsReady={modStatus.core_mods.all_core_mods_installed} />
             </div>
 
-            <ModManager initialMods={modStatus.installed_mods} device={props.device}/>
+            <ModManager initialMods={modStatus.installed_mods} device={device}/>
         </>
     }   else    {
         return <PatchingMenu
-            device={props.device}
+            device={device}
             app_version={modStatus.app_info.version}
             onCompleted={mods => {
                 console.log("App is now patched, moving into mods menu");

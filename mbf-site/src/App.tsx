@@ -6,6 +6,7 @@ import { AdbDaemonTransport, Adb } from '@yume-chan/adb';
 
 import AdbWebCredentialStore from "@yume-chan/adb-credential-web";
 import DeviceModder from './DeviceModder';
+import { ErrorModal, Modal } from './components/Modal';
 
 async function connect(
   setAuthing: () => void): Promise<Adb | null> {
@@ -19,9 +20,8 @@ async function connect(
   try {
     connection = await quest.connect();
   } catch(err) {
-    alert("Some other app is trying to access your quest, e.g. SideQuest." + 
-    " Please restart your computer to close any SideQuest background processes, then try again. \n(" + err + ")");
-    return null;
+    throw new Error("Some other app is trying to access your quest, e.g. SideQuest." + 
+    " Please restart your computer to close any SideQuest background processes, then try again. (Running `adb kill-server` will fix this.)");
   }
   const keyStore: AdbWebCredentialStore = new AdbWebCredentialStore("ModsBeforeFriday");
   
@@ -38,10 +38,14 @@ async function connect(
 function ChooseDevice() {
   const [authing, setAuthing] = useState(false);
   const [chosenDevice, setChosenDevice] = useState(null as Adb | null);
+  const [connectError, setConnectError] = useState(null as string | null);
 
   if(chosenDevice !== null) {
     return <>
-      <DeviceModder device={chosenDevice} />
+      <DeviceModder device={chosenDevice} unrecoverableError={(err) => {
+        setConnectError(String(err));
+        setChosenDevice(null);
+      }} />
     </>
   } else if(authing) {
     return <div className='container mainContainer'>
@@ -52,16 +56,7 @@ function ChooseDevice() {
   } else  {
     return <>
         <div className="container mainContainer">
-          <h1>
-            <span className="initial">M</span>
-            <span className="title">ods</span>
-            <span className="initial">B</span>
-            <span className="title">efore</span>
-            <span className="initial">F</span>
-            <span className="title">riday</span>
-            <span className="initial">!</span>
-          </h1>
-          <p>The easiest way to install custom songs for Beat Saber on Quest!</p>
+          <Title />
           <p>To get started, plug your Quest in with a USB-C cable and click the button below.</p>
 
           <h3>No compatible devices?</h3>
@@ -73,14 +68,44 @@ function ChooseDevice() {
           </p>
 
           <button id="chooseDevice" onClick={async () => {
-            const device = await connect(() => setAuthing(true));
+            let device: Adb | null;
+
+            try {
+              device = await connect(() => setAuthing(true));
+            } catch(e) {
+              setConnectError(String(e));
+              return;
+            }
+            setAuthing(false);
             if(device !== null) {
               setChosenDevice(device);
+              await device.transport.disconnected;
+              setChosenDevice(null);
             }
           }}>Connect to Quest</button>
+
+          <ErrorModal isVisible={connectError != null}
+            title={"Failed to connect to device"}
+            description={connectError!}
+            onClose={() => setConnectError(null)}/>
         </div>
       </>
   }
+}
+
+function Title() {
+  return <>
+    <h1>
+      <span className="initial">M</span>
+      <span className="title">ods</span>
+      <span className="initial">B</span>
+      <span className="title">efore</span>
+      <span className="initial">F</span>
+      <span className="title">riday</span>
+      <span className="initial">!</span>
+    </h1>
+    <p>The easiest way to install custom songs for Beat Saber on Quest!</p>
+  </>
 }
 
 function AppContents() {
