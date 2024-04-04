@@ -8,10 +8,41 @@ ModsBeforeFriday is a modding tool for Beat Saber on Quest that works entirely w
 `./mbf-site` contains the frontend, which communicates with the agent via JSON. (Written in typescript with React).
 
 ## Compilation Instructions
-... coming soon
+### Build Requirements
+- [yarn 1.22](https://classic.yarnpkg.com/lang/en/docs/install/)
+- Rust 1.77 or newer, install with [rustup](https://rustup.rs/).
+- [Android NDK](https://developer.android.com/ndk/downloads), r23b or newer.
+
+### Setting up Rust
+Install the aarch64-linux-android target:
+
+```$ rustup target add aarch64-linux-android```
+
+#### Environment Variables
+- Set `ANDROID_NDK_HOME` to the folder containing your Android NDK.
+- Set `CC_aarch64_linux_android` to `$NDK_PATH/toolchains/llvm/prebuilt/windows-x86_64/bin/aarch64-linux-android31-clang.cmd` where `$NDK_PATH` is your Android NDK root path.
+- Set `AR_aarch64_linux_android` to `$NDK_PATH/toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-ar.exe`.
+
+(if on another OS, the paths may be slightly different. Please update the paths as necessary!)
+#### Cargo config
+Create a new file with path `~/.cargo/config.toml`. Add the following contents.
+```toml
+[target.aarch64-linux-android]
+linker = "CONTENTS OF CC_aarch64_linux_android"
+ar = "CONTENTS OF AR_aarch64_linux_android"
+```
+
+### Compiling Agent
+- To compile the agent and copy it to the `public` directory so that it can be used by the site, navigate to `./mbf-agent` and run `./build.ps1`.
+- The `./run_android` script can be used to automatically copy the agent to the correct location on the Quest if you want to invoke it manually in `adb shell`. The site will do this automatically otherwise.
+- `./reset_bs` will reinstall vanilla Beat Saber. (The paths in this file reflect the directory structure of Lauriethefish's computer and will need updating with the path of your APK/OBB.)
+
+### Debugging site
+To serve the site for testing, navigate to `./mbf-site` and run `yarn start`.
+(you may need to `yarn install` first).
 
 ### TODO List
 - Actually add support for uploading mods.
-- Add actions and build instructions
+- Add actions.
 - Do some beta testing
 - Deploy
