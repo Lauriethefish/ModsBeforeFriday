@@ -10,6 +10,9 @@ jobs:
     env:
       CC_aarch64-linux-android: /home/runner/android-ndk-r26c/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android31-clang
       AR_aarch64-linux-android: /home/runner/android-ndk-r26c/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - uses: actions/checkout@v4
@@ -38,3 +41,12 @@ jobs:
         run: yarn --cwd ./mbf-site install
       - name: yarn build
         run: yarn --cwd ./mbf-site build
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './mbf-site/dist'
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
