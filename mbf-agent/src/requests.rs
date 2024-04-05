@@ -40,7 +40,7 @@ pub enum Request {
         id: String
     },
     /// Imports a mod from the given path on the quest.
-    /// Returns a Mods message containing the mods now installed.
+    /// Returns an ImportedMod message containing the mods now installed, and the ID of the one that was imported.
     Import {
         from_path: String
     },
@@ -98,6 +98,10 @@ pub enum Response {
     },
     Mods {
         installed_mods: Vec<ModModel>
+    },
+    ImportedMod {
+        installed_mods: Vec<ModModel>,
+        imported_id: String  
     },
     // Sent to relay progress information during the modding process.
     // This will NOT be the final message sent.

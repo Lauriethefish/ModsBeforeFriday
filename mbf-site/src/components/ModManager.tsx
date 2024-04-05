@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { LogWindow, useLog } from "./LogWindow";
 import { Mod } from "../Models";
-import { ErrorModal, Modal } from "./Modal";
+import { YesNoModal, ErrorModal, Modal } from "./Modal";
 import { Adb } from '@yume-chan/adb';
 import { ModCard } from "./ModCard";
 import ModIcon from '../icons/mod-icon.svg'
@@ -57,11 +57,17 @@ export function ModManager(props: ModManagerProps) {
                         setWorking(false);
                     }
             }}>Sync Changes</button>}
-            {!hasChanges && <UploadButton onUploaded={async file => {
+            {!hasChanges && <UploadButton onUploaded={async (file, installByDefault) => {
                 console.log("Importing " + file.name);
                 try {
                     setWorking(true);
-                    setMods(await importMod(device, file, addLogEvent));
+                    const { installed_mods, imported_id } = await importMod(device, file, addLogEvent);
+
+                    if(installByDefault) {
+                        setMods(await setModStatuses(device, { [imported_id]: true }, addLogEvent));
+                    }   else    {
+                        setMods(installed_mods);
+                    }
                 }   catch(e)   {
                     setModError("Failed to import mod: " + e);
                 }   finally {
@@ -112,23 +118,36 @@ function Title() {
 }
 
 interface UploadButtonProps {
-    onUploaded: (file: File) => void;
+    onUploaded: (file: File, enable: boolean) => void;
 }
 
 function UploadButton(props: UploadButtonProps) {
-    const inputFile = useRef<HTMLInputElement | null>(null);
+    const { onUploaded } = props;
 
-    return <button id="uploadButton" onClick={() => inputFile.current?.click()}>
-        Upload
-        <img src={UploadIcon}/>
-        <input type="file"
-            id="file"
-            accept=".qmod"
-            ref={inputFile}
-            style={{display: 'none'}}
-            onChange={ev => props.onUploaded(ev.target.files![0])}
-        />
-    </button>
+    const inputFile = useRef<HTMLInputElement | null>(null);
+    const [file, setFile] = useState(null as File | null);
+
+    return <>
+        <button id="uploadButton" onClick={() => inputFile.current?.click()}>
+            Upload
+            <img src={UploadIcon}/>
+            <input type="file"
+                id="file"
+                accept=".qmod"
+                ref={inputFile}
+                style={{display: 'none'}}
+                onChange={ev => setFile(ev.target.files![0])}
+            />
+        </button>
+
+        <YesNoModal
+            title="Enable now?"
+            isVisible={file != null}
+            onYes={() => { setFile(null); onUploaded(file!, true) }}
+            onNo={() => { setFile(null); onUploaded(file!, false) }}>
+            <p>Enable the mod right now, or leave it disabled for later?</p>
+        </YesNoModal>
+    </>
 }
 
 function sortById(mods: Mod[]) {

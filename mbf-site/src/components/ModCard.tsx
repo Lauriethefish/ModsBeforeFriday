@@ -2,7 +2,7 @@ import '../css/ModCard.css';
 import { Mod } from '../Models'
 import { Slider } from './Slider';
 import TrashCan from '../icons/trash.svg';
-import { ConfirmModal, Modal } from './Modal';
+import { YesNoModal, Modal } from './Modal';
 import { useState } from 'react';
 
 interface ModCardProps {
@@ -32,14 +32,15 @@ export function ModCard(props: ModCardProps) {
             }}/>
         </div>
 
-        <ConfirmModal
-            onConfirm={() => {
+        <YesNoModal
+            title="Confirm"
+            onYes={() => {
                 setRequestRemove(false);
                 props.onRemoved();
             }}
-            onDeny={()=> setRequestRemove(false)}
+            onNo={()=> setRequestRemove(false)}
             isVisible={requestRemove}>
             <p>Are you sure that you want to remove {props.mod.id} v{props.mod.version}?</p>
-        </ConfirmModal>
+        </YesNoModal>
     </div>
 }

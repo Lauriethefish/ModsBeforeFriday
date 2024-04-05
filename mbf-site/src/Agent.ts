@@ -1,6 +1,6 @@
 import { AdbSync, AdbSyncWriteOptions, Adb, encodeUtf8 } from '@yume-chan/adb';
 import { ConsumableReadableStream, Consumable, DecodeUtf8Stream, ConcatStringStream } from '@yume-chan/stream-extra';
-import { Request, Response, LogMsg, ModStatus, Mods } from "./Messages";
+import { Request, Response, LogMsg, ModStatus, Mods, ImportedMod } from "./Messages";
 import { Mod } from './Models';
 
 const AgentPath: string = "/data/local/tmp/mbf-agent";
@@ -187,7 +187,7 @@ async function setModStatuses(device: Adb,
 
 async function importMod(device: Adb,
     file: File,
-    eventSink: LogEventSink = null): Promise<Mod[]> {
+    eventSink: LogEventSink = null): Promise<ImportedMod> {
   const sync = await device.sync();
   const tempPath = "/data/local/tmp/mbf-uploads/" + file.name;
   try {
@@ -206,7 +206,7 @@ async function importMod(device: Adb,
       from_path: tempPath
     }, eventSink);
 
-    return (response as Mods).installed_mods;
+    return response as ImportedMod;
   } finally {
     sync.dispose();
   }

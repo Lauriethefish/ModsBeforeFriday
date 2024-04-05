@@ -34,6 +34,12 @@ interface Mods {
     installed_mods: Mod[]
 }
 
+interface ImportedMod {
+    type: 'ImportedMod',
+    installed_mods: Mod[],
+    imported_id: string
+}
+
 interface ModStatus {
     type: 'ModStatus',
     app_info: AppInfo | null,
@@ -48,7 +54,7 @@ interface LogMsg {
     level: LogLevel
 }
 
-type Response = LogMsg | ModStatus | Mods;
+type Response = LogMsg | ModStatus | Mods | ImportedMod;
 
 interface CoreModsInfo {
     supported_versions: string[],
@@ -73,5 +79,6 @@ export type {
     CoreModsInfo,
     LogMsg,
     Mods,
-    ModLoader
+    ModLoader,
+    ImportedMod
 }

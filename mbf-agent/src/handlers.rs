@@ -168,7 +168,8 @@ fn handle_import(from_path: String) -> Result<Response> {
             std::fs::copy(&from_path, new_path)?;
             std::fs::remove_file(from_path)?;
 
-            Ok(Response::Mods {
+            Ok(Response::ImportedMod {
+                imported_id: id,
                 installed_mods
             })
         },
