@@ -62,19 +62,25 @@ export function ModManager(props: ModManagerProps) {
                 console.log("Importing " + file.name);
                 try {
                     setWorking(true);
-                    const { installed_mods, imported_id } = await importMod(device, file, addLogEvent);
-
-                    // Don't install a mod by default if its version mismatches: we 
-                    const versionMismatch = gameVersion !== null 
-                        && gameVersion != installed_mods.find(mod => mod.id == imported_id)?.version;
-                    if(versionMismatch) {
-                        setMods(installed_mods);
-                        setModError("The mod `" + imported_id + "` was not enabled automatically as it is not designed for game version v" + gameVersion + ".");
+                    const importResult = await importMod(device, file, addLogEvent);
+                    if(importResult.type === 'ImportedFileCopy') {
+                        // TODO: Show a toast?
+                        console.log("Successfully copied " + file.name + " to " + importResult.copied_to + " due to request from " + importResult.mod_id)
                     }   else    {
-                        setMods(await setModStatuses(device, { [imported_id]: true }, addLogEvent));
+                        // Don't install a mod by default if its version mismatches: we want the user to understand the consequences
+                        const { installed_mods, imported_id } = importResult;
+
+                        const versionMismatch = gameVersion !== null 
+                        && gameVersion !== installed_mods.find(mod => mod.id === imported_id)?.game_version;
+                        if(versionMismatch) {
+                            setMods(installed_mods);
+                            setModError("The mod `" + imported_id + "` was not enabled automatically as it is not designed for game version v" + gameVersion + ".");
+                        }   else    {
+                            setMods(await setModStatuses(device, { [imported_id]: true }, addLogEvent));
+                        }
                     }
                 }   catch(e)   {
-                    setModError("Failed to import mod: " + e);
+                    setModError("Failed to import file: " + e);
                 }   finally {
                     setWorking(false);
                 }
@@ -105,6 +111,12 @@ export function ModManager(props: ModManagerProps) {
             title={"Failed to sync mods"}
             description={modError!}
             onClose={() => setModError(null)} />
+        <Modal isVisible={isWorking}>
+            <div className='syncingWindow'>
+                <h1>Syncing Mods...</h1>
+                <LogWindow events={logEvents} />
+            </div>
+        </Modal>
     </>
 }
 
@@ -131,7 +143,6 @@ function UploadButton(props: UploadButtonProps) {
             <img src={UploadIcon}/>
             <input type="file"
                 id="file"
-                accept=".qmod"
                 ref={inputFile}
                 style={{display: 'none'}}
                 onChange={ev => onUploaded(ev.target.files![0])}

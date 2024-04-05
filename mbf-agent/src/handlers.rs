@@ -235,7 +235,7 @@ fn attempt_file_copy(from_path: PathBuf, mod_manager: ModManager) -> Result<Resp
         }
     }
 
-    Err(anyhow!("File extension {} was not recognised by any mod", file_ext))
+    Err(anyhow!("File extension `.{}` was not recognised by any mod", file_ext))
 } 
 
 fn handle_remove_mod(id: String) -> Result<Response> {

@@ -40,6 +40,14 @@ interface ImportedMod {
     imported_id: string
 }
 
+interface ImportedFileCopy {
+    type: 'ImportedFileCopy',
+    copied_to: string,
+    mod_id: string
+}
+
+type ImportResult = ImportedMod | ImportedFileCopy;
+
 interface ModStatus {
     type: 'ModStatus',
     app_info: AppInfo | null,
@@ -54,7 +62,7 @@ interface LogMsg {
     level: LogLevel
 }
 
-type Response = LogMsg | ModStatus | Mods | ImportedMod;
+type Response = LogMsg | ModStatus | Mods | ImportResult;
 
 interface CoreModsInfo {
     supported_versions: string[],
@@ -80,5 +88,7 @@ export type {
     LogMsg,
     Mods,
     ModLoader,
-    ImportedMod
+    ImportedMod,
+    ImportedFileCopy,
+    ImportResult
 }

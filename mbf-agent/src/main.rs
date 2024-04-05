@@ -107,7 +107,7 @@ fn main() -> Result<()> {
     match std::panic::catch_unwind(|| handlers::handle_request(req)) {
         Ok(resp) => match resp {
             Ok(resp) => write_response(resp)?,
-            Err(err) => error!("Request failed: {err:?}")
+            Err(err) => error!("{err:?}")
         },
         Err(_) => {} // Panic will be outputted above
     };
