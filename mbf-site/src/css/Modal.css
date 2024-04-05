@@ -19,7 +19,7 @@
     margin: auto;
     background-color: #1f1f1f;
     margin-top: 5rem;
-    max-width: min(30rem, 95%);
+    max-width: min(30rem, 90%);
 }
 
 #errorTitle {
