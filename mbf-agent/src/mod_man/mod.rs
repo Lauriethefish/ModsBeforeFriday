@@ -137,7 +137,7 @@ impl ModManager {
         let mod_rc =  self.mods.get(id)
             .ok_or(anyhow!("Could not install mod with ID {id} as it did not exist"))?.clone();
 
-        let mut to_install = (*mod_rc).borrow_mut();
+        let to_install = (*mod_rc).borrow();
         info!("Installing {} v{}", to_install.manifest.id, to_install.manifest.version);
 
         for dep in &to_install.manifest.dependencies {
@@ -161,8 +161,9 @@ impl ModManager {
                 }
             }
         }
+        drop(to_install);
 
-        self.install_unchecked(&mut to_install)?;
+        self.install_unchecked(&mut (*mod_rc).borrow_mut())?;
         Ok(())
     }
 
