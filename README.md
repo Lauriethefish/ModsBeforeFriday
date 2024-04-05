@@ -43,4 +43,5 @@ To serve the site for testing, navigate to `./mbf-site` and run `yarn start`.
 
 ### TODO List
 - Actually add support for uploading mods.
+- Download the SongDownloader mod by default? (and maybe a song so that users can check it is all working?)
 - Do some beta testing
