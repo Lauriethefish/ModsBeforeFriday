@@ -108,6 +108,7 @@ function Title() {
       <span className="initial">!</span>
     </h1>
     <p>The easiest way to install custom songs for Beat Saber on Quest!</p>
+    <p className="warning">MBF is currently experimental and not yet ready for public use. Use at your own risk.</p>
   </>
 }
 
