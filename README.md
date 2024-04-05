@@ -43,6 +43,4 @@ To serve the site for testing, navigate to `./mbf-site` and run `yarn start`.
 
 ### TODO List
 - Actually add support for uploading mods.
-- Add actions.
 - Do some beta testing
-- Deploy
