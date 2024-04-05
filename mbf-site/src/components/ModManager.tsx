@@ -67,6 +67,8 @@ export function ModManager(props: ModManagerProps) {
                     if(importResult.type === 'ImportedFileCopy') {
                         console.log("Successfully copied " + file.name + " to " + importResult.copied_to + " due to request from " + importResult.mod_id);
                         toast("Successfully copied " + file.name + " to the path specified by " + importResult.mod_id);
+                    }   else if(importResult.type === 'ImportedSong') {
+                        toast("Successfully imported song " + file.name);
                     }   else    {
                         // Don't install a mod by default if its version mismatches: we want the user to understand the consequences
                         const { installed_mods, imported_id } = importResult;

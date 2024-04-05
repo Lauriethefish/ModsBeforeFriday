@@ -32,6 +32,7 @@ pub enum Request {
     SetModsEnabled {
         statuses: HashMap<String, bool>
     },
+    
     // TODO: Make these lists to allow importing multiple mods at once?
 
     /// Removes the mod with the given ID, which will uninstall dependant mods.
@@ -42,6 +43,7 @@ pub enum Request {
     /// Imports a mod or file copy from the given path on the quest.
     /// Returns an ImportedMod message containing the mods now installed, and the ID of the one that was imported, if importing a mod.
     /// Returns an ImportedFileCopy message if the file type was copied by a mod copy extension.
+    /// Returns an ImportedSong message if the file type was copied to the songs folder.
     Import {
         from_path: String
     },
@@ -110,6 +112,7 @@ pub enum Response {
         // The mod ID that the file copy belonged to
         mod_id: String
     },
+    ImportedSong,
     // Sent to relay progress information during the modding process.
     // This will NOT be the final message sent.
     LogMsg {

@@ -11,6 +11,8 @@ use crate::requests::{AppInfo, CoreModsInfo, ModModel, Request, Response};
 use anyhow::{anyhow, Context, Result};
 use log::{error, info, warn};
 
+const SONGS_PATH: &str = "/sdcard/ModData/com.beatgames.beatsaber/Mods/SongCore/CustomLevels";
+
 pub fn handle_request(request: Request) -> Result<Response> {
     match request {
         Request::GetModStatus => handle_get_mod_status(),
@@ -156,11 +158,18 @@ fn handle_import(from_path: String) -> Result<Response> {
 
     info!("Attempting to import from {from_path}");
     let path: PathBuf = from_path.into();
-    let import_result = if path.extension()
-        .map(|ext| ext == "qmod").unwrap_or(false) {
+
+    let file_ext = match path.extension() {
+        Some(ext) => ext.to_string_lossy().to_lowercase().to_string(),
+        None => return Err(anyhow!("File had no extension"))
+    };
+
+    let import_result = if file_ext == "qmod" {
         handle_import_qmod(mod_manager, path.clone())
-    }   else {
-        attempt_file_copy(path.clone(), mod_manager)
+    }   else if file_ext == "zip" {
+        attempt_song_import(path.clone())
+    }   else    {
+        attempt_file_copy(path.clone(), file_ext, mod_manager)
     };
     
     // Make sure to remove the temporary file in the case that importing the file failed.
@@ -203,17 +212,12 @@ fn handle_import_qmod(mut mod_manager: ModManager, from_path: PathBuf) -> Result
 
 // Attempts to copy the given file as a mod file copy.
 // If returning Ok, the file will have been deleted.
-fn attempt_file_copy(from_path: PathBuf, mod_manager: ModManager) -> Result<Response> {
-    let file_ext = match from_path.extension() {
-        Some(ext) => ext.to_string_lossy(),
-        None => return Err(anyhow!("File had no extension"))
-    };
-
+fn attempt_file_copy(from_path: PathBuf, file_ext: String, mod_manager: ModManager) -> Result<Response> {
     for m in mod_manager.get_mods() {
         let mod_ref = (**m).borrow();
         match mod_ref.manifest()
             .copy_extensions.iter()
-            .filter(|ext| ext.extension.eq_ignore_ascii_case(&file_ext))
+            .filter(|ext| ext.extension == file_ext)
             .next() 
         {
             Some(copy_ext) => {
@@ -236,7 +240,35 @@ fn attempt_file_copy(from_path: PathBuf, mod_manager: ModManager) -> Result<Resp
     }
 
     Err(anyhow!("File extension `.{}` was not recognised by any mod", file_ext))
-} 
+}
+
+fn attempt_song_import(from_path: PathBuf) -> Result<Response> {
+    let song_handle = std::fs::File::open(&from_path)?;
+    let mut zip = ZipFile::open(song_handle).context("Song was invalid ZIP file")?;
+
+    if zip.contains_file("info.dat") || zip.contains_file("Info.dat") {
+        let extract_path = Path::new(SONGS_PATH).join(from_path.file_stem().expect("Must have file stem"));
+
+        if extract_path.exists() {
+            std::fs::remove_dir_all(&extract_path).context("Failed to delete existing song")?;
+        }
+
+        std::fs::create_dir_all(&extract_path)?;
+        let entry_names = zip.iter_entry_names()
+            // TODO: This is not nice for performance
+            .map(|s| s.to_string())
+            .collect::<Vec<String>>();
+        for entry_name in entry_names {
+            zip.extract_file_to(&entry_name, extract_path.join(&entry_name))?;
+        }
+
+        drop(zip);
+        std::fs::remove_file(from_path)?;
+        Ok(Response::ImportedSong)
+    }   else {
+        Err(anyhow!("ZIP file was not a song; Unclear know how to import it"))
+    }
+}
 
 fn handle_remove_mod(id: String) -> Result<Response> {
     let mut mod_manager = ModManager::new();

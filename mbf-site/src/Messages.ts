@@ -46,7 +46,11 @@ interface ImportedFileCopy {
     mod_id: string
 }
 
-type ImportResult = ImportedMod | ImportedFileCopy;
+interface ImportedSong {
+    type: 'ImportedSong'
+}
+
+type ImportResult = ImportedMod | ImportedFileCopy | ImportedSong;
 
 interface ModStatus {
     type: 'ModStatus',
@@ -90,5 +94,6 @@ export type {
     ModLoader,
     ImportedMod,
     ImportedFileCopy,
-    ImportResult
+    ImportResult,
+    ImportedSong
 }
