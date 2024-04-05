@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::io::Cursor;
+use std::path::{Path, PathBuf};
 
 use crate::download_file;
 use crate::{axml::AxmlReader, patching, zip::ZipFile};
@@ -154,32 +155,88 @@ fn handle_import(from_path: String) -> Result<Response> {
     mod_manager.load_mods()?;
 
     info!("Attempting to import from {from_path}");
-    match mod_manager.try_load_new_mod(from_path.clone().into()) {
-        Ok(id) => {
-            // A bit of a hack here: when installing mods, 
-            // we don't want to copy the unvalidated mod to the QMODs directory,
-            // so we load it from a temporary directory.
-
-            // If the mod loads successfully, we then need to *unload it* so that the file is not in use, then copy it to the mods directory.
-            let new_path = mod_manager.get_unique_mod_path(&id);
-            let installed_mods = get_mod_models(mod_manager); // Drops the mod_manager/the mod file handles
-
-            // Copy to a new patch in the mods directory
-            std::fs::copy(&from_path, new_path)?;
-            std::fs::remove_file(from_path)?;
-
-            Ok(Response::ImportedMod {
-                imported_id: id,
-                installed_mods
-            })
-        },
+    let path: PathBuf = from_path.into();
+    let import_result = if path.extension()
+        .map(|ext| ext == "qmod").unwrap_or(false) {
+        handle_import_qmod(mod_manager, path.clone())
+    }   else {
+        attempt_file_copy(path.clone(), mod_manager)
+    };
+    
+    // Make sure to remove the temporary file in the case that importing the file failed.
+    match import_result {
+        Ok(resp) => Ok(resp),
         Err(err) => {
-            std::fs::remove_file(from_path)?;
+            match std::fs::remove_file(path) {
+                Ok(_) => {},
+                Err(err) => warn!("Failed to remove temporary file: {err}")
+            }
 
             Err(err)
         }
     }
 }
+
+// Attempts to import the given path as a QMOD
+// The file will be deleted if this results in a success.
+fn handle_import_qmod(mut mod_manager: ModManager, from_path: PathBuf) -> Result<Response> {
+    info!("Loading {from_path:?} as a QMOD");
+    let id = mod_manager.try_load_new_mod(from_path.clone())?;
+
+    // A bit of a hack here: when installing mods, 
+    // we don't want to copy the unvalidated mod to the QMODs directory,
+    // so we load it from a temporary directory.
+
+    // If the mod loads successfully, we then need to *unload it* so that the file is not in use, then copy it to the mods directory.
+    let new_path = mod_manager.get_unique_mod_path(&id);
+    let installed_mods = get_mod_models(mod_manager); // Drops the mod_manager/the mod file handles
+
+    // Copy to a new patch in the mods directory
+    std::fs::copy(&from_path, new_path)?;
+    std::fs::remove_file(from_path)?;
+
+    Ok(Response::ImportedMod {
+        imported_id: id,
+        installed_mods
+    })
+}
+
+// Attempts to copy the given file as a mod file copy.
+// If returning Ok, the file will have been deleted.
+fn attempt_file_copy(from_path: PathBuf, mod_manager: ModManager) -> Result<Response> {
+    let file_ext = match from_path.extension() {
+        Some(ext) => ext.to_string_lossy(),
+        None => return Err(anyhow!("File had no extension"))
+    };
+
+    for m in mod_manager.get_mods() {
+        let mod_ref = (**m).borrow();
+        match mod_ref.manifest()
+            .copy_extensions.iter()
+            .filter(|ext| ext.extension.eq_ignore_ascii_case(&file_ext))
+            .next() 
+        {
+            Some(copy_ext) => {
+                info!("Copying to {}", copy_ext.destination);
+                let dest_folder = Path::new(&copy_ext.destination);
+                std::fs::create_dir_all(dest_folder).context("Failed to create destination folder")?;
+                let dest_path = dest_folder.join(from_path.file_name().unwrap());
+
+                // Rename is not used as these may be in separate volumes.
+                std::fs::copy(&from_path, &dest_path).context("Failed to copy file")?;
+                std::fs::remove_file(&from_path)?;
+
+                return Ok(Response::ImportedFileCopy {
+                    copied_to: dest_path.to_string_lossy().to_string(),
+                    mod_id: mod_ref.manifest().id.to_string()
+                })
+            },
+            None => {}
+        }
+    }
+
+    Err(anyhow!("File extension {} was not recognised by any mod", file_ext))
+} 
 
 fn handle_remove_mod(id: String) -> Result<Response> {
     let mut mod_manager = ModManager::new();

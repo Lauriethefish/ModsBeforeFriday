@@ -39,8 +39,9 @@ pub enum Request {
     RemoveMod {
         id: String
     },
-    /// Imports a mod from the given path on the quest.
-    /// Returns an ImportedMod message containing the mods now installed, and the ID of the one that was imported.
+    /// Imports a mod or file copy from the given path on the quest.
+    /// Returns an ImportedMod message containing the mods now installed, and the ID of the one that was imported, if importing a mod.
+    /// Returns an ImportedFileCopy message if the file type was copied by a mod copy extension.
     Import {
         from_path: String
     },
@@ -102,6 +103,12 @@ pub enum Response {
     ImportedMod {
         installed_mods: Vec<ModModel>,
         imported_id: String  
+    },
+    ImportedFileCopy {
+        // The full path where the file was copied to.
+        copied_to: String,
+        // The mod ID that the file copy belonged to
+        mod_id: String
     },
     // Sent to relay progress information during the modding process.
     // This will NOT be the final message sent.
