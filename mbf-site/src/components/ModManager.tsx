@@ -8,6 +8,7 @@ import ModIcon from '../icons/mod-icon.svg'
 import UploadIcon from '../icons/upload.svg';
 import '../css/ModManager.css';
 import { importMod, removeMod, setModStatuses } from "../Agent";
+import { toast } from "react-toastify";
 
 interface ModManagerProps {
     mods: Mod[],
@@ -64,19 +65,21 @@ export function ModManager(props: ModManagerProps) {
                     setWorking(true);
                     const importResult = await importMod(device, file, addLogEvent);
                     if(importResult.type === 'ImportedFileCopy') {
-                        // TODO: Show a toast?
-                        console.log("Successfully copied " + file.name + " to " + importResult.copied_to + " due to request from " + importResult.mod_id)
+                        console.log("Successfully copied " + file.name + " to " + importResult.copied_to + " due to request from " + importResult.mod_id);
+                        toast("Successfully copied " + file.name + " to the path specified by " + importResult.mod_id);
                     }   else    {
                         // Don't install a mod by default if its version mismatches: we want the user to understand the consequences
                         const { installed_mods, imported_id } = importResult;
 
-                        const versionMismatch = gameVersion !== null 
-                        && gameVersion !== installed_mods.find(mod => mod.id === imported_id)?.game_version;
+                        const imported_mod = installed_mods.find(mod => mod.id === imported_id)!;
+                        const versionMismatch = gameVersion !== null && gameVersion !== imported_mod.game_version;
+
+                        setMods(installed_mods);
                         if(versionMismatch) {
-                            setMods(installed_mods);
                             setModError("The mod `" + imported_id + "` was not enabled automatically as it is not designed for game version v" + gameVersion + ".");
                         }   else    {
                             setMods(await setModStatuses(device, { [imported_id]: true }, addLogEvent));
+                            toast("Successfully downloaded and installed " + imported_id + " v" + imported_mod.version)
                         }
                     }
                 }   catch(e)   {
@@ -145,7 +148,12 @@ function UploadButton(props: UploadButtonProps) {
                 id="file"
                 ref={inputFile}
                 style={{display: 'none'}}
-                onChange={ev => onUploaded(ev.target.files![0])}
+                onChange={ev => {
+                    const files = ev.target.files;
+                    if(files !== null) {
+                        onUploaded(files[0]);
+                    }
+                }}
             />
         </button>
 }
