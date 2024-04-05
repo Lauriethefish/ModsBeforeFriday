@@ -153,6 +153,7 @@ fn handle_import(from_path: String) -> Result<Response> {
     let mut mod_manager = ModManager::new();
     mod_manager.load_mods()?;
 
+    info!("Attempting to import from {from_path}");
     match mod_manager.try_load_new_mod(from_path.clone().into()) {
         Ok(id) => {
             // A bit of a hack here: when installing mods, 

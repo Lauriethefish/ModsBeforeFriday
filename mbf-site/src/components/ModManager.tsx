@@ -1,13 +1,13 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { LogWindow, useLog } from "./LogWindow";
 import { Mod } from "../Models";
 import { ErrorModal, Modal } from "./Modal";
 import { Adb } from '@yume-chan/adb';
-import { LogMsg, Mods } from "../Messages";
 import { ModCard } from "./ModCard";
 import ModIcon from '../icons/mod-icon.svg'
+import UploadIcon from '../icons/upload.svg';
 import '../css/ModManager.css';
-import { removeMod, setModStatuses } from "../Agent";
+import { importMod, removeMod, setModStatuses } from "../Agent";
 
 interface ModManagerProps {
     mods: Mod[],
@@ -16,7 +16,7 @@ interface ModManagerProps {
 }
 
 export function ModManager(props: ModManagerProps) {
-    const { mods, setMods } = props;
+    const { mods, setMods, device } = props;
     
     const [changes, setChanges] = useState({} as { [id: string]: boolean });
     const [isWorking, setWorking] = useState(false);
@@ -24,20 +24,20 @@ export function ModManager(props: ModManagerProps) {
     const [modError, setModError] = useState(null as string | null);
     sortById(mods);
 
-    return <>
-        <div className='horizontalCenter'>
-            <div className='container horizontalCenter'>
-                <h1>Mods</h1>
-                <img src={ModIcon} />
-            </div>
+    const hasChanges = Object.keys(changes).length > 0;
 
-            {Object.keys(changes).length > 0 && <div>
-                <button id="syncButton" onClick={async () => {
+    return <>
+        <div className="horizontalCenter">
+            <Title />
+            <div>
+            {hasChanges &&
+            <button id="syncButton"
+                onClick={async () => {
                     setChanges({});
                     console.log("Installing mods, statuses requested: " + JSON.stringify(changes));
                     try {
                         setWorking(true);
-                        const updatedMods = await setModStatuses(props.device, changes, addLogEvent);
+                        const updatedMods = await setModStatuses(device, changes, addLogEvent);
 
                         let allSuccesful = true;
                         updatedMods.forEach(m => {
@@ -56,8 +56,19 @@ export function ModManager(props: ModManagerProps) {
                     }  finally {
                         setWorking(false);
                     }
-                }}>Sync Changes</button>
-            </div>}
+            }}>Sync Changes</button>}
+            {!hasChanges && <UploadButton onUploaded={async file => {
+                console.log("Importing " + file.name);
+                try {
+                    setWorking(true);
+                    setMods(await importMod(device, file, addLogEvent));
+                }   catch(e)   {
+                    setModError("Failed to import mod: " + e);
+                }   finally {
+                    setWorking(false);
+                }
+            }} />}
+            </div>
         </div>
         {mods.map(mod => <ModCard
             mod={mod}
@@ -65,7 +76,7 @@ export function ModManager(props: ModManagerProps) {
             onRemoved={async () => {
                 setWorking(true);
                 try {
-                    setMods(await removeMod(props.device, mod.id, addLogEvent));
+                    setMods(await removeMod(device, mod.id, addLogEvent));
                 }   catch(e) {
                     setModError(String(e));
                 }   finally {
@@ -89,6 +100,35 @@ export function ModManager(props: ModManagerProps) {
             description={modError!}
             onClose={() => setModError(null)} />
     </>
+}
+
+function Title() {
+    return <div className='container'>
+        <div className="horizontalCenter">
+            <h1>Mods</h1>
+            <img src={ModIcon} />
+        </div>
+    </div>
+}
+
+interface UploadButtonProps {
+    onUploaded: (file: File) => void;
+}
+
+function UploadButton(props: UploadButtonProps) {
+    const inputFile = useRef<HTMLInputElement | null>(null);
+
+    return <button id="uploadButton" onClick={() => inputFile.current?.click()}>
+        Upload
+        <img src={UploadIcon}/>
+        <input type="file"
+            id="file"
+            accept=".qmod"
+            ref={inputFile}
+            style={{display: 'none'}}
+            onChange={ev => props.onUploaded(ev.target.files![0])}
+        />
+    </button>
 }
 
 function sortById(mods: Mod[]) {

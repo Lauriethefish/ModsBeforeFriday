@@ -5,17 +5,25 @@ import { Mod } from './Models';
 
 const AgentPath: string = "/data/local/tmp/mbf-agent";
 
+// Currently, it seems like the ADB implementation deadlocks when 
+// using the constructor of ConsumableReadableStream to properly read data in a streamed manner.
+// As a temporary solution, we will load files into a Uint8Array and then queue this in one go - it seems to fix the problem
+// TODO: Properly diagnose the bug and file a report.
+function readableStreamBodge(array: Uint8Array): ConsumableReadableStream<Uint8Array> {
+  return new ConsumableReadableStream({
+    start(controller) {
+      controller.enqueue(array);
+      controller.close();
+    },
+  });
+}
+
 async function saveAgent(sync: AdbSync) {
   console.log("Downloading agent");
   const agent: Uint8Array = await downloadAgent();
 
   // TODO: properly use readable streams
-  const file: ConsumableReadableStream<Uint8Array> = new ConsumableReadableStream({
-    start(controller) {
-      controller.enqueue(agent);
-      controller.close();
-    },
-  });
+  const file: ConsumableReadableStream<Uint8Array> = readableStreamBodge(agent);
 
   const options: AdbSyncWriteOptions = {
     filename: AgentPath,
@@ -177,6 +185,33 @@ async function setModStatuses(device: Adb,
   return (response as Mods).installed_mods;
 }
 
+async function importMod(device: Adb,
+    file: File,
+    eventSink: LogEventSink = null): Promise<Mod[]> {
+  const sync = await device.sync();
+  const tempPath = "/data/local/tmp/mbf-uploads/" + file.name;
+  try {
+    
+    console.log("Uploading to " + tempPath);
+    // TODO: Properly use readable streams, see readableStreamBodge
+    const fileStream = readableStreamBodge(new Uint8Array(await file.arrayBuffer()))
+
+    await sync.write({
+      filename: tempPath,
+      file: fileStream
+    })
+
+    const response = await sendRequest(device, {
+      'type': 'Import',
+      from_path: tempPath
+    }, eventSink);
+
+    return (response as Mods).installed_mods;
+  } finally {
+    sync.dispose();
+  }
+}
+
 async function removeMod(device: Adb,
   mod_id: string,
   eventSink: LogEventSink = null) {
@@ -243,5 +278,6 @@ export {
   setModStatuses,
   removeMod,
   patchApp,
-  quickFix
+  quickFix,
+  importMod
 };

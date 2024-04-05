@@ -22,7 +22,12 @@ interface RemoveMod {
     id: string
 }
 
-type Request = GetModStatus | Patch | SetModsEnabled | QuickFix | RemoveMod;
+interface Import {
+    type: 'Import',
+    from_path: string
+}
+
+type Request = GetModStatus | Patch | SetModsEnabled | QuickFix | RemoveMod | Import;
 
 interface Mods {
     type: 'Mods',
