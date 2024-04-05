@@ -62,7 +62,8 @@ export default function DeviceModder(props: DeviceModderProps) {
 
                 <ModManager mods={modStatus.installed_mods}
                     setMods={mods => setModStatus({ ...modStatus, installed_mods: mods })}
-                    device={device} 
+                    device={device}
+                    gameVersion={modStatus.app_info.version}
                 />
             </>
         }   else    {

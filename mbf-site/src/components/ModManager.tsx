@@ -11,12 +11,13 @@ import { importMod, removeMod, setModStatuses } from "../Agent";
 
 interface ModManagerProps {
     mods: Mod[],
+    gameVersion: string,
     setMods: (mods: Mod[]) => void
     device: Adb
 }
 
 export function ModManager(props: ModManagerProps) {
-    const { mods, setMods, device } = props;
+    const { mods, setMods, device, gameVersion } = props;
     
     const [changes, setChanges] = useState({} as { [id: string]: boolean });
     const [isWorking, setWorking] = useState(false);
@@ -57,16 +58,20 @@ export function ModManager(props: ModManagerProps) {
                         setWorking(false);
                     }
             }}>Sync Changes</button>}
-            {!hasChanges && <UploadButton onUploaded={async (file, installByDefault) => {
+            {!hasChanges && <UploadButton onUploaded={async file => {
                 console.log("Importing " + file.name);
                 try {
                     setWorking(true);
                     const { installed_mods, imported_id } = await importMod(device, file, addLogEvent);
 
-                    if(installByDefault) {
-                        setMods(await setModStatuses(device, { [imported_id]: true }, addLogEvent));
-                    }   else    {
+                    // Don't install a mod by default if its version mismatches: we 
+                    const versionMismatch = gameVersion !== null 
+                        && gameVersion != installed_mods.find(mod => mod.id == imported_id)?.version;
+                    if(versionMismatch) {
                         setMods(installed_mods);
+                        setModError("The mod `" + imported_id + "` was not enabled automatically as it is not designed for game version v" + gameVersion + ".");
+                    }   else    {
+                        setMods(await setModStatuses(device, { [imported_id]: true }, addLogEvent));
                     }
                 }   catch(e)   {
                     setModError("Failed to import mod: " + e);
@@ -77,6 +82,7 @@ export function ModManager(props: ModManagerProps) {
             </div>
         </div>
         {mods.map(mod => <ModCard
+            gameVersion={gameVersion}
             mod={mod}
             key={mod.id}
             onRemoved={async () => {
@@ -95,12 +101,6 @@ export function ModManager(props: ModManagerProps) {
                 setChanges(newChanges);
             }}/>
         )}
-        <Modal isVisible={isWorking}>
-            <div className='syncingWindow'>
-                <h1>Syncing Mods...</h1>
-                <LogWindow events={logEvents} />
-            </div>
-        </Modal>
         <ErrorModal isVisible={modError != null}
             title={"Failed to sync mods"}
             description={modError!}
@@ -118,17 +118,15 @@ function Title() {
 }
 
 interface UploadButtonProps {
-    onUploaded: (file: File, enable: boolean) => void;
+    onUploaded: (file: File) => void;
 }
 
 function UploadButton(props: UploadButtonProps) {
     const { onUploaded } = props;
 
     const inputFile = useRef<HTMLInputElement | null>(null);
-    const [file, setFile] = useState(null as File | null);
 
-    return <>
-        <button id="uploadButton" onClick={() => inputFile.current?.click()}>
+    return <button id="uploadButton" onClick={() => inputFile.current?.click()}>
             Upload
             <img src={UploadIcon}/>
             <input type="file"
@@ -136,18 +134,9 @@ function UploadButton(props: UploadButtonProps) {
                 accept=".qmod"
                 ref={inputFile}
                 style={{display: 'none'}}
-                onChange={ev => setFile(ev.target.files![0])}
+                onChange={ev => onUploaded(ev.target.files![0])}
             />
         </button>
-
-        <YesNoModal
-            title="Enable now?"
-            isVisible={file != null}
-            onYes={() => { setFile(null); onUploaded(file!, true) }}
-            onNo={() => { setFile(null); onUploaded(file!, false) }}>
-            <p>Enable the mod right now, or leave it disabled for later?</p>
-        </YesNoModal>
-    </>
 }
 
 function sortById(mods: Mod[]) {

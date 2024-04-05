@@ -117,6 +117,7 @@ pub struct ModModel {
     pub id: String,
     pub name: String,
     pub version: Version,
+    pub game_version: Option<String>,
     pub description: Option<String>,
     pub is_enabled: bool
 }
@@ -127,6 +128,7 @@ impl From<&Mod> for ModModel {
             id: value.manifest().id.clone(),
             name: value.manifest().name.clone(),
             version: value.manifest().version.clone(),
+            game_version: value.manifest().package_version.clone(),
             description: value.manifest().description.clone(),
             is_enabled: value.installed()
         }

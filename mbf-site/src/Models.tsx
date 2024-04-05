@@ -3,7 +3,8 @@ interface Mod {
     name: string,
     description: string | null,
     version: string,
-    is_enabled: boolean
+    is_enabled: boolean,
+    game_version: string | null
 }
 
 interface CoreMod {

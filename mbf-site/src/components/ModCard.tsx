@@ -2,17 +2,23 @@ import '../css/ModCard.css';
 import { Mod } from '../Models'
 import { Slider } from './Slider';
 import TrashCan from '../icons/trash.svg';
-import { YesNoModal, Modal } from './Modal';
+import { YesNoModal } from './Modal';
 import { useState } from 'react';
 
 interface ModCardProps {
     mod: Mod,
+    gameVersion: string,
     onEnabledChanged: (enabled: boolean) => void,
     onRemoved: () => void
 }
 
 export function ModCard(props: ModCardProps) {
     const [requestRemove, setRequestRemove] = useState(false);
+    const [wrongGameVersion, setWrongGameVersion] = useState(false);
+    const setEnabled = (enabled: boolean) => {
+        props.onEnabledChanged(enabled);
+        props.mod.is_enabled = enabled;
+    }
 
     return <div className="container modCard">
         <div className='modName'>
@@ -27,8 +33,13 @@ export function ModCard(props: ModCardProps) {
                 <img src={TrashCan} alt="Remove mod icon" />
             </div>
             <Slider on={props.mod.is_enabled} valueChanged={value => {
-                props.onEnabledChanged(value);
-                props.mod.is_enabled = value;
+                if(value && props.mod.game_version != null 
+                    && props.mod.game_version !== props.gameVersion) {
+                    setWrongGameVersion(true);
+                }   else    {
+                    console.log(props.mod.game_version, props.gameVersion);
+                    setEnabled(value);
+                }
             }}/>
         </div>
 
@@ -41,6 +52,13 @@ export function ModCard(props: ModCardProps) {
             onNo={()=> setRequestRemove(false)}
             isVisible={requestRemove}>
             <p>Are you sure that you want to remove {props.mod.id} v{props.mod.version}?</p>
+        </YesNoModal>
+        <YesNoModal title="Wrong game version"
+            onYes={() => { setEnabled(true); setWrongGameVersion(false) }}
+            onNo={() => setWrongGameVersion(false)} 
+            isVisible={wrongGameVersion}>
+            <p>The mod {props.mod.id} v{props.mod.version} is designed for game version {props.mod.game_version} but you have {props.gameVersion}. 
+            Are you sure you still want to enable it?</p>
         </YesNoModal>
     </div>
 }
