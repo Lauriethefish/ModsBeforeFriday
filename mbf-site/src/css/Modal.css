@@ -1,8 +1,3 @@
-@keyframes modalAppear {
-    from { opacity: 0 }
-    to { opacity: 1 }
-}
-
 .modalBackground {
     z-index: 2;
     position: fixed;
@@ -11,8 +6,13 @@
     left: 0;
     top: 0;
     background-color: rgba(0, 0, 0, 0.8);
-    animation-name: modalAppear;
-    animation-duration: 500ms
+    transition-duration: 500ms
+}
+
+.modalClosed {
+    transition-duration: 500ms;
+    background-color: rgba(0, 0, 0, 0.0);
+    pointer-events: none;
 }
 
 .modal {

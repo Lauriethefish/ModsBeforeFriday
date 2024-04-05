@@ -18,7 +18,7 @@ export function Modal(props: ModalProps) {
         </div>
     </div>
     }   else   {
-        return <></>
+        return <div className="modalBackground modalClosed"></div>
     }
 }
 
