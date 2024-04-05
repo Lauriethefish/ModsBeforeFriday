@@ -1,7 +1,7 @@
 name: "Compile and deploy"
 on:
   push:
-  pull_request:
+    branches: ['deploy']
 
 jobs:
   build:
