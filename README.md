@@ -20,16 +20,16 @@ Install the aarch64-linux-android target:
 
 #### Environment Variables
 - Set `ANDROID_NDK_HOME` to the folder containing your Android NDK.
-- Set `CC_aarch64_linux_android` to `$NDK_PATH/toolchains/llvm/prebuilt/windows-x86_64/bin/aarch64-linux-android31-clang.cmd` where `$NDK_PATH` is your Android NDK root path.
-- Set `AR_aarch64_linux_android` to `$NDK_PATH/toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-ar.exe`.
+- Set `CC_aarch64-linux-android` to `$NDK_PATH/toolchains/llvm/prebuilt/windows-x86_64/bin/aarch64-linux-android31-clang.cmd` where `$NDK_PATH` is your Android NDK root path.
+- Set `AR_aarch64-linux-android` to `$NDK_PATH/toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-ar.exe`.
 
 (if on another OS, the paths may be slightly different. Please update the paths as necessary!)
 #### Cargo config
 Create a new file with path `~/.cargo/config.toml`. Add the following contents.
 ```toml
 [target.aarch64-linux-android]
-linker = "CONTENTS OF CC_aarch64_linux_android"
-ar = "CONTENTS OF AR_aarch64_linux_android"
+linker = "CONTENTS OF CC_aarch64-linux-android"
+ar = "CONTENTS OF AR_aarch64-linux-android"
 ```
 
 ### Compiling Agent
