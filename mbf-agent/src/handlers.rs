@@ -231,6 +231,18 @@ fn install_core_mods(mod_manager: &mut ModManager, app_info: AppInfo) -> Result<
 
 
     for core_mod in &core_mods.mods {
+        // Check if there is already an existing mod.
+        match mod_manager.get_mod(&core_mod.id) {
+            Some(existing) => {
+                let existing_ref = existing.borrow();
+                if existing_ref.manifest().version >= core_mod.version {
+                    info!("Core mod {} was already installed with new enough version: {}", core_mod.id, existing_ref.manifest().version);
+                    continue;
+                }
+            },
+            None => {}
+        }
+
         info!("Downloading {} v{}", core_mod.id, core_mod.version);
         let save_path = mod_manager.mods_path().as_ref()
             .join(format!("{}-v{}-CORE.qmod", core_mod.id, core_mod.version));
@@ -240,7 +252,7 @@ fn install_core_mods(mod_manager: &mut ModManager, app_info: AppInfo) -> Result<
         
     }
 
-    info!("Loading and installing core mods");
+    info!("Installing core mods");
     mod_manager.load_mods().context("Failed to load core mods - is one invalid? If so, this is a BIG problem")?;
     for core_mod in &core_mods.mods {
         mod_manager.install_mod(&core_mod.id)?;
