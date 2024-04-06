@@ -136,26 +136,28 @@ function InstalledModsMenu(props: ModMenuProps) {
             }
         }}>Sync Changes</button>
 
-        {mods.map(mod => <ModCard
-            gameVersion={gameVersion}
-            mod={mod}
-            key={mod.id}
-            onRemoved={async () => {
-                setWorking(true);
-                try {
-                    setMods(await removeMod(device, mod.id, addLogEvent));
-                }   catch(e) {
-                    setError(String(e));
-                }   finally {
-                    setWorking(false);
-                }
-            }}
-            onEnabledChanged={enabled => {
-                const newChanges = { ...changes };
-                newChanges[mod.id] = enabled;
-                setChanges(newChanges);
-            }}/>
-        )}
+		<div className="mod-list">
+			{mods.map(mod => <ModCard
+				gameVersion={gameVersion}
+				mod={mod}
+				key={mod.id}
+				onRemoved={async () => {
+					setWorking(true);
+					try {
+						setMods(await removeMod(device, mod.id, addLogEvent));
+					}   catch(e) {
+						setError(String(e));
+					}   finally {
+						setWorking(false);
+					}
+				}}
+				onEnabledChanged={enabled => {
+					const newChanges = { ...changes };
+					newChanges[mod.id] = enabled;
+					setChanges(newChanges);
+				}}/>
+			)}
+		</div>
     </>
 }
 

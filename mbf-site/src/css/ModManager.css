@@ -21,7 +21,8 @@
 }
 
 .hidden {
-    visibility: hidden;
+    display: none;
+    /* visibility: hidden; */
 }
 
 #syncButton:hover {
@@ -68,4 +69,10 @@
 .notSelected:hover {
     background-color: rgb(16, 34, 194);
     transition-duration: 200ms;
+}
+
+.mod-list {
+    display: grid;
+    grid-auto-columns: auto 1fr auto;
+    gap: 0.3em 1em;
 }
