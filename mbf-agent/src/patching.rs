@@ -15,6 +15,7 @@ const MOD_TAG_PATH: &str = "modded.json";
 const LIB_MAIN_PATH: &str = "lib/arm64-v8a/libmain.so";
 const LIB_UNITY_PATH: &str = "lib/arm64-v8a/libunity.so";
 const APK_ID: &str = "com.beatgames.beatsaber";
+const APP_DATA_PATH: &str = "/sdcard/Android/data/com.beatgames.beatsaber/files/";
 const TEMP_PATH: &str = "/data/local/tmp/mbf-tmp";
 
 pub fn mod_current_apk(app_info: &AppInfo) -> Result<()> {
@@ -33,6 +34,18 @@ pub fn mod_current_apk(app_info: &AppInfo) -> Result<()> {
 
     let obb_dir = PathBuf::from(format!("/sdcard/Android/obb/{APK_ID}/"));
     let obb_backup = temp_path.join("backup.obb");
+
+    let player_data_backup = temp_path.join("PlayerData.backup");
+
+    let player_data_path = Path::new(APP_DATA_PATH).join("PlayerData.dat");
+    let backed_up_data = if player_data_path.exists() {
+        info!("Backing up player data");
+        std::fs::copy(&player_data_path, &player_data_backup)?;
+        true
+    }   else    {
+        info!("No player data to save");
+        false
+    };
 
     info!("Saving OBB file");
     let obb_restore_path = save_obb(&obb_dir, &obb_backup)?;
@@ -59,6 +72,12 @@ pub fn mod_current_apk(app_info: &AppInfo) -> Result<()> {
     std::fs::copy(&obb_backup, &obb_restore_path)?;
     std::fs::remove_file(obb_backup)?;
     std::fs::remove_file(temp_apk_path)?;
+
+    if backed_up_data {
+        info!("Restoring player data");
+        std::fs::create_dir_all(&APP_DATA_PATH)?;
+        std::fs::copy(player_data_backup, player_data_path)?;
+    }
 
     Ok(())
 }
