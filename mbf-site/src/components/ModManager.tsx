@@ -10,7 +10,7 @@ import '../css/ModManager.css';
 import { LogEventSink, importFile, importModUrl, removeMod, setModStatuses } from "../Agent";
 import { toast } from "react-toastify";
 import { ModRepoBrowser } from "./ModRepoBrowser";
-import { ImportResult, ImportedMod } from "../Messages";
+import { ImportedMod } from "../Messages";
 
 interface ModManagerProps {
     mods: Mod[],

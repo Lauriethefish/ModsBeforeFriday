@@ -225,6 +225,6 @@ function NextSteps() {
     return <ul>
         <li>Load up the game and look left. A menu should be visible that shows your mods.</li>
         <li>Click the <b>"SongDownloader"</b> mod and browse for custom songs in-game.</li>
-        <li><a href="https://computerelite.github.io/tools/Beat_Saber/questmods.html" target="_blank" rel="noopener noreferrer">Download additional mods here.</a> Simply download the mod to your computer/phone and then click the "Upload" button below.</li>
+        <li>Download additional mods below!</li>
     </ul>
 }
