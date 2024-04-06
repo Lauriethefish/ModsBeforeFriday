@@ -11,7 +11,9 @@ use crate::requests::{AppInfo, CoreModsInfo, ModModel, Request, Response};
 use anyhow::{anyhow, Context, Result};
 use log::{error, info, warn};
 
+// TODO: Centralise these various constants to main.rs.
 const SONGS_PATH: &str = "/sdcard/ModData/com.beatgames.beatsaber/Mods/SongCore/CustomLevels";
+const DOWNLOADS_PATH: &str = "/data/local/tmp/mbf-downloads";
 
 pub fn handle_request(request: Request) -> Result<Response> {
     match request {
@@ -23,6 +25,7 @@ pub fn handle_request(request: Request) -> Result<Response> {
         Request::QuickFix => handle_quick_fix(),
         Request::Import { from_path } => handle_import(from_path),
         Request::RemoveMod { id } => handle_remove_mod(id),
+        Request::ImportModUrl { from_url } => handle_import_mod_url(from_url)
     }
 }
 
@@ -149,6 +152,27 @@ fn get_app_info() -> Result<Option<AppInfo>> {
         version: info.package_version,
         path: apk_path
     }))    
+}
+
+fn handle_import_mod_url(from_url: String) -> Result<Response> {
+    std::fs::create_dir_all(DOWNLOADS_PATH)?;
+    let download_path = Path::new(DOWNLOADS_PATH).join("import_from_url.qmod");
+
+    info!("Downloading {}", from_url);
+    download_file(&download_path, &from_url)?;
+
+    // Load the installed mods.
+    let mut mod_manager = ModManager::new();
+    mod_manager.load_mods()?;
+    
+    // Attempt to import the downloaded file as a qmod, removing the temporary file if this fails.
+    match handle_import_qmod(mod_manager, download_path.clone()) {
+        Ok(resp) => Ok(resp),
+        Err(err) => {
+            std::fs::remove_file(download_path)?;
+            Err(err)
+        }
+    }
 }
 
 fn handle_import(from_path: String) -> Result<Response> {

@@ -40,6 +40,7 @@ fn download_file(to: impl AsRef<Path>, url: &str) -> Result<()> {
 
     let mut writer = OpenOptions::new()
         .write(true)
+        .truncate(true)
         .create(true)
         .open(to).context("Failed to create destination file")?;
 

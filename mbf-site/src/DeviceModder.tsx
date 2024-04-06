@@ -7,6 +7,7 @@ import { LogWindow, useLog } from './components/LogWindow';
 import { Mods } from './Messages';
 import { ErrorModal, Modal } from './components/Modal';
 import { ModManager } from './components/ModManager';
+import { ModRepoBrowser } from './components/ModRepoBrowser';
 
 interface DeviceModderProps {
     device: Adb,
@@ -59,6 +60,7 @@ export default function DeviceModder(props: DeviceModderProps) {
                         device={device}
                         onFixed={status => setModStatus(status)}
                     />
+
 
                     <h4>Not sure what to do next?</h4>
                     <NextSteps />

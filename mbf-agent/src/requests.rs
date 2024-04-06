@@ -47,6 +47,11 @@ pub enum Request {
     Import {
         from_path: String
     },
+    /// Downloads the file from the given URL and then attempts to import it as a mod (only).
+    /// Returns an ImportedMod message.
+    ImportModUrl {
+        from_url: String,
+    },
     /// - Patches Beat Saber to add support for modloaders. (will not patch again if the app is already modded)
     /// - Saves the modloader to the appropriate locatioon on the Quest.
     /// - Wipes any existing mods.

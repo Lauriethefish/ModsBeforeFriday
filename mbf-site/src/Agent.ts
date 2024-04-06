@@ -78,7 +78,7 @@ function logFromAgent(log: LogMsg) {
   }
 }
 
-type LogEventSink = ((event: LogMsg) => void) | null;
+export type LogEventSink = ((event: LogMsg) => void) | null;
 
 async function sendRequest(adb: Adb, request: Request, eventSink: LogEventSink = null): Promise<Response> {
   let command_buffer = encodeUtf8(JSON.stringify(request) + "\n");
@@ -185,6 +185,7 @@ async function setModStatuses(device: Adb,
   return (response as Mods).installed_mods;
 }
 
+
 async function importFile(device: Adb,
     file: File,
     eventSink: LogEventSink = null): Promise<ImportResult> {
@@ -210,6 +211,17 @@ async function importFile(device: Adb,
   } finally {
     sync.dispose();
   }
+}
+
+async function importModUrl(device: Adb,
+url: string,
+eventSink: LogEventSink = null) {
+  const response = await sendRequest(device, {
+    'type': 'ImportModUrl',
+    from_url: url
+  }, eventSink);
+
+  return response as ImportedMod;
 }
 
 async function removeMod(device: Adb,
@@ -279,5 +291,6 @@ export {
   removeMod,
   patchApp,
   quickFix,
-  importFile as importMod
+  importFile,
+  importModUrl
 };

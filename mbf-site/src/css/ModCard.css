@@ -1,6 +1,5 @@
 .modCard {
     width: min(40rem, 95%);
-    justify-content:first baseline;
     align-items: center;
     margin-top: 0;
     margin-bottom: 0;

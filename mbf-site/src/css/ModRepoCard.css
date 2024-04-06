@@ -1,0 +1,51 @@
+#modRepoCard {
+    width: min(40rem, 95%);
+    padding: 2px;
+    display: flex;
+    flex-direction: row;
+    padding: 10px;
+    gap: 20px;
+}
+
+#auxOptions {
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+}
+
+#defaultCover {
+    display: flex;
+    min-width: 10rem;
+    align-items: center;
+    background-color: rgb(10, 10, 10);
+    justify-content: center;
+}
+
+#cover {
+    object-fit: contain;
+    width: 10rem;
+}
+
+#modDetails {
+    margin-bottom: 0px;
+    margin-top: 5px;
+}
+
+#author {
+    margin-top: 3px;
+    font-size: smaller;
+    font-style: italic;
+}
+
+#installMod {
+    margin-top: auto;
+    margin-left: auto;
+
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    size: 5rem;
+    font-size: larger;
+    font-weight: bold;
+}

@@ -27,7 +27,12 @@ interface Import {
     from_path: string
 }
 
-type Request = GetModStatus | Patch | SetModsEnabled | QuickFix | RemoveMod | Import;
+interface ImportModUrl {
+    type: 'ImportModUrl',
+    from_url: string
+}
+
+type Request = GetModStatus | Patch | SetModsEnabled | QuickFix | RemoveMod | Import | ImportModUrl;
 
 interface Mods {
     type: 'Mods',
@@ -95,5 +100,6 @@ export type {
     ImportedMod,
     ImportedFileCopy,
     ImportResult,
-    ImportedSong
+    ImportedSong,
+    ImportModUrl
 }
