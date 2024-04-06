@@ -42,5 +42,5 @@ To serve the site for testing, navigate to `./mbf-site` and run `yarn start`.
 (you may need to `yarn install` first).
 
 ### TODO List
-- Download the SongDownloader mod by default? (and maybe a song so that users can check it is all working?)
-- Do some beta testing
+- Do some more beta testing
+- Potentially add a built-in view to download additional mods. Might not be needed on initial release though.
