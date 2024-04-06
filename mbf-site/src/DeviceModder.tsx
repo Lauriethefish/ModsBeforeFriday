@@ -21,6 +21,7 @@ async function uninstallBeatSaber(device: Adb) {
 export default function DeviceModder(props: DeviceModderProps) {
     const [modStatus, setModStatus] = useState(null as ModStatus | null);
     const { device, quit } = props;
+
     useEffect(() => {
         loadModStatus(device)
             .then(data => setModStatus(data))
@@ -58,6 +59,9 @@ export default function DeviceModder(props: DeviceModderProps) {
                         device={device}
                         onFixed={status => setModStatus(status)}
                     />
+
+                    <h4>Not sure what to do next?</h4>
+                    <NextSteps />
                 </div>
 
                 <ModManager mods={modStatus.installed_mods}
@@ -188,6 +192,7 @@ function PatchingMenu(props: PatchingMenuProps) {
         return <div className='container mainContainer'>
             <h1>App is being patched</h1>
             <p>This should only take a few minutes, but might take up to 10 on a very slow internet connection.</p>
+            <p className='warning'>You must not disconnect your device during this process.</p>
             <LogWindow events={logEvents}/>
         </div>
     }
@@ -212,4 +217,12 @@ function IncompatibleLoader(props: IncompatibleLoaderProps) {
             quit();
         }}>Uninstall Beat Saber</button>
     </div>
+}
+
+function NextSteps() {
+    return <ul>
+        <li>Load up the game and look left. A menu should be visible that shows your mods.</li>
+        <li>Click the <b>"SongDownloader"</b> mod and browse for custom songs in-game.</li>
+        <li><a href="https://computerelite.github.io/tools/Beat_Saber/questmods.html" target="_blank" rel="noopener noreferrer">Download additional mods here.</a> Simply download the mod to your computer/phone and then click the "Upload" button below.</li>
+    </ul>
 }
