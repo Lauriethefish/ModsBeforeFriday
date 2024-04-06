@@ -25,11 +25,11 @@ Install the aarch64-linux-android target:
 
 (if on another OS, the paths may be slightly different. Please update the paths as necessary!)
 #### Cargo config
-Create a new file with path `~/.cargo/config.toml`. Add the following contents.
+Create a new file with path `~/.cargo/config.toml`. Add the following contents, replacing the `<contents of...>` with the relevant environment variable.
 ```toml
 [target.aarch64-linux-android]
-linker = "CONTENTS OF CC_aarch64-linux-android"
-ar = "CONTENTS OF AR_aarch64-linux-android"
+linker = "<contents OF CC_aarch64-linux-android environment variable>"
+ar = "<contents OF AR_aarch64-linux-android environment variable>"
 ```
 
 ### Compiling Agent
