@@ -76,11 +76,11 @@ function Title(props: TitleProps) {
 
     return <div className='container noPadding'>
         <div className="horizontalCenter">
-            <div className={menu === 'current' ? "selected" : "notSelected"}>
+            <div className={`tab-header ${menu === 'current' ? "selected":""}`}>
                 <h1 onClick={() => setMenu('current')}>Your Mods</h1>
             </div>
             <img src={ModIcon} />
-            <div className={menu === 'add' ? "selected" : "notSelected"}>
+            <div className={`tab-header ${menu === 'add' ? "selected":""}`}>
                 <h1 onClick={() => setMenu('add')}>Add Mods</h1>
             </div>
         </div>
