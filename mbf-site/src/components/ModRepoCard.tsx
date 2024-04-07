@@ -12,7 +12,7 @@ export function ModRepoCard({ mod, onInstall, update }: { mod: ModRepoMod, onIns
         {!hasCover && <div id="defaultCover">
             <img src={ModIcon} width={40} />
         </div>}
-        <div>
+        <div className="mod-repo-card-info">
             <p id="modDetails">{mod.name} v{mod.version}</p>
             <p id="author">by {mod.author}</p>
             <p>{mod.description}</p>

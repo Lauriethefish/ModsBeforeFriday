@@ -1,16 +1,4 @@
 .modCard {
-    /*width: min(40rem, 95%);
-    align-items: center;
-    margin-top: 0;
-    margin-bottom: 0;
-    display: flex;
-    flex-direction: row;
-    gap: 10px;
-    padding-top: 0;
-    padding-bottom: 0;
-    padding-left: 10px;
-    padding-right: 10px;*/
-
     grid-column: 1/4;
     display: grid;
     grid-template-columns: subgrid;
@@ -69,9 +57,6 @@
 }
 
 @media screen and (max-width: 700px) {
-    /*.modControls {
-        flex-direction: column-reverse;
-    }*/
     .descriptionText {
         grid-row: 2;
         grid-column: 1/4;
