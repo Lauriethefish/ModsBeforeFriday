@@ -10,6 +10,8 @@
     grid-column: 1/3;
     justify-content: center;
     align-items: center;
+
+    --cover-width: 10rem;
 }
 
 #auxOptions {
@@ -21,7 +23,7 @@
 
 #defaultCover {
     display: flex;
-    min-width: 10rem;
+    min-width: var(--cover-width);
     width: 100%;
     height: 100%;
     align-items: center;
@@ -31,7 +33,7 @@
 
 #cover {
     object-fit: contain;
-    width: 10rem;
+    width: var(--cover-width);
 }
 
 #modDetails {
@@ -58,6 +60,12 @@
 }
 
 @media (max-width: 800px) {
+    #modRepoCard {
+        --cover-width: 5rem;
+    }
+    #cover {
+        rotate: -90deg;
+    }
     #installMod {
         max-height: 46px;
     }
