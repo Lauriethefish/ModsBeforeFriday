@@ -33,15 +33,19 @@ export function ModManager(props: ModManagerProps) {
     return <>
         <Title menu={menu} setMenu={setMenu}/>
         
-        {menu === 'add' && <AddModsMenu
-            mods={mods}
-            setMods={setMods}
-            setWorking={working => setWorking(working)}
-            gameVersion={gameVersion}
-            setError={err => setModError(err)}
-            device={device}
-            addLogEvent={addLogEvent}
-        />}
+        {/* We use a style with display: none when hiding this menu, as this avoids remounting the component,
+            which would fetch the mods index again. */}
+        <div style={menu === 'add' ? {} : { display: 'none' }}>
+            <AddModsMenu
+                mods={mods}
+                setMods={setMods}
+                setWorking={working => setWorking(working)}
+                gameVersion={gameVersion}
+                setError={err => setModError(err)}
+                device={device}
+                addLogEvent={addLogEvent}
+            />
+        </div>
         
         {menu === 'current' && <InstalledModsMenu
             mods={mods}
@@ -209,7 +213,7 @@ function AddModsMenu(props: ModMenuProps) {
         }
     }
 
-    return <>
+    return <div className="verticalCenter">
         <UploadButton onUploaded={async file => {
             console.log("Importing " + file.name);
             try {
@@ -240,7 +244,7 @@ function AddModsMenu(props: ModMenuProps) {
                 setWorking(false);
             }
         }} />
-    </>
+    </div>
 }
 
 

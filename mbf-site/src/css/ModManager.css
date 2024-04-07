@@ -5,6 +5,14 @@
     gap: 10px;
 }
 
+.verticalCenter {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 10px;
+}
+
 #modMenuTitle {
     display: flex;
     align-items: center;
