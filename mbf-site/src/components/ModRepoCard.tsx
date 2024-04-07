@@ -20,11 +20,12 @@ export function ModRepoCard({ mod, onInstall, update }: { mod: ModRepoMod, onIns
                 <a href={mod.source} target="_blank"><button>View source code</button></a>
                 {mod.source.includes("github") && 
                     <a href={mod.source + "/issues"} target="_blank"><button>Report a bug</button></a>}
+
+                <button id="installMod" onClick={onInstall}>
+                    {update ? "Update" : "Install"}
+                    <img src={DownloadIcon} />
+                </button>
             </div>
         </div>
-        <button id="installMod" onClick={onInstall}>
-            {update ? "Update" : "Install"}
-            <img src={DownloadIcon} />
-        </button>
     </div>
 }
