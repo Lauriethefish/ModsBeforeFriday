@@ -1,5 +1,5 @@
 import { Adb } from '@yume-chan/adb';
-import { loadModStatus, patchApp, prepareAgent, quickFix } from "./Agent";
+import { loadModStatus, patchApp, quickFix } from "./Agent";
 import { useEffect, useState } from 'react';
 import { ModLoader, ModStatus } from './Messages';
 import './css/DeviceModder.css';
@@ -18,7 +18,7 @@ async function uninstallBeatSaber(device: Adb) {
     await device.subprocess.spawnAndWait("pm uninstall com.beatgames.beatsaber");
 }
 
-export default function DeviceModder(props: DeviceModderProps) {
+export function DeviceModder(props: DeviceModderProps) {
     const [modStatus, setModStatus] = useState(null as ModStatus | null);
     const { device, quit } = props;
 

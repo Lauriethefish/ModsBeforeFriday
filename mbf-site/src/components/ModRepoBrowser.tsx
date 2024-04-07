@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { ModRepo, ModRepoMod, loadRepo } from "../ModsRepo";
 import { ModRepoCard } from "./ModRepoCard";
-import { toast } from "react-toastify";
 import { gt as semverGt } from "semver";
 import { Mod } from "../Models";
 

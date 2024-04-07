@@ -1,63 +1,63 @@
 import { Mod } from "./Models";
 
-interface GetModStatus {
+export interface GetModStatus {
     type: 'GetModStatus'
 }
 
-interface Patch {
+export interface Patch {
     type: 'Patch'
 }
 
-interface SetModsEnabled {
+export interface SetModsEnabled {
     type: 'SetModsEnabled',
     statuses: { [id: string]: boolean } 
 }
 
-interface QuickFix {
+export interface QuickFix {
     type: 'QuickFix'
 }
 
-interface RemoveMod {
+export interface RemoveMod {
     type: 'RemoveMod',
     id: string
 }
 
-interface Import {
+export interface Import {
     type: 'Import',
     from_path: string
 }
 
-interface ImportModUrl {
+export interface ImportModUrl {
     type: 'ImportModUrl',
     from_url: string
 }
 
-type Request = GetModStatus | Patch | SetModsEnabled | QuickFix | RemoveMod | Import | ImportModUrl;
+export type Request = GetModStatus | Patch | SetModsEnabled | QuickFix | RemoveMod | Import | ImportModUrl;
 
-interface Mods {
+export interface Mods {
     type: 'Mods',
     installed_mods: Mod[]
 }
 
-interface ImportedMod {
+export interface ImportedMod {
     type: 'ImportedMod',
     installed_mods: Mod[],
     imported_id: string
 }
 
-interface ImportedFileCopy {
+export interface ImportedFileCopy {
     type: 'ImportedFileCopy',
     copied_to: string,
     mod_id: string
 }
 
-interface ImportedSong {
+export interface ImportedSong {
     type: 'ImportedSong'
 }
 
-type ImportResult = ImportedMod | ImportedFileCopy | ImportedSong;
+export type ImportResult = ImportedMod | ImportedFileCopy | ImportedSong;
 
-interface ModStatus {
+export interface ModStatus {
     type: 'ModStatus',
     app_info: AppInfo | null,
     core_mods: CoreModsInfo | null,
@@ -65,41 +65,24 @@ interface ModStatus {
     installed_mods: Mod[]
 }
 
-interface LogMsg {
+export interface LogMsg {
     type: 'LogMsg',
     message: string,
     level: LogLevel
 }
 
-type Response = LogMsg | ModStatus | Mods | ImportResult;
+export type Response = LogMsg | ModStatus | Mods | ImportResult;
 
-interface CoreModsInfo {
+export interface CoreModsInfo {
     supported_versions: string[],
     all_core_mods_installed: boolean
 }
 
-type ModLoader = "Scotland2" | "QuestLoader" | "Unknown";
+export type ModLoader = "Scotland2" | "QuestLoader" | "Unknown";
 
-interface AppInfo {
+export interface AppInfo {
     version: string,
     loader_installed: ModLoader | null
 }
 
-type LogLevel = "Error" | "Warn" | "Info" | "Debug" | "Trace";
-
-export type {
-    Request,
-    GetModStatus,
-    Response,
-    ModStatus,
-    AppInfo,
-    CoreModsInfo,
-    LogMsg,
-    Mods,
-    ModLoader,
-    ImportedMod,
-    ImportedFileCopy,
-    ImportResult,
-    ImportedSong,
-    ImportModUrl
-}
+export type LogLevel = "Error" | "Warn" | "Info" | "Debug" | "Trace";

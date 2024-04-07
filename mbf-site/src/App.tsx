@@ -5,7 +5,7 @@ import { AdbDaemonWebUsbConnection, AdbDaemonWebUsbDeviceManager } from '@yume-c
 import { AdbDaemonTransport, Adb } from '@yume-chan/adb';
 
 import AdbWebCredentialStore from "@yume-chan/adb-credential-web";
-import DeviceModder from './DeviceModder';
+import { DeviceModder } from './DeviceModder';
 import { ErrorModal } from './components/Modal';
 import { Bounce, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';

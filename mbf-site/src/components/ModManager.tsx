@@ -1,7 +1,7 @@
-import { SetStateAction, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { LogWindow, useLog } from "./LogWindow";
 import { Mod, trimGameVersion } from "../Models";
-import { YesNoModal, ErrorModal, Modal } from "./Modal";
+import { ErrorModal, Modal } from "./Modal";
 import { Adb } from '@yume-chan/adb';
 import { ModCard } from "./ModCard";
 import ModIcon from '../icons/mod-icon.svg'
