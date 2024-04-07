@@ -20,10 +20,6 @@
     font-size: x-large;
 }
 
-.hidden {
-    display: none;
-}
-
 #syncButton:hover {
     background-color: #ff0000;
 }

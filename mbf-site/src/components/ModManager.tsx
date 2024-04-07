@@ -111,7 +111,7 @@ function InstalledModsMenu(props: ModMenuProps) {
     const hasChanges = Object.keys(changes).length > 0;
 
     return <>
-        <button id="syncButton" className={hasChanges ? "" : "hidden"} onClick={async () => {
+        {hasChanges && <button id="syncButton" onClick={async () => {
             setChanges({});
             console.log("Installing mods, statuses requested: " + JSON.stringify(changes));
             try {
@@ -134,7 +134,7 @@ function InstalledModsMenu(props: ModMenuProps) {
             }  finally {
                 setWorking(false);
             }
-        }}>Sync Changes</button>
+        }}>Sync Changes</button>}
 
 		<div className="mod-list">
 			{mods.map(mod => <ModCard
