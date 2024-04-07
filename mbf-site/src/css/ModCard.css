@@ -1,25 +1,21 @@
 .modCard {
-    width: min(40rem, 95%);
-    align-items: center;
-    margin-top: 0;
-    margin-bottom: 0;
-    display: flex;
-    flex-direction: row;
-    gap: 10px;
-    padding-top: 0;
-    padding-bottom: 0;
-    padding-left: 10px;
-    padding-right: 10px;
+    grid-column: 1/4;
+    display: grid;
+    grid-template-columns: subgrid;
+    grid-row-gap: 1em;
+    padding: 13px;
 }
 
 .modName {
+    margin: 0px;
     display: flex;
     flex-direction: column;
+    grid-column: 1;
+    justify-content: center;
 }
 
 .nameText {
-    margin-top: 10px;
-    margin-bottom: 0px;
+    margin: 0px;
     font-weight: 500;
 }
 
@@ -30,6 +26,7 @@
     align-items: center;
     justify-content: center;
     gap: 10px;
+    grid-column: 3;
 }
 
 #removeMod {
@@ -49,7 +46,7 @@
 }
 
 .idVersionText {
-    margin-top: 1px;
+    margin: 1px;
     font-size: 10px;
     font-weight: 100;
     font-style: italic;
@@ -57,4 +54,16 @@
 
 .descriptionText {
     font-size: smaller;
+    grid-column: 2;
+    margin: auto 0px;
+}
+
+@media screen and (max-width: 700px) {
+    .descriptionText {
+        grid-row: 2;
+        grid-column: 1/4;
+    }
+    #removeMod > img {
+        width: 27px;
+    }
 }

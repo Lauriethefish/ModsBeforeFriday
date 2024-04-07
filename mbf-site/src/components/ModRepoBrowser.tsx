@@ -37,23 +37,23 @@ export function ModRepoBrowser(props: ModRepoBrowserProps) {
         }   else    {
             return <h1>Loading mods...</h1>
         }
-    }   
+    }
     else if(gameVersion in modRepo) {
         return <>
-            {latestVersions(modRepo[gameVersion]).map(mod => {
-                const existingInstall = props.existingMods
-                .find(existing => existing.id === mod.id);
+            <div className="mod-list">
+                {latestVersions(modRepo[gameVersion]).map(mod => {
+                    const existingInstall = props.existingMods
+                    .find(existing => existing.id === mod.id);
 
-                if(existingInstall !== undefined && existingInstall?.version === mod.version) {
-                    return <span key={mod.id} style={ {display: "none"} } />
-                }   else    {
-                    return <ModRepoCard
-                        mod={mod}
-                        key={mod.id}
-                        update={existingInstall !== undefined}
-                        onInstall={() => onDownload(mod.download)} />
-                }
-            })}
+                    if(existingInstall === undefined || existingInstall?.version !== mod.version) {
+                        return <ModRepoCard
+                            mod={mod}
+                            key={mod.id}
+                            update={existingInstall !== undefined}
+                            onInstall={() => onDownload(mod.download)} />
+                    }
+                })}
+            </div>
         </>
     }   else    {
         return <>

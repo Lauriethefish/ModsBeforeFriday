@@ -20,10 +20,6 @@
     font-size: x-large;
 }
 
-.hidden {
-    visibility: hidden;
-}
-
 #syncButton:hover {
     background-color: #ff0000;
 }
@@ -44,28 +40,40 @@
     gap: 10px;
 }
 
-.selected:h1 {
-    padding: 10px;
-}
-
-.selected {
+.tab-header.selected {
     background-color: rgb(17, 39, 243);
-    padding: 10px;
-    border-radius: 10px;
 }
 
 .noPadding {
     padding: 0;
 }
 
-.notSelected {
+.tab-header {
     background-color: rgb(25, 25, 25);
     padding: 10px;
     border-radius: 10px;
-    transition-duration: 200ms;
+    transition: background 200ms;
 }
 
-.notSelected:hover {
+.tab-header:hover {
     background-color: rgb(16, 34, 194);
-    transition-duration: 200ms;
+}
+
+.mod-list {
+    display: grid;
+    grid-auto-columns: auto 1fr auto;
+    gap: 0.3em 1em;
+    max-width: 1024px;
+    grid-auto-rows: auto;
+}
+
+@media screen and (max-width: 700px) {
+    .tab-header {
+        font-size: 0.85em;
+    }
+}
+@media screen and (max-width: 400px) {
+    .tab-header {
+        font-size: 0.7em;
+    }
 }

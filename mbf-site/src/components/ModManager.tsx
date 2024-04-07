@@ -76,11 +76,11 @@ function Title(props: TitleProps) {
 
     return <div className='container noPadding'>
         <div className="horizontalCenter">
-            <div className={menu === 'current' ? "selected" : "notSelected"}>
+            <div className={`tab-header ${menu === 'current' ? "selected":""}`}>
                 <h1 onClick={() => setMenu('current')}>Your Mods</h1>
             </div>
             <img src={ModIcon} />
-            <div className={menu === 'add' ? "selected" : "notSelected"}>
+            <div className={`tab-header ${menu === 'add' ? "selected":""}`}>
                 <h1 onClick={() => setMenu('add')}>Add Mods</h1>
             </div>
         </div>
@@ -111,7 +111,7 @@ function InstalledModsMenu(props: ModMenuProps) {
     const hasChanges = Object.keys(changes).length > 0;
 
     return <>
-        <button id="syncButton" className={hasChanges ? "" : "hidden"} onClick={async () => {
+        {hasChanges && <button id="syncButton" onClick={async () => {
             setChanges({});
             console.log("Installing mods, statuses requested: " + JSON.stringify(changes));
             try {
@@ -134,28 +134,30 @@ function InstalledModsMenu(props: ModMenuProps) {
             }  finally {
                 setWorking(false);
             }
-        }}>Sync Changes</button>
+        }}>Sync Changes</button>}
 
-        {mods.map(mod => <ModCard
-            gameVersion={gameVersion}
-            mod={mod}
-            key={mod.id}
-            onRemoved={async () => {
-                setWorking(true);
-                try {
-                    setMods(await removeMod(device, mod.id, addLogEvent));
-                }   catch(e) {
-                    setError(String(e));
-                }   finally {
-                    setWorking(false);
-                }
-            }}
-            onEnabledChanged={enabled => {
-                const newChanges = { ...changes };
-                newChanges[mod.id] = enabled;
-                setChanges(newChanges);
-            }}/>
-        )}
+		<div className="mod-list">
+			{mods.map(mod => <ModCard
+				gameVersion={gameVersion}
+				mod={mod}
+				key={mod.id}
+				onRemoved={async () => {
+					setWorking(true);
+					try {
+						setMods(await removeMod(device, mod.id, addLogEvent));
+					}   catch(e) {
+						setError(String(e));
+					}   finally {
+						setWorking(false);
+					}
+				}}
+				onEnabledChanged={enabled => {
+					const newChanges = { ...changes };
+					newChanges[mod.id] = enabled;
+					setChanges(newChanges);
+				}}/>
+			)}
+		</div>
     </>
 }
 
