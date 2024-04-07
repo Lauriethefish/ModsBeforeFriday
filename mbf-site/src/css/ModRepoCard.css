@@ -53,9 +53,14 @@
     flex-direction: row;
     align-items: center;
     gap: 10px;
-    size: 5rem;
-    font-size: larger;
+    font-size: large;
     font-weight: bold;
+}
+
+@media (max-width: 800px) {
+    #installMod {
+        max-height: 46px;
+    }
 }
 
 .mod-repo-list {

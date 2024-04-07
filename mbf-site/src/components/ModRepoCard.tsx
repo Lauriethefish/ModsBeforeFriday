@@ -17,9 +17,9 @@ export function ModRepoCard({ mod, onInstall, update }: { mod: ModRepoMod, onIns
             <p id="author">by {mod.author}</p>
             <p>{mod.description}</p>
             <div id="auxOptions">
-                <a href={mod.source} target="_blank"><button>View source code</button></a>
+                <a href={mod.source} target="_blank"><button>View source</button></a>
                 {mod.source.includes("github") && 
-                    <a href={mod.source + "/issues"} target="_blank"><button>Report a bug</button></a>}
+                    <a href={mod.source + "/issues"} target="_blank"><button>Report bug</button></a>}
 
                 <button id="installMod" onClick={onInstall}>
                     {update ? "Update" : "Install"}
