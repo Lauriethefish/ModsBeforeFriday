@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
-use crate::download_file;
+use crate::{download_file, DOWNLOADS_PATH, SONGS_PATH};
 use crate::{axml::AxmlReader, patching, zip::ZipFile};
 use crate::external_res::CoreModsError;
 use crate::manifest::ManifestInfo;
@@ -11,9 +11,6 @@ use crate::requests::{AppInfo, CoreModsInfo, ModModel, Request, Response};
 use anyhow::{anyhow, Context, Result};
 use log::{error, info, warn};
 
-// TODO: Centralise these various constants to main.rs.
-const SONGS_PATH: &str = "/sdcard/ModData/com.beatgames.beatsaber/Mods/SongCore/CustomLevels";
-const DOWNLOADS_PATH: &str = "/data/local/tmp/mbf-downloads";
 
 pub fn handle_request(request: Request) -> Result<Response> {
     match request {

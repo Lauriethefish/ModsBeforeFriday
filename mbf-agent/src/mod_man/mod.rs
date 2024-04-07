@@ -7,12 +7,7 @@ pub use manifest::*;
 use anyhow::{Context, Result, anyhow};
 use semver::Version;
 
-use crate::{download_file, zip::ZipFile};
-
-const QMODS_DIR: &str = "/sdcard/ModsBeforeFriday/Mods";
-const LATE_MODS_DIR: &str = "/sdcard/ModData/com.beatgames.beatsaber/Modloader/mods";
-const EARLY_MODS_DIR: &str = "/sdcard/ModData/com.beatgames.beatsaber/Modloader/early_mods";
-const LIBS_DIR: &str = "/sdcard/ModData/com.beatgames.beatsaber/Modloader/libs";
+use crate::{download_file, zip::ZipFile, EARLY_MODS_DIR, LATE_MODS_DIR, LIBS_DIR, QMODS_DIR};
 
 pub struct Mod {
     manifest: ModInfo,

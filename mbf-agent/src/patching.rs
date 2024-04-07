@@ -2,7 +2,7 @@ use std::{fs::{File, OpenOptions}, io::{Cursor, Seek, Write}, path::{Path, PathB
 
 use anyhow::{Context, Result, anyhow};
 use log::{info, warn};
-use crate::{axml::{AxmlReader, AxmlWriter}, external_res, requests::{AppInfo, ModLoader}, zip, ModTag};
+use crate::{axml::{AxmlReader, AxmlWriter}, external_res, requests::{AppInfo, ModLoader}, zip, ModTag, APK_ID, APP_DATA_PATH, TEMP_PATH};
 use crate::manifest::{ManifestMod, ResourceIds};
 use crate::zip::{signing, FileCompression, ZipFile};
 
@@ -14,9 +14,6 @@ const MOD_TAG_PATH: &str = "modded.json";
 
 const LIB_MAIN_PATH: &str = "lib/arm64-v8a/libmain.so";
 const LIB_UNITY_PATH: &str = "lib/arm64-v8a/libunity.so";
-const APK_ID: &str = "com.beatgames.beatsaber";
-const APP_DATA_PATH: &str = "/sdcard/Android/data/com.beatgames.beatsaber/files/";
-const TEMP_PATH: &str = "/data/local/tmp/mbf-tmp";
 
 pub fn mod_current_apk(app_info: &AppInfo) -> Result<()> {
     let temp_path = Path::new(TEMP_PATH);

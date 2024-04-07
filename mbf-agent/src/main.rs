@@ -9,12 +9,24 @@ mod handlers;
 
 use crate::requests::Request;
 use anyhow::{Context, Result};
+use const_format::formatcp;
 use log::{error, Level};
 use requests::Response;
 use serde::{Deserialize, Serialize};
 use std::{fs::OpenOptions, io::{BufRead, BufReader, Write}, panic, path::Path, process::Command};
 
-const APK_ID: &str = "com.beatgames.beatsaber";
+// Directories accessed by the agent, in one place so that they can be easily changed.
+pub const APK_ID: &str = "com.beatgames.beatsaber";
+pub const QMODS_DIR: &str = "/sdcard/ModsBeforeFriday/Mods";
+pub const MODLOADER_DIR: &str = formatcp!("/sdcard/ModData/{APK_ID}/Modloader");
+pub const LATE_MODS_DIR: &str = formatcp!("{MODLOADER_DIR}/mods");
+pub const EARLY_MODS_DIR: &str = formatcp!("{MODLOADER_DIR}/early_mods");
+pub const LIBS_DIR: &str = formatcp!("{MODLOADER_DIR}/libs");
+pub const APP_DATA_PATH: &str = formatcp!("/sdcard/Android/data/{APK_ID}/files/");
+
+pub const SONGS_PATH: &str = formatcp!("/sdcard/ModData/{APK_ID}/Mods/SongCore/CustomLevels");
+pub const DOWNLOADS_PATH: &str = "/data/local/tmp/mbf-downloads";
+pub const TEMP_PATH: &str = "/data/local/tmp/mbf-tmp";
 
 
 pub fn get_apk_path() -> Result<Option<String>> {
