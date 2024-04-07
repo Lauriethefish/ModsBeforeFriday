@@ -25,3 +25,8 @@ export type {
     VersionedCoreMods,
     CoreModIndex
 }
+
+// Removes the build number, i.e. `_<big number>` suffix from the given game version.
+export function trimGameVersion(gameVersion: string): string {
+    return gameVersion.split("_")[0];
+}

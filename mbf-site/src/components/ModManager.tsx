@@ -1,6 +1,6 @@
 import { SetStateAction, useRef, useState } from "react";
 import { LogWindow, useLog } from "./LogWindow";
-import { Mod } from "../Models";
+import { Mod, trimGameVersion } from "../Models";
 import { YesNoModal, ErrorModal, Modal } from "./Modal";
 import { Adb } from '@yume-chan/adb';
 import { ModCard } from "./ModCard";
@@ -206,7 +206,7 @@ function AddModsMenu(props: ModMenuProps) {
         const versionMismatch = gameVersion !== null && gameVersion !== imported_mod.game_version;
         if(versionMismatch) {
             // Don't install a mod by default if its version mismatches: we want the user to understand the consequences
-            setError("The mod `" + imported_id + "` was not enabled automatically as it is not designed for game version v" + gameVersion + ".");
+            setError("The mod `" + imported_id + "` was not enabled automatically as it is not designed for game version v" + trimGameVersion(gameVersion) + ".");
         }   else    {
             setMods(await setModStatuses(device, { [imported_id]: true }, addLogEvent));
             toast("Successfully downloaded and installed " + imported_id + " v" + imported_mod.version)

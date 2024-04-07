@@ -1,5 +1,5 @@
 import '../css/ModCard.css';
-import { Mod } from '../Models'
+import { Mod, trimGameVersion } from '../Models'
 import { Slider } from './Slider';
 import TrashCan from '../icons/trash.svg';
 import { YesNoModal } from './Modal';
@@ -57,8 +57,9 @@ export function ModCard(props: ModCardProps) {
             onYes={() => { setEnabled(true); setWrongGameVersion(false) }}
             onNo={() => setWrongGameVersion(false)} 
             isVisible={wrongGameVersion}>
-            <p>The mod {props.mod.id} v{props.mod.version} is designed for game version {props.mod.game_version} but you have {props.gameVersion}. 
-            Are you sure you still want to enable it?</p>
+            <p>The mod {props.mod.id} v{props.mod.version} is designed for game version {props.mod.game_version === null ? null : trimGameVersion(props.mod.game_version)} but you have {trimGameVersion(props.gameVersion)}.</p>
+            <p className="warning">It is EXTREMELY likely that enabling it will crash your game and/or mess up your mods in a way that could be VERY DIFFICULT to undo.</p>
+            <p>Are you sure you still want to enable it (you don't)?</p>
         </YesNoModal>
     </div>
 }

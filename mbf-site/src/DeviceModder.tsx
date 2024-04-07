@@ -6,6 +6,7 @@ import './css/DeviceModder.css';
 import { LogWindow, useLog } from './components/LogWindow';
 import { ErrorModal, Modal } from './components/Modal';
 import { ModManager } from './components/ModManager';
+import { trimGameVersion } from './Models';
 
 interface DeviceModderProps {
     device: Adb,
@@ -90,10 +91,10 @@ interface NotSupportedProps {
 function NotSupported(props: NotSupportedProps) {
     return <div className='container mainContainer'>
         <h1>Unsupported Version</h1>
-        <p>You have Beat Saber v{props.version} installed, but this version has no support for mods!</p>
+        <p>You have Beat Saber v{trimGameVersion(props.version)} installed, but this version has no support for mods!</p>
         <p>To install custom songs, one of the following versions is needed:</p>
         <ul>
-            {props.supportedVersions.map(ver => <li>{ver}</li>)}
+            {props.supportedVersions.map(ver => <li key={ver}>{trimGameVersion(ver)}</li>)}
         </ul>
     </div>
 }
