@@ -1,0 +1,33 @@
+#anim-bg {
+	position: absolute;
+	z-index: -100;
+	top:0px;
+	left: 0px;
+	width: 100vw;
+	height: 100vh;
+}
+.block rect {
+	fill: rgb(0, 5, 120);
+}
+.block path {
+	stroke-width: 3px;
+	stroke: rgb(0, 97, 255);
+	fill: rgb(185, 186, 255);
+}
+
+.red-block rect {
+	fill: rgb(120, 0, 0);
+}
+.red-block path {
+	stroke: rgb(255, 0, 0);
+	stroke-width: 3px;
+	fill: rgb(255, 232, 232);
+}
+.green-block rect {
+	fill: rgb(0, 120, 0);
+}
+.green-block path {
+	stroke: rgb(0, 255, 0);
+	stroke-width: 3px;
+	fill: rgb(150, 254, 150);
+}

@@ -10,6 +10,8 @@ import { ErrorModal } from './components/Modal';
 import { Bounce, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
+import { AnimatedBackground } from "./components/AnimatedBackground";
+
 async function connect(
   setAuthing: () => void): Promise<Adb | null> {
  const device_manager = new AdbDaemonWebUsbDeviceManager(navigator.usb);
@@ -26,7 +28,7 @@ async function connect(
     " Please restart your computer to close any SideQuest background processes, then try again. (Running `adb kill-server` will fix this.)");
   }
   const keyStore: AdbWebCredentialStore = new AdbWebCredentialStore("ModsBeforeFriday");
-  
+
   setAuthing();
   const transport: AdbDaemonTransport = await AdbDaemonTransport.authenticate({
     serial: quest.serial,
@@ -117,6 +119,7 @@ function AppContents() {
 
 function App() {
   return <div className='main'>
+    <AnimatedBackground />
     <AppContents />
     <ToastContainer
       position="bottom-right"
