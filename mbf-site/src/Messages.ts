@@ -75,7 +75,8 @@ export type Response = LogMsg | ModStatus | Mods | ImportResult;
 
 export interface CoreModsInfo {
     supported_versions: string[],
-    all_core_mods_installed: boolean
+    downgrade_versions: string[],
+    all_core_mods_installed: boolean,
 }
 
 export type ModLoader = "Scotland2" | "QuestLoader" | "Unknown";
