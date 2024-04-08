@@ -49,7 +49,7 @@ const CORE_MODS_URL: &str = "https://git.bmbf.dev/unicorns/resources/-/raw/maste
 pub fn fetch_json<T: DeserializeOwned>(from: &str) -> Result<T, JsonPullError> {
     let response = match ureq::get(from)
         .call()
-        .context("Failed to GET from resources repository") {
+        .context("Failed to GET resource") {
             Ok(resp) => resp,
             Err(err) => return Err(JsonPullError::FetchError(err))
         };
@@ -104,7 +104,7 @@ pub fn get_libunity_stream(apk_id: &str, version: &str) -> Result<Option<impl Re
 /// since there is no quota on the total size of a release.
 
 // For now, during testing, the diffs must be hosted manually
-const DIFF_INDEX_STEM: &str = "http://192.168.0.72:9000/diffs.json";
+const DIFF_INDEX_STEM: &str = "http://<LOCAL IP>:9000/diffs.json";
 
 pub type DiffIndex = Vec<VersionDiffs>;
 
