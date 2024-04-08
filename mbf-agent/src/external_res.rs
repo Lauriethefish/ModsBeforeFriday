@@ -103,8 +103,7 @@ pub fn get_libunity_stream(apk_id: &str, version: &str) -> Result<Option<impl Re
 /// We just use one github release with a JSON file attached to it that explains the content of the other files attached,
 /// since there is no quota on the total size of a release.
 
-// For now, during testing, the diffs must be hosted manually
-const DIFF_INDEX_STEM: &str = "http://<LOCAL IP>:9000/diffs.json";
+const DIFF_INDEX_STEM: &str = "https://github.com/Lauriethefish/mbf-diffs/releases/download/1.0.0";
 
 pub type DiffIndex = Vec<VersionDiffs>;
 
