@@ -41,6 +41,5 @@ ar = "<contents OF AR_aarch64-linux-android environment variable>"
 To serve the site for testing, navigate to `./mbf-site` and run `yarn start`.
 (you may need to `yarn install` first).
 
-### TODO List
-- Do some more beta testing
-- Potentially add a built-in view to download additional mods. Might not be needed on initial release though.
+### TODO LIST
+- Add automatic downgrading, will be needed in the future.
