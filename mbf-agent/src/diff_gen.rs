@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use std::{fs::OpenOptions, io::{BufReader, Read}, path::Path};
 use anyhow::{Result, anyhow};
 use external_res::{Diff, VersionDiffs};
