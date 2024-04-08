@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use crate::{download_file, DOWNLOADS_PATH, SONGS_PATH};
 use crate::{axml::AxmlReader, patching, zip::ZipFile};
-use crate::external_res::CoreModsError;
+use crate::external_res::{get_diff_index, JsonPullError};
 use crate::manifest::ManifestInfo;
 use crate::mod_man::ModManager;
 use crate::requests::{AppInfo, CoreModsInfo, ModModel, Request, Response};
@@ -94,8 +94,8 @@ fn get_core_mods_info(apk_version: &str, mod_manager: &ModManager) -> Result<Opt
     info!("Fetching core mod index");
     let core_mods = match crate::external_res::fetch_core_mods() {
         Ok(mods) => mods,
-        Err(CoreModsError::FetchError(_)) => return Ok(None),
-        Err(CoreModsError::ParseError(err)) => return Err(err)
+        Err(JsonPullError::FetchError(_)) => return Ok(None),
+        Err(JsonPullError::ParseError(err)) => return Err(err)
     };
 
     // Check that all core mods are installed with an appropriate version
@@ -121,9 +121,17 @@ fn get_core_mods_info(apk_version: &str, mod_manager: &ModManager) -> Result<Opt
         _minor.parse::<i64>().expect("Invalid version in core mod index") >= 35
     }).collect();
 
+    let downgrade_versions: Vec<String> = get_diff_index()
+        .context("Failed to get downgrading information")?
+        .into_iter()
+        .filter(|diff| diff.from_version == apk_version)
+        .map(|diff| diff.to_version)
+        .collect();
+
     Ok(Some(CoreModsInfo {
         supported_versions,
-        all_core_mods_installed
+        all_core_mods_installed,
+        downgrade_versions
     }))
 }
 

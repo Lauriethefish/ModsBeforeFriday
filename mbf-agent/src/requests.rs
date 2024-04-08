@@ -69,6 +69,8 @@ pub enum Request {
 pub struct CoreModsInfo {
     /// All of the Beat Saber versions with core mods using Scotland2
     pub supported_versions: Vec<String>,
+    /// The versions of Beat Saber that can be reached by downgrading the game.
+    pub downgrade_versions: Vec<String>,
     pub all_core_mods_installed: bool
 }
 
