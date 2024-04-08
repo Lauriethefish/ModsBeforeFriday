@@ -10,6 +10,8 @@ import { ErrorModal } from './components/Modal';
 import { Bounce, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
+import { AnimatedBackground } from "./components/AnimatedBackground";
+
 async function connect(
   setAuthing: () => void): Promise<Adb | null> {
  const device_manager = new AdbDaemonWebUsbDeviceManager(navigator.usb);
@@ -31,7 +33,7 @@ async function connect(
     throw new Error("Some other app is trying to access your quest, e.g. SideQuest.\n" + fixInstructions);
   }
   const keyStore: AdbWebCredentialStore = new AdbWebCredentialStore("ModsBeforeFriday");
-  
+
   setAuthing();
   const transport: AdbDaemonTransport = await AdbDaemonTransport.authenticate({
     serial: quest.serial,
@@ -131,6 +133,7 @@ function AppContents() {
 
 function App() {
   return <div className='main'>
+    <AnimatedBackground />
     <AppContents />
     <ToastContainer
       position="bottom-right"
