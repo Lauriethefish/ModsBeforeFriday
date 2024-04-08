@@ -32,7 +32,7 @@ export function AnimatedBlock({index}:{index:number}){
 
 		let start = [Math.random()*(document.body.clientWidth+200)-bg.clientLeft,-100];
 		let angle = Math.random() * Math.PI/2+Math.PI/4;
-		const speed = 0.2//0.05;
+		const speed = 0.05;//0.2
 		let vel = [speed*Math.cos(angle), speed*Math.sin(angle)];
 
 		let time = 1400/vel[1];
@@ -41,10 +41,11 @@ export function AnimatedBlock({index}:{index:number}){
 		if(end[0] > 0 && time > -100){
 
 		}
+		let filters = `brightness(${1+0.6*(Math.random()-0.5)})`;
 
 		let animation = elem.animate([
-			{ transform: `translate(${start[0]}px, ${start[1]}px) rotate(${(Math.random()-0.5)*Math.PI*4}rad) scale(${1-0.5*Math.random()})` },
-			{ transform: `translate(${end[0]}px, ${end[1]}px) rotate(${(Math.random()-0.5)*Math.PI*4}rad) scale(${1-0.5*Math.random()})` }],
+			{ transform: `translate(${start[0]}px, ${start[1]}px) rotate(${(Math.random()-0.5)*Math.PI*4}rad) scale(${1.5-Math.random()})`, filter: filters },
+			{ transform: `translate(${end[0]}px, ${end[1]}px) rotate(${(Math.random()-0.5)*Math.PI*4}rad) scale(${1.5-Math.random()})`, filters: filters }],
 			{duration: time, iterations: 1});
 		animation.onfinish = generateNewAnimation;
 	}
@@ -53,7 +54,7 @@ export function AnimatedBlock({index}:{index:number}){
 		elem.classList.remove("hidden");
 		elem.classList.remove("green-block");
 		generateNewAnimation();
-	},10000*Math.random());
+	},60000*Math.random());
 	
 	return block;
 }
