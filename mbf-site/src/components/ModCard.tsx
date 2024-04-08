@@ -37,7 +37,6 @@ export function ModCard(props: ModCardProps) {
                     && props.mod.game_version !== props.gameVersion) {
                     setWrongGameVersion(true);
                 }   else    {
-                    console.log(props.mod.game_version, props.gameVersion);
                     setEnabled(value);
                 }
             }}/>
