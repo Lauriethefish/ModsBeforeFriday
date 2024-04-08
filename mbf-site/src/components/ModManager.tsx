@@ -4,25 +4,27 @@ import { Mod, trimGameVersion } from "../Models";
 import { ErrorModal, Modal } from "./Modal";
 import { Adb } from '@yume-chan/adb';
 import { ModCard } from "./ModCard";
-import ModIcon from '../icons/mod-icon.svg'
 import UploadIcon from '../icons/upload.svg';
+import ToolsIcon from '../icons/tools-icon.svg';
 import '../css/ModManager.css';
 import { LogEventSink, importFile, importModUrl, removeMod, setModStatuses } from "../Agent";
 import { toast } from "react-toastify";
 import { ModRepoBrowser } from "./ModRepoBrowser";
 import { ImportedMod } from "../Messages";
+import { OptionsMenu } from "./OptionsMenu";
 
 interface ModManagerProps {
     mods: Mod[],
     gameVersion: string,
     setMods: (mods: Mod[]) => void
-    device: Adb
+    device: Adb,
+    quit: () => void
 }
 
-type SelectedMenu = 'add' | 'current';
+type SelectedMenu = 'add' | 'current' | 'options';
 
 export function ModManager(props: ModManagerProps) {
-    const { mods, setMods, device, gameVersion } = props;
+    const { mods, setMods, device, gameVersion, quit } = props;
     
     const [isWorking, setWorking] = useState(false);
     const [logEvents, addLogEvent] = useLog();
@@ -57,6 +59,12 @@ export function ModManager(props: ModManagerProps) {
             addLogEvent={addLogEvent}
         />}
         
+        {menu === 'options' && <OptionsMenu
+            device={device}
+            quit={quit}
+            setError={err => setModError(err)}
+         />}
+        
         <ErrorModal isVisible={modError != null}
             title={"Failed to sync mods"}
             description={modError!}
@@ -78,15 +86,15 @@ interface TitleProps {
 function Title(props: TitleProps) {
     const { menu, setMenu } = props;
 
-    return <div className='container noPadding'>
-        <div className="horizontalCenter">
-            <div className={`tab-header ${menu === 'current' ? "selected":""}`}>
-                <h1 onClick={() => setMenu('current')}>Your Mods</h1>
-            </div>
-            <img src={ModIcon} />
-            <div className={`tab-header ${menu === 'add' ? "selected":""}`}>
-                <h1 onClick={() => setMenu('add')}>Add Mods</h1>
-            </div>
+    return <div className='container noPadding horizontalCenter'>
+        <div className={`tab-header ${menu === 'current' ? "selected":""}`}>
+            <h1 onClick={() => setMenu('current')}>Your Mods</h1>
+        </div>
+        <span className={`tab-header ${menu === 'options' ? "selected":""}`}>
+            <img onClick={() => setMenu('options')} src={ToolsIcon} />
+        </span>
+        <div className={`tab-header ${menu === 'add' ? "selected":""}`}>
+            <h1 onClick={() => setMenu('add')}>Add Mods</h1>
         </div>
     </div>
 }

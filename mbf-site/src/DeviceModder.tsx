@@ -14,7 +14,7 @@ interface DeviceModderProps {
     quit: (err: unknown | null) => void
 }
 
-async function uninstallBeatSaber(device: Adb) {
+export async function uninstallBeatSaber(device: Adb) {
     await device.subprocess.spawnAndWait("pm uninstall com.beatgames.beatsaber");
 }
 
@@ -69,6 +69,7 @@ export function DeviceModder(props: DeviceModderProps) {
                     setMods={mods => setModStatus({ ...modStatus, installed_mods: mods })}
                     device={device}
                     gameVersion={modStatus.app_info.version}
+                    quit={() => quit(undefined)}
                 />
             </>
         }   else    {
