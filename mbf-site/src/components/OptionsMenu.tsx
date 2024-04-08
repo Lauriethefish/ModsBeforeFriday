@@ -30,6 +30,9 @@ export function OptionsMenu({ device, quit, setError }: {
 // Returns a blob containing the logcat messages recorded.
 async function logcatToBlob(device: Adb, getCancelled: () => boolean): Promise<Blob> {
     console.log("Starting `logcat` process");
+
+    // First clear the logcat buffer - we only want logs from events happening after the "start logcat" button is pressed.
+    await device.subprocess.spawnAndWait("logcat -c");
     
     const process = await device.subprocess.spawn("logcat");
     let killed = false;
