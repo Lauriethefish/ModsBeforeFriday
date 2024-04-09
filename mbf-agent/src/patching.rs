@@ -2,7 +2,7 @@ use std::{fs::{File, OpenOptions}, io::{BufReader, Cursor, Read, Seek, Write}, p
 
 use anyhow::{Context, Result, anyhow};
 use log::{error, info, warn};
-use crate::{axml::{AxmlReader, AxmlWriter}, copy_stream_progress, external_res::{self, Diff, VersionDiffs}, requests::{AppInfo, ModLoader}, zip::{self, ZIP_CRC}, ModTag, APK_ID, APP_DATA_PATH, APP_OBB_PATH, TEMP_PATH};
+use crate::{axml::{AxmlReader, AxmlWriter}, copy_stream_progress, external_res::{self, Diff, VersionDiffs}, requests::{AppInfo, ModLoader}, zip::{self, ZIP_CRC}, ModTag, APK_ID, APP_DATA_PATH, APP_OBB_PATH};
 use crate::manifest::{ManifestMod, ResourceIds};
 use crate::zip::{signing, FileCompression, ZipFile};
 
@@ -17,10 +17,7 @@ const LIB_UNITY_PATH: &str = "lib/arm64-v8a/libunity.so";
 const DIFF_DOWNLOAD_ATTEMPTS: u32 = 3;
 
 // Mods the currently installed version of the given app and reinstalls it, without doing any downgrading.
-pub fn mod_current_apk(app_info: &AppInfo) -> Result<()> {
-    let temp_path = Path::new(TEMP_PATH);
-    std::fs::create_dir_all(TEMP_PATH)?;
-
+pub fn mod_current_apk(temp_path: &Path, app_info: &AppInfo) -> Result<()> {
     info!("Downloading unstripped libunity.so (this could take a minute)");
     let libunity_path = save_libunity(temp_path, &app_info.version).context("Failed to save libunity.so")?;
 
@@ -37,10 +34,7 @@ pub fn mod_current_apk(app_info: &AppInfo) -> Result<()> {
 }
 
 // Downgrades the APK/OBB files for the given app using the diffs provided, then reinstalls the app.
-pub fn downgrade_and_mod_apk(app_info: &AppInfo, diffs: VersionDiffs) -> Result<()> {
-    let temp_path = Path::new(TEMP_PATH);
-    std::fs::create_dir_all(TEMP_PATH)?;
-
+pub fn downgrade_and_mod_apk(temp_path: &Path, app_info: &AppInfo, diffs: VersionDiffs) -> Result<()> {
     // Download libunity.so *for the downgraded version*
     info!("Downloading unstripped libunity.so (this could take a minute)");
     let libunity_path = save_libunity(temp_path, &diffs.to_version)
@@ -136,7 +130,7 @@ fn read_file_vec(path: impl AsRef<Path>) -> Result<Vec<u8>> {
 
     let mut file_content = Vec::with_capacity(handle.metadata()?.len() as usize);
     let mut reader = BufReader::new(handle);
-    reader.read_exact(&mut file_content);
+    reader.read_exact(&mut file_content)?;
 
     Ok(file_content)
 }
@@ -283,7 +277,7 @@ fn restore_obb_files(restore_dir: &Path, obb_backups: Vec<PathBuf>) -> Result<()
         // Cannot use a `rename` since the mount points are different
         info!("Restoring {:?}", backup_path);
         std::fs::copy(&backup_path, restore_dir.join(backup_path.file_name().unwrap()))?;
-        std::fs::remove_file(backup_path);
+        std::fs::remove_file(backup_path)?;
     }
 
     Ok(())
