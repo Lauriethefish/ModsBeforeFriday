@@ -2,7 +2,7 @@ use std::{fs::{File, OpenOptions}, io::{BufReader, Cursor, Read, Seek, Write}, p
 
 use anyhow::{Context, Result, anyhow};
 use log::{error, info, warn};
-use crate::{axml::{AxmlReader, AxmlWriter}, copy_stream_progress, external_res::{self, Diff, VersionDiffs}, requests::{AppInfo, ModLoader}, zip::{self, ZIP_CRC}, ModTag, APK_ID, APP_DATA_PATH, APP_OBB_PATH};
+use crate::{axml::{AxmlReader, AxmlWriter}, copy_stream_progress, external_res::{self, Diff, VersionDiffs}, requests::{AppInfo, ModLoader}, zip::{self, ZIP_CRC}, ModTag, APK_ID, APP_DATA_PATH, APP_OBB_PATH, PLAYER_DATA_PATH};
 use crate::manifest::{ManifestMod, ResourceIds};
 use crate::zip::{signing, FileCompression, ZipFile};
 
@@ -78,7 +78,7 @@ fn patch_and_reinstall(libunity_path: Option<PathBuf>,
     temp_path: &Path,
     obb_paths: Vec<PathBuf>) -> Result<()> {
     let player_data_backup = temp_path.join("PlayerData.backup");
-    let player_data_path = Path::new(APP_DATA_PATH).join("PlayerData.dat");
+    let player_data_path = Path::new(PLAYER_DATA_PATH);
     let backed_up_data = if player_data_path.exists() {
         info!("Backing up player data");
         std::fs::copy(&player_data_path, &player_data_backup)?;
@@ -100,10 +100,29 @@ fn patch_and_reinstall(libunity_path: Option<PathBuf>,
     if backed_up_data {
         info!("Restoring player data");
         std::fs::create_dir_all(&APP_DATA_PATH)?;
-        std::fs::copy(player_data_backup, player_data_path)?;
+        std::fs::copy(player_data_backup, &player_data_path)?;
+
+        #[cfg(unix)]
+        try_chmod_player_data();
     }
 
     Ok(())
+}
+
+#[cfg(unix)]
+pub fn try_chmod_player_data() {
+    use std::os::unix::fs::PermissionsExt;
+    use std::fs::Permissions;
+
+    if !Path::new(PLAYER_DATA_PATH).exists() {
+        return;
+    }
+
+    info!("Ch-modding player data");
+    match std::fs::set_permissions(PLAYER_DATA_PATH, Permissions::from_mode(777)) {
+        Ok(_) => {},
+        Err(err) => warn!("Failed to chmod player data: {err}")
+    }
 }
 
 fn reinstall_modded_app(temp_apk_path: &Path) -> Result<()> {

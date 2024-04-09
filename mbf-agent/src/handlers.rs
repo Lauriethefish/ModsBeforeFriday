@@ -75,6 +75,9 @@ fn handle_get_mod_status() -> Result<Response> {
         }
     };
 
+    #[cfg(unix)]
+    patching::try_chmod_player_data();
+
     Ok(Response::ModStatus { 
         app_info,
         core_mods,

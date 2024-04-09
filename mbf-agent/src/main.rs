@@ -22,7 +22,8 @@ pub const MODLOADER_DIR: &str = formatcp!("/sdcard/ModData/{APK_ID}/Modloader");
 pub const LATE_MODS_DIR: &str = formatcp!("{MODLOADER_DIR}/mods");
 pub const EARLY_MODS_DIR: &str = formatcp!("{MODLOADER_DIR}/early_mods");
 pub const LIBS_DIR: &str = formatcp!("{MODLOADER_DIR}/libs");
-pub const APP_DATA_PATH: &str = formatcp!("/sdcard/Android/data/{APK_ID}/files/");
+pub const APP_DATA_PATH: &str = formatcp!("/sdcard/Android/data/{APK_ID}/files");
+pub const PLAYER_DATA_PATH: &str = formatcp!("{APP_DATA_PATH}/PlayerData.dat");
 pub const APP_OBB_PATH: &str = formatcp!("/sdcard/Android/obb/{APK_ID}/");
 
 
