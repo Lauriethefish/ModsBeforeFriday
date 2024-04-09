@@ -1,8 +1,8 @@
-use std::{fs::{File, OpenOptions}, io::{Cursor, Seek, Write}, path::{Path, PathBuf}, process::Command};
+use std::{fs::{File, OpenOptions}, io::{Cursor, Seek, Write}, path::{Path, PathBuf}, process::Command, time::{Instant, SystemTime}};
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result};
 use log::{info, warn};
-use crate::{axml::{AxmlReader, AxmlWriter}, external_res, requests::{AppInfo, ModLoader}, zip, ModTag, APK_ID, APP_DATA_PATH, TEMP_PATH};
+use crate::{axml::{AxmlReader, AxmlWriter}, copy_stream_progress, external_res::{self, Diff, VersionDiffs}, requests::{AppInfo, ModLoader}, zip, ModTag, APK_ID, APP_DATA_PATH, TEMP_PATH};
 use crate::manifest::{ManifestMod, ResourceIds};
 use crate::zip::{signing, FileCompression, ZipFile};
 
@@ -15,7 +15,7 @@ const MOD_TAG_PATH: &str = "modded.json";
 const LIB_MAIN_PATH: &str = "lib/arm64-v8a/libmain.so";
 const LIB_UNITY_PATH: &str = "lib/arm64-v8a/libunity.so";
 
-pub fn mod_current_apk(app_info: &AppInfo) -> Result<()> {
+pub fn mod_current_apk(app_info: &AppInfo, downgrade_to: Option<String>) -> Result<()> {
     let temp_path = Path::new(TEMP_PATH);
     std::fs::create_dir_all(TEMP_PATH)?;
 
@@ -30,7 +30,7 @@ pub fn mod_current_apk(app_info: &AppInfo) -> Result<()> {
     patch_apk_in_place(&temp_apk_path, libunity_path)?;
 
     let obb_dir = PathBuf::from(format!("/sdcard/Android/obb/{APK_ID}/"));
-    let obb_backup = temp_path.join("backup.obb");
+    let obb_backup = temp_path.join("obbs");
 
     let player_data_backup = temp_path.join("PlayerData.backup");
 
@@ -44,9 +44,25 @@ pub fn mod_current_apk(app_info: &AppInfo) -> Result<()> {
         false
     };
 
-    info!("Saving OBB file");
-    let obb_restore_path = save_obb(&obb_dir, &obb_backup)?;
+    info!("Saving OBB files");
+    let obb_backups = save_obbs(&obb_dir, &obb_backup)?;
 
+    reinstall_modded_app(&temp_apk_path)?;
+
+    info!("Restoring OBB files");
+    restore_obb_files(&obb_dir, obb_backups)?;
+    std::fs::remove_file(temp_apk_path)?;
+
+    if backed_up_data {
+        info!("Restoring player data");
+        std::fs::create_dir_all(&APP_DATA_PATH)?;
+        std::fs::copy(player_data_backup, player_data_path)?;
+    }
+
+    Ok(())
+}
+
+fn reinstall_modded_app(temp_apk_path: &Path) -> Result<()> {
     info!("Reinstalling modded app");
     Command::new("pm")
         .args(["uninstall", APK_ID])
@@ -63,19 +79,47 @@ pub fn mod_current_apk(app_info: &AppInfo) -> Result<()> {
         .args(["set", "--uid", APK_ID, "MANAGE_EXTERNAL_STORAGE", "allow"])
         .output()?;
 
-    // Cannot use a `rename` since the mount points are different
-    info!("Restoring OBB file");
-    std::fs::create_dir_all(obb_dir)?;
-    std::fs::copy(&obb_backup, &obb_restore_path)?;
-    std::fs::remove_file(obb_backup)?;
-    std::fs::remove_file(temp_apk_path)?;
+    Ok(())
+}
 
-    if backed_up_data {
-        info!("Restoring player data");
-        std::fs::create_dir_all(&APP_DATA_PATH)?;
-        std::fs::copy(player_data_backup, player_data_path)?;
+
+// Downloads the deltas needed for downgrading with the given version_diffs.
+// The diffs are saved with names matching `diff_name` in the `Diff` struct.
+fn download_diffs(to_path: impl AsRef<Path>, version_diffs: &VersionDiffs) -> Result<()> {
+    for diff in version_diffs.obb_diffs.iter() {
+        info!("Downloading diff for OBB {}", diff.file_name);
+        download_diff(diff, to_path)?;
     }
 
+    info!("Downloading diff for APK");
+    download_diff(&version_diffs.apk_diff, to_path);
+
+    Ok(())
+}
+
+// Downloads a diff to the given directory, using the file name given in the `Diff` struct.
+fn download_diff(diff: &Diff, to_dir: impl AsRef<Path>) -> Result<()> {
+    let mut output = OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .write(true)
+        .open(to_dir.as_ref().join(diff.diff_name))?;
+
+    let (mut resp, length) = external_res::get_diff_reader(diff)?;
+
+    if let Some(length) = length {
+        let mut last_progress_update = Instant::now();
+        copy_stream_progress(&mut resp, &mut output, &mut |bytes_copied| {
+            let now = Instant::now();
+            if now.duration_since(last_progress_update).as_secs_f32() > 2.0 {
+                info!("Progress: {:.2}%", (bytes_copied as f32 / length as f32) * 100.0);
+            }
+        })?;
+
+    }   else {
+        warn!("Diff repository returned no Content-Length, so cannot show download progress");
+        std::io::copy(&mut resp, &mut output)?;
+    }
     Ok(())
 }
 
@@ -98,22 +142,36 @@ fn save_libunity(temp_path: impl AsRef<Path>, app_info: &AppInfo) -> Result<Opti
 }
 
 // Moves the OBB file to a backup location and returns the path that the OBB needs to be restored to
-fn save_obb(obb_dir: &Path, obb_backup_path: &Path) -> Result<PathBuf> {
+fn save_obbs(obb_dir: &Path, obb_backup_path: &Path) -> Result<Vec<PathBuf>> {
+    let mut paths = Vec::new();
     for err_or_stat in std::fs::read_dir(obb_dir)? {
         if let Ok(stat) = err_or_stat {
             let path = stat.path();
             let ext = path.extension();
             if ext.is_some_and(|ext| ext == "obb") {
                 // Rename doesn't work due to different mount points
-                std::fs::copy(&path, obb_backup_path)?;
+                std::fs::copy(&path, obb_backup_path.join(path.file_name().unwrap()))?;
                 std::fs::remove_file(&path)?;
                 
-                return Ok(path)
+                paths.push(path);
             }
         }
     }
 
-    Err(anyhow!("Could not find an OBB to save"))
+    Ok(paths)
+}
+
+// Copies the contents of `obb_backups` back to `restore_dir`, creating it if it doesn't already exist.
+fn restore_obb_files(restore_dir: &Path, obb_backups: Vec<PathBuf>) -> Result<()> {
+    std::fs::create_dir_all(restore_dir)?;
+    for backup_path in obb_backups {
+        // Cannot use a `rename` since the mount points are different
+        info!("Restoring {:?}", backup_path);
+        std::fs::copy(&backup_path, restore_dir.join(backup_path.file_name().unwrap()))?;
+        std::fs::remove_file(backup_path);
+    }
+
+    Ok(())
 }
 
 pub fn get_modloader_path() -> Result<PathBuf> {
