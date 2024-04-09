@@ -172,7 +172,7 @@ function PatchingMenu(props: PatchingMenuProps) {
             <button className="modButton" onClick={async () => {
                 setIsPatching(true);
                 try {
-                    onCompleted(await patchApp(device, modStatus, addLogEvent));
+                    onCompleted(await patchApp(device, modStatus, downgradingTo, addLogEvent));
                 } catch(e) {
                     setPatchingError(String(e));
                     setIsPatching(false);

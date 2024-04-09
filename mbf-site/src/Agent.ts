@@ -240,9 +240,11 @@ export async function removeMod(device: Adb,
 // (will not patch if the APK is already modded - will just extract the modloader and install core mods.)
 export async function patchApp(device: Adb,
   beforePatch: ModStatus,
+  downgradeToVersion: string | null,
   eventSink: LogEventSink = null): Promise<ModStatus> {
   let response = await sendRequest(device, {
-      type: 'Patch'
+      type: 'Patch',
+      downgrade_to: downgradeToVersion
   }, eventSink);
 
   // Return the new mod status assumed after patching
@@ -251,11 +253,12 @@ export async function patchApp(device: Adb,
       'type': 'ModStatus',
       app_info: {
           loader_installed: 'Scotland2',
-          version: beforePatch.app_info!.version
+          version: downgradeToVersion ?? beforePatch.app_info!.version
       },
       core_mods: {
           all_core_mods_installed: true,
-          supported_versions: beforePatch.core_mods!.supported_versions
+          supported_versions: beforePatch.core_mods!.supported_versions,
+          downgrade_versions: []
       },
       modloader_present: true,
       installed_mods: (response as Mods).installed_mods
@@ -278,6 +281,7 @@ export async function quickFix(device: Adb,
       core_mods: {
           all_core_mods_installed: true,
           supported_versions: beforeFix.core_mods!.supported_versions,
+          downgrade_versions: beforeFix.core_mods!.downgrade_versions
       },
       installed_mods: (response as Mods).installed_mods,
       modloader_present: true

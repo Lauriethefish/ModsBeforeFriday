@@ -5,7 +5,8 @@ export interface GetModStatus {
 }
 
 export interface Patch {
-    type: 'Patch'
+    type: 'Patch',
+    downgrade_to: string | null
 }
 
 export interface SetModsEnabled {
