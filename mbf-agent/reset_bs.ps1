@@ -1,3 +1,5 @@
+$Latest=$args[0]
+
 # Put your OBB file/BS APK here
 if ( $Latest.Length -ne 0 ) {
     Write-Output "Using latest: 1.36"
