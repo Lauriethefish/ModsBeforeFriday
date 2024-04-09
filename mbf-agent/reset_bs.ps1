@@ -1,9 +1,15 @@
 # Put your OBB file/BS APK here
-$OBB_PATH = "C:\Users\Lauri\Beat_Saber_Mod_Dev\main.1130.com.beatgames.beatsaber.obb"
-$BS_PATH = "bs.apk"
+if ( $Latest.Length -ne 0 ) {
+    Write-Output "Using latest: 1.36"
+    $OBB_PATH = "main.1188.com.beatgames.beatsaber.obb"
+    $BS_PATH = "bs136.apk"
+}   else    {
+    $OBB_PATH = "main.1130.com.beatgames.beatsaber.obb"
+    $BS_PATH = "bs135.apk"
+}
 
 Write-Output "Resetting to vanilla BS"
 adb shell pm uninstall com.beatgames.beatsaber
-adb install bs.apk
-adb push $OBB_PATH "/sdcard/Android/obb/com.beatgames.beatsaber/main.1130.com.beatgames.beatsaber.obb"
+adb install $BS_PATH
+adb push $OBB_PATH "/sdcard/Android/obb/com.beatgames.beatsaber/$OBB_PATH"
 adb kill-server

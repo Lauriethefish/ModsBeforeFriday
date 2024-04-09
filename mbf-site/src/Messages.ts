@@ -5,7 +5,8 @@ export interface GetModStatus {
 }
 
 export interface Patch {
-    type: 'Patch'
+    type: 'Patch',
+    downgrade_to: string | null
 }
 
 export interface SetModsEnabled {
@@ -75,7 +76,8 @@ export type Response = LogMsg | ModStatus | Mods | ImportResult;
 
 export interface CoreModsInfo {
     supported_versions: string[],
-    all_core_mods_installed: boolean
+    downgrade_versions: string[],
+    all_core_mods_installed: boolean,
 }
 
 export type ModLoader = "Scotland2" | "QuestLoader" | "Unknown";

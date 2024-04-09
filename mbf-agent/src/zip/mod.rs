@@ -14,7 +14,7 @@ pub mod signing;
 // Minimum version needed to extract ZIP files made by this module
 const VERSION_NEEDED_TO_EXTRACT: u16 = 0x0002;
 
-const ZIP_CRC: Crc<u32> =  Crc::<u32>::new(&Algorithm {
+pub const ZIP_CRC: Crc<u32> =  Crc::<u32>::new(&Algorithm {
     width: 32,
     poly: 0x04c11db7,
     init: 0xffffffff,

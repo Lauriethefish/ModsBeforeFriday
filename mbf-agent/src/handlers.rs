@@ -2,9 +2,9 @@ use std::collections::HashMap;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
-use crate::{download_file, DOWNLOADS_PATH, SONGS_PATH};
+use crate::{download_file, DOWNLOADS_PATH, SONGS_PATH, TEMP_PATH};
 use crate::{axml::AxmlReader, patching, zip::ZipFile};
-use crate::external_res::CoreModsError;
+use crate::external_res::{get_diff_index, JsonPullError};
 use crate::manifest::ManifestInfo;
 use crate::mod_man::ModManager;
 use crate::requests::{AppInfo, CoreModsInfo, ModModel, Request, Response};
@@ -15,7 +15,7 @@ use log::{error, info, warn};
 pub fn handle_request(request: Request) -> Result<Response> {
     match request {
         Request::GetModStatus => handle_get_mod_status(),
-        Request::Patch => handle_patch(),
+        Request::Patch { downgrade_to } => handle_patch(downgrade_to),
         Request::SetModsEnabled {
             statuses
         } => run_mod_action(statuses),
@@ -94,8 +94,8 @@ fn get_core_mods_info(apk_version: &str, mod_manager: &ModManager) -> Result<Opt
     info!("Fetching core mod index");
     let core_mods = match crate::external_res::fetch_core_mods() {
         Ok(mods) => mods,
-        Err(CoreModsError::FetchError(_)) => return Ok(None),
-        Err(CoreModsError::ParseError(err)) => return Err(err)
+        Err(JsonPullError::FetchError(_)) => return Ok(None),
+        Err(JsonPullError::ParseError(err)) => return Err(err)
     };
 
     // Check that all core mods are installed with an appropriate version
@@ -121,9 +121,17 @@ fn get_core_mods_info(apk_version: &str, mod_manager: &ModManager) -> Result<Opt
         _minor.parse::<i64>().expect("Invalid version in core mod index") >= 35
     }).collect();
 
+    let downgrade_versions: Vec<String> = get_diff_index()
+        .context("Failed to get downgrading information")?
+        .into_iter()
+        .filter(|diff| diff.from_version == apk_version)
+        .map(|diff| diff.to_version)
+        .collect();
+
     Ok(Some(CoreModsInfo {
         supported_versions,
-        all_core_mods_installed
+        all_core_mods_installed,
+        downgrade_versions
     }))
 }
 
@@ -316,11 +324,33 @@ fn handle_quick_fix() -> Result<Response> {
     })
 }
 
-fn handle_patch() -> Result<Response> {
+fn handle_patch(downgrade_to: Option<String>) -> Result<Response> {
     let app_info = get_app_info()?
         .ok_or(anyhow!("Cannot patch when app not installed"))?;
 
-    patching::mod_current_apk(&app_info).context("Failed to patch APK")?;
+    std::fs::create_dir_all(TEMP_PATH)?;
+
+    // Either downgrade or just patch the current APK depending on the caller's choice.
+    let patching_result = if let Some(to_version) = downgrade_to {
+        let diff_index = get_diff_index()
+            .context("Failed to get diff index to downgrade")?;
+        let version_diffs = diff_index.into_iter()
+            .filter(|diff| diff.from_version == app_info.version && diff.to_version == to_version)
+            .next()
+            .ok_or(anyhow!("No diff existed to go from {} to {}", app_info.version, to_version))?;
+
+        patching::downgrade_and_mod_apk(Path::new(TEMP_PATH), &app_info, version_diffs)
+    }   else {
+        patching::mod_current_apk(Path::new(TEMP_PATH), &app_info).context("Failed to patch APK")
+    };
+
+    // No matter what, make sure that all temporary files are gone.
+    std::fs::remove_dir_all(TEMP_PATH)?;
+
+    if let Err(err) = patching_result {
+        return Err(err).context("Failed to patch")
+    }
+
     patching::install_modloader().context("Failed to save modloader")?;
 
     let mut mod_manager = ModManager::new();
