@@ -27,6 +27,7 @@ pub fn mod_current_apk(temp_path: &Path, app_info: &AppInfo) -> Result<()> {
 
     info!("Saving OBB files");
     let obb_backup = temp_path.join("obbs");
+    std::fs::create_dir(&obb_backup)?;
     let obb_backups = save_obbs(Path::new(APP_OBB_PATH), &obb_backup)?;
 
     patch_and_reinstall(libunity_path, &temp_apk_path, temp_path, obb_backups)?;
@@ -53,6 +54,7 @@ pub fn downgrade_and_mod_apk(temp_path: &Path, app_info: &AppInfo, diffs: Versio
 
     // Downgrade the obb files, copying them to a temporary directory in the process.
     let obb_backup_dir = temp_path.join("obbs");
+    std::fs::create_dir(&obb_backup_dir)?;
     let mut obb_backup_paths = Vec::new();
     for obb_diff in &diffs.obb_diffs {
         let obb_path = Path::new(APP_OBB_PATH).join(&obb_diff.file_name);
@@ -60,7 +62,7 @@ pub fn downgrade_and_mod_apk(temp_path: &Path, app_info: &AppInfo, diffs: Versio
             return Err(anyhow!("Obb file {} did not exist, is the Beat Saber installation corrupt", obb_diff.file_name));
         }
 
-        let obb_backup_path = obb_backup_dir.join(&obb_diff.diff_name);
+        let obb_backup_path = obb_backup_dir.join(&obb_diff.output_file_name);
 
         info!("Downgrading obb {}", obb_diff.file_name);
         apply_diff(&obb_path,& obb_backup_path, obb_diff, &diffs_path)?;
@@ -130,7 +132,7 @@ fn read_file_vec(path: impl AsRef<Path>) -> Result<Vec<u8>> {
 
     let mut file_content = Vec::with_capacity(handle.metadata()?.len() as usize);
     let mut reader = BufReader::new(handle);
-    reader.read_exact(&mut file_content)?;
+    reader.read_to_end(&mut file_content)?;
 
     Ok(file_content)
 }
@@ -141,7 +143,7 @@ fn apply_diff(from_path: &Path,
     to_path: &Path,
     diff: &Diff,
     diffs_path: &Path) -> Result<()> {
-    let diff_content = read_file_vec(diffs_path.join(&diff.file_name))
+    let diff_content = read_file_vec(diffs_path.join(&diff.diff_name))
         .context("Diff could not be opened. Was it downloaded")?;
 
     let patch = qbsdiff::Bspatch::new(&diff_content)
@@ -158,6 +160,7 @@ fn apply_diff(from_path: &Path,
     }
 
     // Carry out the downgrade
+    info!("Applying patch");
     let mut output_handle = OpenOptions::new()
         .truncate(true)
         .create(true)
@@ -250,7 +253,7 @@ fn save_libunity(temp_path: impl AsRef<Path>, version: &str) -> Result<Option<Pa
 }
 
 // Moves the OBB file to a backup location and returns the path that the OBB needs to be restored to
-fn save_obbs(obb_dir: &Path, obb_backup_path: &Path) -> Result<Vec<PathBuf>> {
+fn save_obbs(obb_dir: &Path, obb_backups_path: &Path) -> Result<Vec<PathBuf>> {
     let mut paths = Vec::new();
     for err_or_stat in std::fs::read_dir(obb_dir)? {
         if let Ok(stat) = err_or_stat {
@@ -259,10 +262,11 @@ fn save_obbs(obb_dir: &Path, obb_backup_path: &Path) -> Result<Vec<PathBuf>> {
             // Make sure that we check the extension is OBB: We don't backup DLCs (no extension) since this might cause further issues and they can easily be redownloaded.
             if ext.is_some_and(|ext| ext == "obb") {
                 // Rename doesn't work due to different mount points
-                std::fs::copy(&path, obb_backup_path.join(path.file_name().unwrap()))?;
+                let obb_backup_path = obb_backups_path.join(path.file_name().unwrap());
+                std::fs::copy(&path, &obb_backup_path)?;
                 std::fs::remove_file(&path)?;
                 
-                paths.push(path);
+                paths.push(obb_backup_path);
             }
         }
     }

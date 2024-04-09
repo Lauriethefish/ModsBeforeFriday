@@ -63,6 +63,7 @@ fn generate_diff(
     })
 }
 
+/*
 fn main() -> Result<()> {
     let mut args = std::env::args();
     args.next().unwrap();
@@ -100,4 +101,16 @@ fn main() -> Result<()> {
     }   else {
         Err(anyhow!("Missing diff for the APK file"))
     }
+}*/
+
+fn main() -> Result<()> {
+    let handle = std::fs::File::open("bs1.36-1.35.apk.diff")?;
+
+    let mut file_content = Vec::with_capacity(handle.metadata()?.len() as usize);
+    let mut reader = BufReader::new(handle);
+    reader.read_to_end(&mut file_content)?;
+
+    let patch = qbsdiff::Bspatch::new(&file_content)?;
+
+    Ok(())
 }

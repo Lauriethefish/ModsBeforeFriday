@@ -135,9 +135,9 @@ pub fn get_diff_index() -> Result<DiffIndex, JsonPullError> {
 
 pub fn get_diff_reader(diff: &Diff) -> Result<(impl Read, Option<usize>)> {
     // We will want to implement some kind of progress system, since I imagine that diffs will get fairly large.
-    let resp = ureq::get(&format!("{DIFF_INDEX_STEM}/{}", diff.file_name))
+    let resp = ureq::get(&format!("{DIFF_INDEX_STEM}/{}", diff.diff_name))
         .call()
-        .context("Failed to GET libunity version")?;
+        .context("Failed to GET diff file")?;
 
     let content_len = match resp.header("Content-Length") {
         Some(length) => length.parse::<usize>().ok(),

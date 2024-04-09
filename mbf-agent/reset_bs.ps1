@@ -1,5 +1,5 @@
 # Put your OBB file/BS APK here
-if ( $Latest.Length -eq 0 ) {
+if ( $Latest.Length -ne 0 ) {
     Write-Output "Using latest: 1.36"
     $OBB_PATH = "main.1188.com.beatgames.beatsaber.obb"
     $BS_PATH = "bs136.apk"
