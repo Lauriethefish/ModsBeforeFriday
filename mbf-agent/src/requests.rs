@@ -53,11 +53,14 @@ pub enum Request {
         from_url: String,
     },
     /// - Patches Beat Saber to add support for modloaders. (will not patch again if the app is already modded)
+    /// - Optionally, downgrades the game if downgrade_to is Some
     /// - Saves the modloader to the appropriate locatioon on the Quest.
     /// - Wipes any existing mods.
     /// - Installs the core mods for the current version.
     /// Returns a `Mods` response to update the frontend with the newly installed core mods.
-    Patch,
+    Patch {
+        downgrade_to: Option<String>
+    },
 
     /// Reinstalls any core mods that are misssing/out of date and overwrites the modloader in case it is corrupt.
     /// Should fix most issues with any installation.

@@ -15,7 +15,7 @@ use log::{error, info, warn};
 pub fn handle_request(request: Request) -> Result<Response> {
     match request {
         Request::GetModStatus => handle_get_mod_status(),
-        Request::Patch => handle_patch(),
+        Request::Patch { downgrade_to } => handle_patch(),
         Request::SetModsEnabled {
             statuses
         } => run_mod_action(statuses),

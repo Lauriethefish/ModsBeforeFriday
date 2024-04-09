@@ -1,8 +1,8 @@
-use std::{fs::{File, OpenOptions}, io::{Cursor, Seek, Write}, path::{Path, PathBuf}, process::Command, time::Instant};
+use std::{fs::{File, OpenOptions}, io::{BufReader, Cursor, Read, Seek, Write}, path::{Path, PathBuf}, process::Command, time::Instant};
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, anyhow};
 use log::{error, info, warn};
-use crate::{axml::{AxmlReader, AxmlWriter}, copy_stream_progress, external_res::{self, Diff, VersionDiffs}, requests::{AppInfo, ModLoader}, zip, ModTag, APK_ID, APP_DATA_PATH, TEMP_PATH};
+use crate::{axml::{AxmlReader, AxmlWriter}, copy_stream_progress, external_res::{self, Diff, VersionDiffs}, requests::{AppInfo, ModLoader}, zip::{self, ZIP_CRC}, ModTag, APK_ID, APP_DATA_PATH, APP_OBB_PATH, TEMP_PATH};
 use crate::manifest::{ManifestMod, ResourceIds};
 use crate::zip::{signing, FileCompression, ZipFile};
 
@@ -16,7 +16,8 @@ const LIB_MAIN_PATH: &str = "lib/arm64-v8a/libmain.so";
 const LIB_UNITY_PATH: &str = "lib/arm64-v8a/libunity.so";
 const DIFF_DOWNLOAD_ATTEMPTS: u32 = 3;
 
-pub fn mod_current_apk(app_info: &AppInfo, downgrade_to: Option<String>) -> Result<()> {
+// Mods the currently installed version of the given app.
+pub fn mod_current_apk(app_info: &AppInfo) -> Result<()> {
     let temp_path = Path::new(TEMP_PATH);
     std::fs::create_dir_all(TEMP_PATH)?;
 
@@ -27,11 +28,9 @@ pub fn mod_current_apk(app_info: &AppInfo, downgrade_to: Option<String>) -> Resu
     let temp_apk_path = temp_path.join("mbf-tmp.apk");
     std::fs::copy(&app_info.path, &temp_apk_path).context("Failed to copy APK to temp")?;
 
-    info!("Patching APK at {:?}", temp_path);
-    patch_apk_in_place(&temp_apk_path, libunity_path)?;
-
-    let obb_dir = PathBuf::from(format!("/sdcard/Android/obb/{APK_ID}/"));
+    info!("Saving OBB files");
     let obb_backup = temp_path.join("obbs");
+    let obb_backups = save_obbs(Path::new(APP_OBB_PATH), &obb_backup)?;
 
     let player_data_backup = temp_path.join("PlayerData.backup");
 
@@ -45,13 +44,13 @@ pub fn mod_current_apk(app_info: &AppInfo, downgrade_to: Option<String>) -> Resu
         false
     };
 
-    info!("Saving OBB files");
-    let obb_backups = save_obbs(&obb_dir, &obb_backup)?;
+    info!("Patching APK at {:?}", temp_path);
+    patch_apk_in_place(&temp_apk_path, libunity_path)?;
 
     reinstall_modded_app(&temp_apk_path)?;
 
     info!("Restoring OBB files");
-    restore_obb_files(&obb_dir, obb_backups)?;
+    restore_obb_files(Path::new(APP_OBB_PATH), obb_backups)?;
     std::fs::remove_file(temp_apk_path)?;
 
     if backed_up_data {
@@ -83,13 +82,60 @@ fn reinstall_modded_app(temp_apk_path: &Path) -> Result<()> {
     Ok(())
 }
 
+// Reads the content of the given file path as a Vec
+fn read_file_vec(path: impl AsRef<Path>) -> Result<Vec<u8>> {
+    let handle = std::fs::File::open(path)?;
+
+    let mut file_content = Vec::with_capacity(handle.metadata()?.len() as usize);
+    let mut reader = BufReader::new(handle);
+    reader.read_exact(&mut file_content);
+
+    Ok(file_content)
+}
+
+// Loads the file from from_path into memory, verifies it matches the checksum of the given diff,
+// applies the diff and then outputs it to to_path
+fn apply_diff(from_path: &Path,
+    to_path: &Path,
+    diff: &Diff,
+    diffs_path: &Path) -> Result<()> {
+    let diff_content = read_file_vec(diffs_path.join(&diff.file_name))
+        .context("Diff could not be opened. Was it downloaded")?;
+
+    let patch = qbsdiff::Bspatch::new(&diff_content)
+        .context("Diff file was invalid")?;
+
+    let file_content = read_file_vec(from_path)?;
+
+    // Verify the CRC32 hash of the file content.
+    info!("Verifying installation is unmodified");
+    let before_crc = ZIP_CRC.checksum(&file_content);
+    if before_crc != diff.file_crc {
+        return Err(anyhow!("File CRC {} did not match expected value of {}. 
+            Is the file corrupt, or is the game pirated?", before_crc, diff.file_crc));
+    }
+
+    // Carry out the downgrade
+    let mut output_handle = OpenOptions::new()
+        .truncate(true)
+        .create(true)
+        .read(true)
+        .write(true)
+        .open(to_path)?;
+    patch.apply(&file_content, &mut output_handle)?;
+
+    // TODO: Verify checksum on the result of downgrading?
+
+    Ok(())
+
+}
 
 // Downloads the deltas needed for downgrading with the given version_diffs.
 // The diffs are saved with names matching `diff_name` in the `Diff` struct.
 fn download_diffs(to_path: impl AsRef<Path>, version_diffs: &VersionDiffs) -> Result<()> {
     for diff in version_diffs.obb_diffs.iter() {
         info!("Downloading diff for OBB (this may take a long time) {}", diff.file_name);
-        download_diff_retry(diff, to_path)?;
+        download_diff_retry(diff, &to_path)?;
     }
 
     info!("Downloading diff for APK (this may take a long time)");
@@ -103,7 +149,7 @@ fn download_diffs(to_path: impl AsRef<Path>, version_diffs: &VersionDiffs) -> Re
 fn download_diff_retry(diff: &Diff, to_dir: impl AsRef<Path>) -> Result<()> {
     let mut attempt = 1;
     loop {
-        match download_diff(diff, to_dir) {
+        match download_diff(diff, &to_dir) {
             Ok(_) => return Ok(()),
             Err(err) => if attempt == DIFF_DOWNLOAD_ATTEMPTS {
                 break Err(err);
@@ -122,7 +168,7 @@ fn download_diff(diff: &Diff, to_dir: impl AsRef<Path>) -> Result<()> {
         .create(true)
         .truncate(true)
         .write(true)
-        .open(to_dir.as_ref().join(diff.diff_name))?;
+        .open(to_dir.as_ref().join(&diff.diff_name))?;
 
     let (mut resp, length) = external_res::get_diff_reader(diff)?;
 
@@ -131,6 +177,7 @@ fn download_diff(diff: &Diff, to_dir: impl AsRef<Path>) -> Result<()> {
         copy_stream_progress(&mut resp, &mut output, &mut |bytes_copied| {
             let now = Instant::now();
             if now.duration_since(last_progress_update).as_secs_f32() > 2.0 {
+                last_progress_update = now;
                 info!("Progress: {:.2}%", (bytes_copied as f32 / length as f32) * 100.0);
             }
         })?;
@@ -167,6 +214,7 @@ fn save_obbs(obb_dir: &Path, obb_backup_path: &Path) -> Result<Vec<PathBuf>> {
         if let Ok(stat) = err_or_stat {
             let path = stat.path();
             let ext = path.extension();
+            // Make sure that we check the extension is OBB: We don't backup DLCs (no extension) since this might cause further issues and they can easily be redownloaded.
             if ext.is_some_and(|ext| ext == "obb") {
                 // Rename doesn't work due to different mount points
                 std::fs::copy(&path, obb_backup_path.join(path.file_name().unwrap()))?;
