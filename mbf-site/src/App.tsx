@@ -10,7 +10,6 @@ import { ErrorModal } from './components/Modal';
 import { Bounce, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
-import { AnimatedBackground } from "./components/AnimatedBackground";
 
 async function connect(
   setAuthing: () => void): Promise<Adb | null> {
@@ -133,7 +132,6 @@ function AppContents() {
 
 function App() {
   return <div className='main'>
-    <AnimatedBackground />
     <AppContents />
     <ToastContainer
       position="bottom-right"
