@@ -16,13 +16,13 @@ const LIB_MAIN_PATH: &str = "lib/arm64-v8a/libmain.so";
 const LIB_UNITY_PATH: &str = "lib/arm64-v8a/libunity.so";
 const DIFF_DOWNLOAD_ATTEMPTS: u32 = 3;
 
-// Mods the currently installed version of the given app.
+// Mods the currently installed version of the given app and reinstalls it, without doing any downgrading.
 pub fn mod_current_apk(app_info: &AppInfo) -> Result<()> {
     let temp_path = Path::new(TEMP_PATH);
     std::fs::create_dir_all(TEMP_PATH)?;
 
     info!("Downloading unstripped libunity.so (this could take a minute)");
-    let libunity_path = save_libunity(temp_path, app_info).context("Failed to save libunity.so")?;
+    let libunity_path = save_libunity(temp_path, &app_info.version).context("Failed to save libunity.so")?;
 
     info!("Copying APK to temporary location");
     let temp_apk_path = temp_path.join("mbf-tmp.apk");
@@ -32,8 +32,56 @@ pub fn mod_current_apk(app_info: &AppInfo) -> Result<()> {
     let obb_backup = temp_path.join("obbs");
     let obb_backups = save_obbs(Path::new(APP_OBB_PATH), &obb_backup)?;
 
-    let player_data_backup = temp_path.join("PlayerData.backup");
+    patch_and_reinstall(libunity_path, &temp_apk_path, temp_path, obb_backups)?;
+    Ok(())
+}
 
+// Downgrades the APK/OBB files for the given app using the diffs provided, then reinstalls the app.
+pub fn downgrade_and_mod_apk(app_info: &AppInfo, diffs: VersionDiffs) -> Result<()> {
+    let temp_path = Path::new(TEMP_PATH);
+    std::fs::create_dir_all(TEMP_PATH)?;
+
+    // Download libunity.so *for the downgraded version*
+    info!("Downloading unstripped libunity.so (this could take a minute)");
+    let libunity_path = save_libunity(temp_path, &diffs.to_version)
+        .context("Failed to save libunity.so")?;
+
+    // Download the diff files
+    let diffs_path = temp_path.join("diffs");
+    std::fs::create_dir(&diffs_path)?;
+    info!("Downloading diffs needed to downgrade Beat Saber (this could take a LONG time, make a cup of tea)");
+    download_diffs(&diffs_path, &diffs)?;
+
+    // Copy the APK to temp, downgrading it in the process.
+    info!("Downgrading APK");
+    let temp_apk_path = temp_path.join("mbf-downgraded.apk");
+    apply_diff(Path::new(&app_info.path), &temp_apk_path, &diffs.apk_diff, &diffs_path)?;
+
+    // Downgrade the obb files, copying them to a temporary directory in the process.
+    let obb_backup_dir = temp_path.join("obbs");
+    let mut obb_backup_paths = Vec::new();
+    for obb_diff in &diffs.obb_diffs {
+        let obb_path = Path::new(APP_OBB_PATH).join(&obb_diff.file_name);
+        if !obb_path.exists() {
+            return Err(anyhow!("Obb file {} did not exist, is the Beat Saber installation corrupt", obb_diff.file_name));
+        }
+
+        let obb_backup_path = obb_backup_dir.join(&obb_diff.diff_name);
+
+        info!("Downgrading obb {}", obb_diff.file_name);
+        apply_diff(&obb_path,& obb_backup_path, obb_diff, &diffs_path)?;
+        obb_backup_paths.push(obb_backup_path);
+    }
+
+    patch_and_reinstall(libunity_path, &temp_apk_path, temp_path, obb_backup_paths)?;
+    Ok(())
+}
+
+fn patch_and_reinstall(libunity_path: Option<PathBuf>,
+    temp_apk_path: &Path,
+    temp_path: &Path,
+    obb_paths: Vec<PathBuf>) -> Result<()> {
+    let player_data_backup = temp_path.join("PlayerData.backup");
     let player_data_path = Path::new(APP_DATA_PATH).join("PlayerData.dat");
     let backed_up_data = if player_data_path.exists() {
         info!("Backing up player data");
@@ -48,10 +96,10 @@ pub fn mod_current_apk(app_info: &AppInfo) -> Result<()> {
     patch_apk_in_place(&temp_apk_path, libunity_path)?;
 
     reinstall_modded_app(&temp_apk_path)?;
+    std::fs::remove_file(temp_apk_path)?;
 
     info!("Restoring OBB files");
-    restore_obb_files(Path::new(APP_OBB_PATH), obb_backups)?;
-    std::fs::remove_file(temp_apk_path)?;
+    restore_obb_files(Path::new(APP_OBB_PATH), obb_paths)?;
 
     if backed_up_data {
         info!("Restoring player data");
@@ -134,11 +182,11 @@ fn apply_diff(from_path: &Path,
 // The diffs are saved with names matching `diff_name` in the `Diff` struct.
 fn download_diffs(to_path: impl AsRef<Path>, version_diffs: &VersionDiffs) -> Result<()> {
     for diff in version_diffs.obb_diffs.iter() {
-        info!("Downloading diff for OBB (this may take a long time) {}", diff.file_name);
+        info!("Downloading diff for OBB {}", diff.file_name);
         download_diff_retry(diff, &to_path)?;
     }
 
-    info!("Downloading diff for APK (this may take a long time)");
+    info!("Downloading diff for APK");
     download_diff_retry(&version_diffs.apk_diff, to_path)?;
 
     Ok(())
@@ -189,8 +237,8 @@ fn download_diff(diff: &Diff, to_dir: impl AsRef<Path>) -> Result<()> {
     Ok(())
 }
 
-fn save_libunity(temp_path: impl AsRef<Path>, app_info: &AppInfo) -> Result<Option<PathBuf>> {
-    let mut libunity_stream = match external_res::get_libunity_stream(APK_ID, &app_info.version)? {
+fn save_libunity(temp_path: impl AsRef<Path>, version: &str) -> Result<Option<PathBuf>> {
+    let mut libunity_stream = match external_res::get_libunity_stream(APK_ID, version)? {
         Some(stream) => stream,
         None => return Ok(None) // No libunity for this version
     };
