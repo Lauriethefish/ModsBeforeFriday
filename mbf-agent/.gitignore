@@ -3,5 +3,6 @@
 *.so
 *.obb
 *.diff
+index.json
 
 mbf-agent
