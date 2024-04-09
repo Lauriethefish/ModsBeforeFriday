@@ -14,7 +14,7 @@ h3 {
 }
 
 .container {
-    background-color: black;
+    background-color: rgba(0, 0, 0, 0.9);
     padding: 20px;
     border-radius: 10px;
     width: fit-content;
