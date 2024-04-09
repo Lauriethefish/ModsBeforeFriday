@@ -1,7 +1,7 @@
-use std::{fs::{File, OpenOptions}, io::{Cursor, Seek, Write}, path::{Path, PathBuf}, process::Command, time::{Instant, SystemTime}};
+use std::{fs::{File, OpenOptions}, io::{Cursor, Seek, Write}, path::{Path, PathBuf}, process::Command, time::Instant};
 
 use anyhow::{Context, Result};
-use log::{info, warn};
+use log::{error, info, warn};
 use crate::{axml::{AxmlReader, AxmlWriter}, copy_stream_progress, external_res::{self, Diff, VersionDiffs}, requests::{AppInfo, ModLoader}, zip, ModTag, APK_ID, APP_DATA_PATH, TEMP_PATH};
 use crate::manifest::{ManifestMod, ResourceIds};
 use crate::zip::{signing, FileCompression, ZipFile};
@@ -14,6 +14,7 @@ const MOD_TAG_PATH: &str = "modded.json";
 
 const LIB_MAIN_PATH: &str = "lib/arm64-v8a/libmain.so";
 const LIB_UNITY_PATH: &str = "lib/arm64-v8a/libunity.so";
+const DIFF_DOWNLOAD_ATTEMPTS: u32 = 3;
 
 pub fn mod_current_apk(app_info: &AppInfo, downgrade_to: Option<String>) -> Result<()> {
     let temp_path = Path::new(TEMP_PATH);
@@ -87,14 +88,32 @@ fn reinstall_modded_app(temp_apk_path: &Path) -> Result<()> {
 // The diffs are saved with names matching `diff_name` in the `Diff` struct.
 fn download_diffs(to_path: impl AsRef<Path>, version_diffs: &VersionDiffs) -> Result<()> {
     for diff in version_diffs.obb_diffs.iter() {
-        info!("Downloading diff for OBB {}", diff.file_name);
-        download_diff(diff, to_path)?;
+        info!("Downloading diff for OBB (this may take a long time) {}", diff.file_name);
+        download_diff_retry(diff, to_path)?;
     }
 
-    info!("Downloading diff for APK");
-    download_diff(&version_diffs.apk_diff, to_path);
+    info!("Downloading diff for APK (this may take a long time)");
+    download_diff_retry(&version_diffs.apk_diff, to_path)?;
 
     Ok(())
+}
+
+
+// Attempts to download the given diff DIFF_DOWNLOAD_ATTEMPTS times, returning an error if the final attempt fails.
+fn download_diff_retry(diff: &Diff, to_dir: impl AsRef<Path>) -> Result<()> {
+    let mut attempt = 1;
+    loop {
+        match download_diff(diff, to_dir) {
+            Ok(_) => return Ok(()),
+            Err(err) => if attempt == DIFF_DOWNLOAD_ATTEMPTS {
+                break Err(err);
+            }   else    {
+                error!("Failed to download {}: {err}\nTrying again...", diff.diff_name);
+            }
+        }
+
+        attempt += 1;
+    }
 }
 
 // Downloads a diff to the given directory, using the file name given in the `Diff` struct.
