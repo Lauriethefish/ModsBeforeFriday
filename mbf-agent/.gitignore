@@ -1,5 +1,7 @@
 /target
 *.apk
 *.so
+*.obb
+*.diff
 
 mbf-agent
