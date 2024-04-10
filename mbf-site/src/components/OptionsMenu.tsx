@@ -12,6 +12,17 @@ export function OptionsMenu({ device, quit, setError }: {
     return <>
         <div className="container mainContainer" id="toolsContainer">
             <h2>Mod Tools</h2>
+            <br/>
+
+            <button onClick={async () => {
+                try {
+                    await device.subprocess.spawnAndWait("am force-stop com.beatgames.beatsaber");
+                    toast("Successfully killed Beat Saber");
+                }   catch(e) {
+                    setError("Failed to kill Beat Saber process " + e);
+                }
+            }}>Kill Beat Saber</button>
+
             <br />
             <button onClick={async () => {
                 try {
