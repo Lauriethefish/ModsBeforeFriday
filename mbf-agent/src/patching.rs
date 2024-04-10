@@ -2,7 +2,7 @@ use std::{fs::{File, OpenOptions}, io::{BufReader, Cursor, Read, Seek, Write}, p
 
 use anyhow::{Context, Result, anyhow};
 use log::{error, info, warn};
-use crate::{axml::{AxmlReader, AxmlWriter}, copy_stream_progress, external_res::{self, Diff, VersionDiffs}, requests::{AppInfo, ModLoader}, zip::{self, ZIP_CRC}, ModTag, APK_ID, APP_DATA_PATH, APP_OBB_PATH, PLAYER_DATA_PATH};
+use crate::{axml::{AxmlReader, AxmlWriter}, copy_stream_progress, external_res::{self, Diff, VersionDiffs}, requests::{AppInfo, ModLoader}, zip::{self, ZIP_CRC}, ModTag, APK_ID, APP_OBB_PATH, DATAKEEPER_PATH, DATA_BACKUP_PATH, PLAYER_DATA_PATH};
 use crate::manifest::{ManifestMod, ResourceIds};
 use crate::zip::{signing, FileCompression, ZipFile};
 
@@ -77,19 +77,15 @@ fn patch_and_reinstall(libunity_path: Option<PathBuf>,
     temp_apk_path: &Path,
     temp_path: &Path,
     obb_paths: Vec<PathBuf>) -> Result<()> {
-    let player_data_backup = temp_path.join("PlayerData.backup");
-    let player_data_path = Path::new(PLAYER_DATA_PATH);
-    let backed_up_data = if player_data_path.exists() {
-        info!("Backing up player data");
-        std::fs::copy(&player_data_path, &player_data_backup)?;
-        true
-    }   else    {
-        info!("No player data to save");
-        false
-    };
-
     info!("Patching APK at {:?}", temp_path);
     patch_apk_in_place(&temp_apk_path, libunity_path)?;
+
+    if Path::new(PLAYER_DATA_PATH).exists() {
+        info!("Backing up player data");
+        backup_player_data().context("Failed to backup player data")?;
+    }   else    {
+        info!("No player data to backup");
+    }
 
     reinstall_modded_app(&temp_apk_path)?;
     std::fs::remove_file(temp_apk_path)?;
@@ -97,10 +93,25 @@ fn patch_and_reinstall(libunity_path: Option<PathBuf>,
     info!("Restoring OBB files");
     restore_obb_files(Path::new(APP_OBB_PATH), obb_paths)?;
 
-    if backed_up_data {
-        info!("Restoring player data");
-        std::fs::create_dir_all(&APP_DATA_PATH)?;
-        std::fs::copy(player_data_backup, &player_data_path)?;
+    // Player data is not restored back to the `files` directory as we cannot correctly set its permissions so that BS can access it.
+    // (which causes a black screen that can only be fixed by manually deleting the file)
+
+    Ok(())
+}
+
+pub fn backup_player_data() -> Result<()> {
+    info!("Copying to {}", DATA_BACKUP_PATH);
+
+    std::fs::create_dir_all(Path::new(DATA_BACKUP_PATH).parent().unwrap())?;
+    std::fs::copy(PLAYER_DATA_PATH, DATA_BACKUP_PATH)?;
+
+    if Path::new(DATAKEEPER_PATH).exists() {
+        warn!("Did not backup PlayerData.dat to datakeeper folder as there was already a PlayerData.dat there. 
+            The player data is still safe in {}", DATA_BACKUP_PATH);
+    }   else    {
+        info!("Copying to {}", DATAKEEPER_PATH);
+        std::fs::create_dir_all(Path::new(DATAKEEPER_PATH).parent().unwrap())?;
+        std::fs::copy(PLAYER_DATA_PATH, DATAKEEPER_PATH)?;
     }
 
     Ok(())
