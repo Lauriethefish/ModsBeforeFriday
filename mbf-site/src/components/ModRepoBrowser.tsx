@@ -25,14 +25,14 @@ export function ModRepoBrowser(props: ModRepoBrowserProps) {
 
     if(modRepo === null) {
         if(failedToLoad) {
-            return <p>
+            return <div className="container">
                 <h1>Failed to load mods</h1>
                 <p>Please check that your internet is working.</p>
                 <button onClick={() => {
                     setAttempt(attempt + 1);
                     setFailedToLoad(false);
                 }}>Try again</button>
-            </p>
+            </div>
         }   else    {
             return <h1>Loading mods...</h1>
         }

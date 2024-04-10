@@ -43,15 +43,22 @@ function ChooseDevice() {
   const [connectError, setConnectError] = useState(null as string | null);
 
   if(chosenDevice !== null) {
-    return <>
-      <DeviceModder device={chosenDevice} quit={(err) => {
-        if(err != null) {
-          setConnectError(String(err));
-        }
-        chosenDevice.close().catch(err => console.warn("Failed to close device " + err));
-        setChosenDevice(null);
-      }} />
-    </>
+    if(chosenDevice.banner.model === "Quest 1") {
+      return <div className='container mainContainer'>
+        <h1>Quest 1 Not Supported</h1>
+        <p>ModsBeforeFriday has detected that you're using a Quest 1, which is no longer supported for modding Beat Saber.</p>
+      </div>
+    } else {
+      return <>
+        <DeviceModder device={chosenDevice} quit={(err) => {
+          if(err != null) {
+            setConnectError(String(err));
+          }
+          chosenDevice.close().catch(err => console.warn("Failed to close device " + err));
+          setChosenDevice(null);
+        }} />
+      </>
+    }
   } else if(authing) {
     return <div className='container mainContainer'>
       <h2>Allow connection in headset</h2>
@@ -72,9 +79,11 @@ function ChooseDevice() {
             try {
               device = await connect(() => setAuthing(true));
             } catch(e) {
+              console.log("Failed to connect: " + e);
               setConnectError(String(e));
               return;
             }
+            
             setAuthing(false);
             if(device !== null) {
               setChosenDevice(device);
