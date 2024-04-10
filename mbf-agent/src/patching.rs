@@ -101,28 +101,9 @@ fn patch_and_reinstall(libunity_path: Option<PathBuf>,
         info!("Restoring player data");
         std::fs::create_dir_all(&APP_DATA_PATH)?;
         std::fs::copy(player_data_backup, &player_data_path)?;
-
-        #[cfg(unix)]
-        try_chmod_player_data();
     }
 
     Ok(())
-}
-
-#[cfg(unix)]
-pub fn try_chmod_player_data() {
-    use std::os::unix::fs::PermissionsExt;
-    use std::fs::Permissions;
-
-    if !Path::new(PLAYER_DATA_PATH).exists() {
-        return;
-    }
-
-    info!("Ch-modding player data");
-    match std::fs::set_permissions(PLAYER_DATA_PATH, Permissions::from_mode(777)) {
-        Ok(_) => {},
-        Err(err) => warn!("Failed to chmod player data: {err}")
-    }
 }
 
 fn reinstall_modded_app(temp_apk_path: &Path) -> Result<()> {
