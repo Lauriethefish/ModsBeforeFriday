@@ -21,6 +21,7 @@ export function OptionsMenu({ device, quit, setError }: {
                     setError("Failed to uninstall Beat Saber " + e)
                 }
             }}>Uninstall Beat Saber</button>
+            <br/>
 
             <button onClick={async () => {
                 try {
