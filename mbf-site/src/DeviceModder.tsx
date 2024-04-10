@@ -199,7 +199,7 @@ function PatchingMenu(props: PatchingMenuProps) {
 function VersionSupportedMessage({ version }: { version: string }) {
     return <>
         <h1>Install Custom Songs</h1>
-        <p>Your app has version: {version}, which is supported by mods!</p>
+        <p>Your app has version {trimGameVersion(version)}, which is supported by mods!</p>
         <p>To get your game ready for custom songs, ModsBeforeFriday will next patch your Beat Saber app and install some essential mods.
         Once this is done, you will be able to manage your custom songs <b>inside the game.</b></p>
     </>
@@ -210,8 +210,8 @@ function DowngradeMessage({ toVersion }: { toVersion: string }) {
         <h1>Downgrade and set up mods</h1>
         <p>MBF has detected that your version of Beat Saber doesn't support mods!</p>
 
-        <p>Fortunately for you, your version can be downgraded automatically to the latest moddable version: {toVersion}</p>
-        <p><span className='warning'>NOTE:</span> By downgrading, you will lose access to any DLCs or other content that is not present in version {toVersion}. If you decide to stop using mods and reinstall vanilla Beat Saber, however, then you will get this content back.</p>
+        <p>Fortunately for you, your version can be downgraded automatically to the latest moddable version: {trimGameVersion(toVersion)}</p>
+        <p><span className='warning'>NOTE:</span> By downgrading, you will lose access to any DLCs or other content that is not present in version {trimGameVersion(toVersion)}. If you decide to stop using mods and reinstall vanilla Beat Saber, however, then you will get this content back.</p>
     </>
 }
 
