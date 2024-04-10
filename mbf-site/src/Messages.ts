@@ -72,7 +72,7 @@ export interface FixedPlayerData {
     existed: boolean
 }
 
-export type ImportResult = ImportedMod | ImportedFileCopy | ImportedSong | FixedPlayerData;
+export type ImportResult = ImportedMod | ImportedFileCopy | ImportedSong;
 
 export interface ModStatus {
     type: 'ModStatus',
@@ -88,7 +88,7 @@ export interface LogMsg {
     level: LogLevel
 }
 
-export type Response = LogMsg | ModStatus | Mods | ImportResult;
+export type Response = LogMsg | ModStatus | Mods | ImportResult | FixedPlayerData;
 
 export interface CoreModsInfo {
     supported_versions: string[],
