@@ -1,6 +1,6 @@
 import { AdbSync, AdbSyncWriteOptions, Adb, encodeUtf8 } from '@yume-chan/adb';
 import { ConsumableReadableStream, Consumable, DecodeUtf8Stream, ConcatStringStream } from '@yume-chan/stream-extra';
-import { Request, Response, LogMsg, ModStatus, Mods, ImportedMod, ImportResult } from "./Messages";
+import { Request, Response, LogMsg, ModStatus, Mods, ImportedMod, ImportResult, FixedPlayerData } from "./Messages";
 import { Mod } from './Models';
 
 const AgentPath: string = "/data/local/tmp/mbf-agent";
@@ -286,4 +286,12 @@ export async function quickFix(device: Adb,
       installed_mods: (response as Mods).installed_mods,
       modloader_present: true
   }
+}
+
+// Attempts to fix the black screen issue on Quest 3.
+export async function fixPlayerData(device: Adb,
+  eventSink: LogEventSink = null): Promise<boolean> {
+  let response = await sendRequest(device, { type: 'FixPlayerData' }, eventSink);
+
+  return (response as FixedPlayerData).existed
 }

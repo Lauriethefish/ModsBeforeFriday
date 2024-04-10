@@ -62,6 +62,13 @@ pub enum Request {
         downgrade_to: Option<String>
     },
 
+    // Attempts to fix a blackscreen issue by removing PlayerData.dat from `/sdcard/...../files/`.
+    // (and copying it to /sdcard/ModsBeforeFriday so it isn't lost. It will also be copied to the datakeeper directory iff there isn't already one there)
+    // (This occurs when the permissions set by MBF copying the file lead to the gmae not being able to open it, typically on Quest 3,
+    // unfortunately chmod 777 doesn't seem to fix the issue.)
+    // Gives a `FixedPlayerData` response.
+    FixPlayerData,
+
     /// Reinstalls any core mods that are misssing/out of date and overwrites the modloader in case it is corrupt.
     /// Should fix most issues with any installation.
     /// Returns a `Mods` response containing the newly installed mods.
@@ -128,6 +135,10 @@ pub enum Response {
     LogMsg {
         message: String,
         level: LogLevel
+    },
+    FixedPlayerData {
+        // True if a PlayerData.dat existed to fix, false if the request did nothing.
+        existed: bool
     }
 }
 

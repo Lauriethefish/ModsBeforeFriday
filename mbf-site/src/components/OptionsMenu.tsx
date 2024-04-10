@@ -1,7 +1,8 @@
 import { Adb, decodeUtf8 } from '@yume-chan/adb';
 import { uninstallBeatSaber } from '../DeviceModder';
-import { LogEventSink, quickFix } from '../Agent';
 import { useEffect, useState } from 'react';
+import { fixPlayerData } from '../Agent';
+import { toast } from 'react-toastify';
 
 
 export function OptionsMenu({ device, quit, setError }: {
@@ -20,6 +21,18 @@ export function OptionsMenu({ device, quit, setError }: {
                     setError("Failed to uninstall Beat Saber " + e)
                 }
             }}>Uninstall Beat Saber</button>
+
+            <button onClick={async () => {
+                try {
+                    if(await fixPlayerData(device)) {
+                        toast("Successfully fixed player data issues");
+                    }   else    {
+                        toast("No player data file found to fix");
+                    }
+                }   catch(e) {
+                    setError("Failed to fix player data " + e);
+                }
+            }}>Fix Player Data</button>
 
             <AdbLogger device={device}/>
         </div>
@@ -50,7 +63,7 @@ async function logcatToBlob(device: Adb, getCancelled: () => boolean): Promise<B
         }
 
         // NB: It is vital that, after we kill logcat, we read any messages that have not yet been read
-        // before returning. Otherwise, the unread messages causes the ADB implementation to hang on all future requests!
+        // before returning. Otherwise, the unread messages cause the ADB implementation to hang on all future requests!
         if(getCancelled() && !killed) {
             console.log("Killing `logcat` process");
             await process.kill();

@@ -9,6 +9,10 @@ export interface Patch {
     downgrade_to: string | null
 }
 
+export interface FixPlayerData {
+    type: 'FixPlayerData',
+}
+
 export interface SetModsEnabled {
     type: 'SetModsEnabled',
     statuses: { [id: string]: boolean } 
@@ -33,7 +37,14 @@ export interface ImportModUrl {
     from_url: string
 }
 
-export type Request = GetModStatus | Patch | SetModsEnabled | QuickFix | RemoveMod | Import | ImportModUrl;
+export type Request = GetModStatus | 
+    Patch | 
+    SetModsEnabled | 
+    QuickFix | 
+    RemoveMod | 
+    Import | 
+    ImportModUrl | 
+    FixPlayerData;
 
 export interface Mods {
     type: 'Mods',
@@ -56,7 +67,12 @@ export interface ImportedSong {
     type: 'ImportedSong'
 }
 
-export type ImportResult = ImportedMod | ImportedFileCopy | ImportedSong;
+export interface FixedPlayerData {
+    type: 'FixedPlayerData',
+    existed: boolean
+}
+
+export type ImportResult = ImportedMod | ImportedFileCopy | ImportedSong | FixedPlayerData;
 
 export interface ModStatus {
     type: 'ModStatus',

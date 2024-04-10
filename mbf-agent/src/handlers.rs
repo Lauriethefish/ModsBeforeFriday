@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
-use crate::{download_file, DOWNLOADS_PATH, SONGS_PATH, TEMP_PATH};
+use crate::{download_file, DOWNLOADS_PATH, PLAYER_DATA_BAK_PATH, PLAYER_DATA_PATH, SONGS_PATH, TEMP_PATH};
 use crate::{axml::AxmlReader, patching, zip::ZipFile};
 use crate::external_res::{get_diff_index, JsonPullError};
 use crate::manifest::ManifestInfo;
@@ -22,7 +22,8 @@ pub fn handle_request(request: Request) -> Result<Response> {
         Request::QuickFix => handle_quick_fix(),
         Request::Import { from_path } => handle_import(from_path),
         Request::RemoveMod { id } => handle_remove_mod(id),
-        Request::ImportModUrl { from_url } => handle_import_mod_url(from_url)
+        Request::ImportModUrl { from_url } => handle_import_mod_url(from_url),
+        Request::FixPlayerData => handle_fix_player_data()
     }
 }
 
@@ -322,6 +323,28 @@ fn handle_quick_fix() -> Result<Response> {
     Ok(Response::Mods {
         installed_mods: get_mod_models(mod_manager)
     })
+}
+
+fn handle_fix_player_data() -> Result<Response> {
+    if Path::new(PLAYER_DATA_PATH).exists() {
+        info!("Backing up player data");
+        patching::backup_player_data()?;
+
+        info!("Removing (potentially faulty) PlayerData.dat at {}", PLAYER_DATA_PATH);
+        std::fs::remove_file(PLAYER_DATA_PATH).context("Failed to delete faulty player data")?;
+        if Path::new(PLAYER_DATA_BAK_PATH).exists() {
+            std::fs::remove_file(PLAYER_DATA_BAK_PATH)?;
+        }
+        
+        Ok(Response::FixedPlayerData {
+            existed: true
+        })
+    }   else {
+        warn!("No player data found to \"fix\"");
+        Ok(Response::FixedPlayerData {
+            existed: false
+        })
+    }
 }
 
 fn handle_patch(downgrade_to: Option<String>) -> Result<Response> {
