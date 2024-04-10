@@ -43,7 +43,7 @@ function ChooseDevice() {
   const [connectError, setConnectError] = useState(null as string | null);
 
   if(chosenDevice !== null) {
-    if(chosenDevice.banner.model === "Quest 1") {
+    if(chosenDevice.banner.model === "Quest") { // "Quest" not "Quest 2/3"
       return <div className='container mainContainer'>
         <h1>Quest 1 Not Supported</h1>
         <p>ModsBeforeFriday has detected that you're using a Quest 1, which is no longer supported for modding Beat Saber.</p>
