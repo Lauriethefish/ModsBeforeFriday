@@ -22,7 +22,9 @@
 }*/
 
 .block rect {
-	fill: rgb(0, 5, 120);
+	fill: rgb(0, 0, 120);
+	stroke-width: 4px;
+	stroke: rgb(0, 0, 80);
 }
 .block path {
 	stroke-width: 4px;
@@ -31,6 +33,7 @@
 }
 
 .red-block rect {
+	stroke: rgb(80, 0, 0);
 	fill: rgb(120, 0, 0);
 }
 .red-block path {
@@ -43,4 +46,7 @@
 .green-block path {
 	stroke: rgb(0, 255, 0);
 	fill: rgb(150, 254, 150);
+}
+.hidden {
+	display: none;
 }

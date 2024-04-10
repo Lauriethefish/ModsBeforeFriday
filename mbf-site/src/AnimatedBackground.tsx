@@ -1,7 +1,7 @@
 import "./css/AnimatedBackground.css";
 import { useRef } from 'react';
 
-const BLOCK_SPEED = 0.05;
+const BLOCK_SPEED = 0.025;
 
 
 
@@ -16,7 +16,7 @@ export function AnimatedBackground(body: HTMLBodyElement){
 		svg.setAttribute("viewBox", `0 0 ${window.innerWidth} ${window.innerHeight}`);
 	});
 
-	for(let i=0;i<100;i++){
+	for(let i=0;i<200;i++){
 		svg.appendChild(AnimatedBlock());
 	}
 }
@@ -24,7 +24,7 @@ export function AnimatedBlock(){
 	let block = document.createElementNS("http://www.w3.org/2000/svg", "g");
 	{
 		block.classList.add("block");
-		block.classList.add("green-block");
+		block.classList.add("hidden");
 		if(Math.random()>0.5) block.classList.add("red-block");
 
 		let rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
@@ -82,7 +82,6 @@ export function AnimatedBlock(){
 	setTimeout(()=>{
 		//let elem:any = bgref.current;
 		block.classList.remove("hidden");
-		block.classList.remove("green-block");
 		generateNewAnimation();
 	}, 60000*Math.random());
 	
