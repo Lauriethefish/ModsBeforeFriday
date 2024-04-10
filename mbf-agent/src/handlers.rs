@@ -326,6 +326,8 @@ fn handle_quick_fix() -> Result<Response> {
 }
 
 fn handle_fix_player_data() -> Result<Response> {
+    patching::kill_app()?; // Kill app, in case it's still stuck in a hanging state
+
     if Path::new(PLAYER_DATA_PATH).exists() {
         info!("Backing up player data");
         patching::backup_player_data()?;

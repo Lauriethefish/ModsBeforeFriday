@@ -21,6 +21,8 @@ pub fn mod_current_apk(temp_path: &Path, app_info: &AppInfo) -> Result<()> {
     info!("Downloading unstripped libunity.so (this could take a minute)");
     let libunity_path = save_libunity(temp_path, &app_info.version).context("Failed to save libunity.so")?;
 
+    kill_app()?;
+
     info!("Copying APK to temporary location");
     let temp_apk_path = temp_path.join("mbf-tmp.apk");
     std::fs::copy(&app_info.path, &temp_apk_path).context("Failed to copy APK to temp")?;
@@ -47,6 +49,8 @@ pub fn downgrade_and_mod_apk(temp_path: &Path, app_info: &AppInfo, diffs: Versio
     info!("Downloading diffs needed to downgrade Beat Saber (this could take a LONG time, make a cup of tea)");
     download_diffs(&diffs_path, &diffs)?;
 
+    kill_app()?;
+
     // Copy the APK to temp, downgrading it in the process.
     info!("Downgrading APK");
     let temp_apk_path = temp_path.join("mbf-downgraded.apk");
@@ -65,11 +69,19 @@ pub fn downgrade_and_mod_apk(temp_path: &Path, app_info: &AppInfo, diffs: Versio
         let obb_backup_path = obb_backup_dir.join(&obb_diff.output_file_name);
 
         info!("Downgrading obb {}", obb_diff.file_name);
-        apply_diff(&obb_path,& obb_backup_path, obb_diff, &diffs_path)?;
+        apply_diff(&obb_path,&obb_backup_path, obb_diff, &diffs_path)?;
         obb_backup_paths.push(obb_backup_path);
     }
 
     patch_and_reinstall(libunity_path, &temp_apk_path, temp_path, obb_backup_paths)?;
+    Ok(())
+}
+
+pub fn kill_app() -> Result<()> {
+    info!("Killing Beat Saber");
+    Command::new("am")
+        .args(&["force-stop", APK_ID])
+        .output()?;
     Ok(())
 }
 
