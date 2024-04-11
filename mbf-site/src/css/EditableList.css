@@ -8,6 +8,7 @@
 #editableList > p {
     margin: 0px;
     font-size: 15px;
+    cursor: pointer;
 }
 
 #editableList > p:hover {
