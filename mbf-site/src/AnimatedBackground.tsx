@@ -1,27 +1,30 @@
 import "./css/AnimatedBackground.css";
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-const BLOCK_FALL_SPEED = 0.025;
-const BLOCK_ROTATION_SPEED = 0.025;
+const BLOCK_FALL_SPEED = 100/1000;
+//const BLOCK_FALL_SPEED = 20/1000;
+const BLOCK_ROTATION_SPEED = 0.25/1000;
 const BLOCK_SCALE_RANGE = 0.5;
-const BLOCK_SCALE_SPEED = 0.01;
+const BLOCK_SCALE_SPEED = 0.01/1000;
+const BLOCK_BRIGHTNESS_RANGE = 0.30;
+const BLOCK_BRIGHTNESS_SPEED = 0.01/1000;
+const BLOCK_VALUE_SAFETY_LIMIT = 0.2;
 
 export class FallingBlockParticle {
 	type:number = 0;
 
-	start_position:[number,number] = [0,0];
-	start_rotation:number = 0;
-	start_scale:number = 1;
-	start_brightness:number = 1;
+	position:[number,number] = [0,0];
+	rotation:number = 0;
+	scale:number = 1;
+	brightness:number = 1;
 
 	velocity:[number,number] = [0,0];
 	angular_velocity:number = 0;
 	scale_change_speed:number = 0;
 	brightness_change_speed:number = 0;
 
-	progress:number = 0;
 	node:SVGElement;
-	current_animation:Animation|null = null;
+	animation:Animation|null = null;
 
 	constructor(svg:SVGSVGElement){
 		this.node = createSvgNode("g");
@@ -33,16 +36,24 @@ export class FallingBlockParticle {
 		this.type = Math.floor(2*Math.random());
 		this.angular_velocity = (2*Math.random()-1)*BLOCK_ROTATION_SPEED;
 
-		this.start_scale = 1-(2*Math.random()-1)*BLOCK_SCALE_RANGE;
+		this.rotation = 1-(2*Math.random()-1)*Math.PI;
 
-		let start_x_percentage = Math.random();
-		this.start_position = [
-			start_x_percentage*(window.innerWidth+200*this.start_scale)-this.start_scale*100,
-			Math.random()*(window.innerHeight+150*this.start_scale)-this.start_scale*100
+		let limiter = 2*Math.random()-1;	//	Make small blocks more likely to grow, and big blocks more likely to shrink.
+		this.scale = 1-limiter*BLOCK_SCALE_RANGE;
+		this.scale_change_speed = ((2-Math.abs(limiter))*Math.random()-1+limiter) * BLOCK_SCALE_SPEED;
+
+		limiter = 2*Math.random()-1;	//	Make bright blocks more likely to darken, and dark blocks more likely to lighten up.
+		this.brightness = 1+limiter*BLOCK_BRIGHTNESS_RANGE;
+		this.brightness_change_speed = ((2-Math.abs(limiter))*Math.random()-1+limiter) * BLOCK_BRIGHTNESS_SPEED;
+
+		let start_x_percentage = Math.random();	//	Figure out where the block should spawn
+		this.position = [
+			start_x_percentage*(window.innerWidth+200*this.scale)-this.scale*100,
+			Math.random()*(window.innerHeight+150*this.scale)-this.scale*100
 		];
 
 		if(start_at_top){
-			this.start_position[1] = -100*this.start_scale;
+			this.position[1] = -100*this.scale;
 		}
 
 		let drop_angle = Math.random() * Math.PI/2+Math.PI/4;	//	Calculate the angle at which the block will be moving
@@ -50,8 +61,9 @@ export class FallingBlockParticle {
 		this.velocity = [BLOCK_FALL_SPEED*Math.cos(drop_angle), BLOCK_FALL_SPEED*Math.sin(drop_angle)];	//	Calculate the velocity of the block
 
 
-		this.progress = 0;
+		this.animation = null;
 		this.update_node();
+		this.update_progress(0);
 	}
 
 	update_node(){
@@ -90,10 +102,37 @@ export class FallingBlockParticle {
 				break;
 		}
 	}
+	update_progress(delta_time:number){
+		if(delta_time > 0){
+			console.log(`Animation update: delta_time = ${delta_time}`);
+			this.position[0] += this.velocity[0] * delta_time;
+			this.position[1] += this.velocity[1] * delta_time;
+			this.rotation += this.angular_velocity * delta_time;
+			this.scale = Math.min(Math.max(this.scale + this.scale_change_speed * delta_time, 1-BLOCK_VALUE_SAFETY_LIMIT-BLOCK_SCALE_RANGE), 1+BLOCK_VALUE_SAFETY_LIMIT+BLOCK_SCALE_RANGE);
+			this.brightness = Math.min(Math.max(this.brightness + this.brightness_change_speed * delta_time, 1-BLOCK_VALUE_SAFETY_LIMIT-BLOCK_BRIGHTNESS_RANGE), 1+BLOCK_VALUE_SAFETY_LIMIT+BLOCK_BRIGHTNESS_RANGE);
+		}
+		if((this.position[1] > 100*this.scale + window.innerHeight) || (this.position[0] < -100*this.scale) || (this.position[0] > 100*this.scale + window.innerWidth)){
+			this.randomise_state();
+		}else{
+			this.update_animation();
+		}
+	}
+	update_animation(){
+		const pass_time = 2000;
+		let keyframes = [
+			{ transform: `translate(${this.position[0]}px, ${this.position[1]}px) rotate(${this.rotation}rad) scale(${this.scale})`, filter: `brightness(${this.brightness})` },
+			{ transform: `translate(${this.position[0]}px, ${this.position[1]}px) rotate(${this.rotation}rad) scale(${this.scale})`, filter: `brightness(${this.brightness})` },
+		];
+		this.animation = this.node.animate(keyframes, pass_time);
+		this.animation.onfinish = ()=>{
+			this.update_progress(1*(this.animation?.currentTime as number));
+		}
+		this.animation.onremove
+	}
 }
 
 export function AnimatedBackground(){
-	let svg:SVGSVGElement = createSvgNode("svg", {
+	let svg = createSvgNode("svg", {
 		id:"anim-bg",
 		viewBox:`0 0 ${window.innerWidth} ${window.innerHeight}`
 	}) as SVGSVGElement;
@@ -108,8 +147,6 @@ export function AnimatedBackground(){
 
 	for(let i=0; i<100; i++){
 		particles.push(new FallingBlockParticle(svg));
-
-		//svg.appendChild(AnimatedBlock());
 	}
 }
 
