@@ -49,7 +49,8 @@ export class FallingBlockParticle {
 	}
 
 	randomise_state(start_at_top:boolean = true){
-		this.type = Math.abs(Math.floor(7*Math.random())-2);
+		this.type = Math.floor(7*Math.random())-2;
+		if(this.type<0) this.type+=2;
 		this.angular_velocity = (2*Math.random()-1)*BLOCK_ROTATION_SPEED;
 
 		this.rotation = 1-(2*Math.random()-1)*Math.PI;
