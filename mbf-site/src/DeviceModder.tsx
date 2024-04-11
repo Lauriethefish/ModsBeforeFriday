@@ -8,6 +8,7 @@ import { ErrorModal, Modal } from './components/Modal';
 import { ModManager } from './components/ModManager';
 import { ManifestMod, trimGameVersion } from './Models';
 import { PermissionsMenu } from './components/PermissionsMenu';
+import { Collapsible } from './components/Collapsible';
 
 interface DeviceModderProps {
     device: Adb,
@@ -170,7 +171,10 @@ function PatchingMenu(props: PatchingMenuProps) {
         return <div className='container mainContainer'>
             {downgradingTo !== null && <DowngradeMessage toVersion={downgradingTo}/>}
             {downgradingTo === null && <VersionSupportedMessage version={modStatus.app_info!.version} />}
-            <PermissionsMenu manifestMod={manifestMod} setManifestMod={mod => setManifestMod(mod)} />
+            
+            <Collapsible title="Change App Permissions">
+                <PermissionsMenu manifestMod={manifestMod} setManifestMod={mod => setManifestMod(mod)} />
+            </Collapsible>
             <h2 className='warning'>READ CAREFULLY</h2>
             <p>Mods and custom songs are not supported by Beat Games. You may experience bugs and crashes that you wouldn't in a vanilla game.</p>
             <b>In addition, by modding the game you will lose access to both vanilla leaderboards and vanilla multiplayer.</b> (Modded leaderboards/servers are available.)

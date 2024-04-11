@@ -48,7 +48,6 @@ export function PermissionsMenu({ manifestMod, setManifestMod }: ManifestStatePr
     const [advanced, setAdvanced] = useState(false);
 
     return <>
-        <h3 id="permissionsTitle">App permissions</h3>
         <p>Certain mods may find it useful for the app to request microphone permissions or access to the headset cameras. Due to the privacy implications, you need to enable permissions here if you want them.</p>
         
         {!advanced && <ToggleMenu manifestMod={manifestMod} setManifestMod={setManifestMod} />}
