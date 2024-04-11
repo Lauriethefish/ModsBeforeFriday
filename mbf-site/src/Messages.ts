@@ -1,4 +1,4 @@
-import { Mod } from "./Models";
+import { ManifestMod, Mod } from "./Models";
 
 export interface GetModStatus {
     type: 'GetModStatus'
@@ -6,7 +6,9 @@ export interface GetModStatus {
 
 export interface Patch {
     type: 'Patch',
-    downgrade_to: string | null
+    manifest_mod: ManifestMod,
+    downgrade_to: string | null,
+    install_core_mods: boolean
 }
 
 export interface FixPlayerData {

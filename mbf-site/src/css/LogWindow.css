@@ -14,8 +14,3 @@
     font-family: Consolas;
     word-break: break-word;
 }
-
-@font-face {
-    font-family: Consolas;
-    src: local('Consolas'), format("ttf"), url("../fonts/Consolas.ttf")
-}

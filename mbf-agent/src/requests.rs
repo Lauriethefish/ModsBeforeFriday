@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use semver::Version;
 use serde::{Deserialize, Serialize};
 
-use crate::mod_man::Mod;
+use crate::{manifest::ManifestMod, mod_man::Mod};
 
 #[derive(Serialize)]
 pub struct AppInfo {
@@ -52,14 +52,22 @@ pub enum Request {
     ImportModUrl {
         from_url: String,
     },
-    /// - Patches Beat Saber to add support for modloaders. (will not patch again if the app is already modded)
-    /// - Optionally, downgrades the game if downgrade_to is Some
+
+    /// - Patches Beat Saber to add support for modloaders.
+    /// - Optionally, downgrades the game to the given version if downgrade_to is Some
     /// - Saves the modloader to the appropriate locatioon on the Quest.
+    /// 
+    /// <OPTIONALLY, if `install_core_mods` is set to `true`>
     /// - Wipes any existing mods.
     /// - Installs the core mods for the current version.
     /// Returns a `Mods` response to update the frontend with the newly installed core mods.
     Patch {
-        downgrade_to: Option<String>
+        downgrade_to: Option<String>,
+        /// Any additional settings to add to the app manifest.
+        /// Settings such as debuggable = true and external storage permissions do not need to be specified here - 
+        /// they will automatically be added no matter what.
+        manifest_mod: ManifestMod,
+        install_core_mods: bool
     },
 
     // Attempts to fix a blackscreen issue by removing PlayerData.dat from `/sdcard/...../files/`.

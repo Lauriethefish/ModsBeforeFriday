@@ -1,9 +1,11 @@
 //! Module containing convenience functions for modifying AndroidManifest.xml
 
-use std::{collections::HashMap, io::{Cursor, Read, Seek, Write}, rc::Rc};
+use std::{collections::{HashMap, HashSet}, io::{Cursor, Read, Seek, Write}, rc::Rc};
 
 use anyhow::{Context, Result, anyhow};
 use byteorder::{ReadBytesExt, LE};
+use log::info;
+use serde::Deserialize;
 
 use crate::axml::{Attribute, AttributeValue, AxmlReader, AxmlWriter, Event};
 
@@ -55,17 +57,20 @@ impl ManifestInfo {
 
 
 /// Convenient builder that can be used to modify the APK manifest
+#[derive(Deserialize)]
 pub struct ManifestMod {
-    queued_perms: Vec<Rc<str>>,
-    queued_features: Vec<Rc<str>>,
+    add_permissions: Vec<Rc<str>>,
+    add_features: Vec<Rc<str>>,
+    #[serde(default = "bool::default")]
     debuggable: bool
 }
 
 impl ManifestMod {
+    #[allow(unused)]
     pub fn new() -> Self {
         Self {
-            queued_perms: Vec::new(),
-            queued_features: Vec::new(),
+            add_permissions: Vec::new(),
+            add_features: Vec::new(),
             debuggable: false
         }
     }
@@ -74,12 +79,12 @@ impl ManifestMod {
     /// Currently not supported.
     #[allow(unused)]
     pub fn with_feature(mut self, feature: &str) -> Self {
-        self.queued_features.push(feature.into());
+        self.add_features.push(feature.into());
         self
     }
 
     pub fn with_permission(mut self, feature: &str) -> Self {
-        self.queued_perms.push(feature.into());
+        self.add_permissions.push(feature.into());
         self
     }
 
@@ -88,20 +93,66 @@ impl ManifestMod {
         self
     }
 
+    // Set the "debuggable" attribute on the given attribute list for the <application ...> element to "true".
+    // Returns true if any value was actually changed, false otherwise.
+    fn apply_debuggable(attributes: &mut Vec<Attribute>, res_ids: &ResourceIds) -> bool {
+        // Set the debuggable attribute
+        if let Some(existing_debuggable) = attributes
+            .iter_mut()
+            .find(|attr| &*attr.name == "debuggable") {
+            // Set the value of the debuggable attribute if it exists
+            if existing_debuggable.value != AttributeValue::Boolean(true) {
+                existing_debuggable.value = AttributeValue::Boolean(true);
+                true
+            }   else {
+                false
+            }
+        }   else    {
+            // Add the debuggable attribute if one doesn't already exist.
+            attributes.push(
+                android_attribute("debuggable", AttributeValue::Boolean(true), res_ids)
+            );
+            true
+        }
+    }
+
+    fn get_name_attribute(attributes: &[Attribute]) -> Result<Rc<str>> {
+        match &attributes.iter()
+            .filter(|attr| &*attr.name == "name")
+            .next()
+            .ok_or(anyhow!("No valid `name` attribute existed"))?.value
+        {
+            AttributeValue::String(s) => Ok(s.clone()),
+            _ => Err(anyhow!("`name` attribute had non-string value!"))
+        }
+    }
+
     // Adds the requested permissions and features to the APK
+    // Returns true if any changes were actually made, false otherwise.
+    // This can be used to avoid overwriting the manifest which would add to the ZIP size due to the naive ZIP library.
     pub fn apply_mod<R: Read + Seek, W: Write>(&self,
         reader: &mut AxmlReader<R>,
         writer: &mut AxmlWriter<W>,
-        res_ids: &ResourceIds) -> Result<()> {
+        res_ids: &ResourceIds) -> Result<bool> {
+        let mut modified = false;
+
+        let mut existing_features = HashSet::new();
+        let mut existing_permissions = HashSet::new();
 
         while let Some(mut ev) = reader.read_next_event().context("Failed to read original manifest")? {
-            let is_closing = match &mut ev { // Determine if the current event is the final tag: </manifest>
+            let is_end_of_manifest = match &mut ev { // Determine if the current event is the final tag: </manifest>
                 Event::StartElement { attributes, name, .. } => {
-                    // Add the debuggable attribute onto the "application" element
                     if &**name == "application" && self.debuggable {
-                        attributes.push(
-                            android_attribute("debuggable", AttributeValue::Boolean(true), res_ids)
-                        );
+                        info!("Setting debuggable to `{}`", self.debuggable);
+                        modified |= Self::apply_debuggable(attributes, res_ids);
+                    }   else if &**name == "uses-permission" {
+                        // Silently fail for elements without a name attribute
+                        // TODO: figure out why some elements in the Beat Saber manifest don't have one.
+                        let _ = Self::get_name_attribute(attributes)
+                            .map(|perm| existing_permissions.insert(perm));
+                    }   else if &**name == "uses-feature" {
+                        let _ = Self::get_name_attribute(attributes)
+                        .map(|feature| existing_features.insert(feature));
                     }
                     false
                 },
@@ -110,22 +161,30 @@ impl ManifestMod {
                 _ => false
             };
 
-            if is_closing {
+            if is_end_of_manifest {
                 // Write out permissions and features just before the final (closing) tag
                 let uses_feature: Rc<str> = "uses-feature".into();
                 let uses_permission: Rc<str> = "uses-permission".into();
-                for feature in &self.queued_features {
-                    write_named_element(writer, uses_feature.clone(), feature.clone(), res_ids);
+                for feature in &self.add_features {
+                    if !existing_features.contains(feature) {
+                        info!("Adding feature `{feature}`");
+                        write_named_element(writer, uses_feature.clone(), feature.clone(), res_ids);
+                        modified = true;
+                    }
                 }
-                for permission in &self.queued_perms {
-                    write_named_element(writer, uses_permission.clone(), permission.clone(), res_ids);
+                for permission in &self.add_permissions {
+                    if !existing_permissions.contains(permission) {
+                        info!("Adding permission `{permission}`");
+                        write_named_element(writer, uses_permission.clone(), permission.clone(), res_ids);
+                        modified = true;
+                    }
                 }
             }
 
             writer.write_event(ev);
         };
 
-        Ok(())
+        Ok(modified)
     }
 }
 

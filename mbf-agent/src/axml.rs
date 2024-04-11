@@ -43,7 +43,7 @@ pub struct Attribute {
     pub value: AttributeValue
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum AttributeValue {
     String(Rc<str>),
     Boolean(bool),

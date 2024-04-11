@@ -42,3 +42,8 @@ button:hover {
 .warning {
     color: red
 }
+
+@font-face {
+    font-family: Consolas;
+    src: local('Consolas'), format("ttf"), url("../fonts/Consolas.ttf")
+}

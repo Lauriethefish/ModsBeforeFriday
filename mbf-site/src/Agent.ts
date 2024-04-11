@@ -1,7 +1,7 @@
 import { AdbSync, AdbSyncWriteOptions, Adb, encodeUtf8 } from '@yume-chan/adb';
 import { ConsumableReadableStream, Consumable, DecodeUtf8Stream, ConcatStringStream } from '@yume-chan/stream-extra';
 import { Request, Response, LogMsg, ModStatus, Mods, ImportedMod, ImportResult, FixedPlayerData } from "./Messages";
-import { Mod } from './Models';
+import { ManifestMod, Mod } from './Models';
 
 const AgentPath: string = "/data/local/tmp/mbf-agent";
 
@@ -241,10 +241,13 @@ export async function removeMod(device: Adb,
 export async function patchApp(device: Adb,
   beforePatch: ModStatus,
   downgradeToVersion: string | null,
+  manifestMod: ManifestMod,
   eventSink: LogEventSink = null): Promise<ModStatus> {
   let response = await sendRequest(device, {
       type: 'Patch',
-      downgrade_to: downgradeToVersion
+      downgrade_to: downgradeToVersion,
+      manifest_mod: manifestMod,
+      install_core_mods: true
   }, eventSink);
 
   // Return the new mod status assumed after patching

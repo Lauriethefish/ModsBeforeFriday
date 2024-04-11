@@ -6,7 +6,8 @@ import './css/DeviceModder.css';
 import { LogWindow, useLog } from './components/LogWindow';
 import { ErrorModal, Modal } from './components/Modal';
 import { ModManager } from './components/ModManager';
-import { trimGameVersion } from './Models';
+import { ManifestMod, trimGameVersion } from './Models';
+import { PermissionsMenu } from './components/PermissionsMenu';
 
 interface DeviceModderProps {
     device: Adb,
@@ -159,13 +160,17 @@ function PatchingMenu(props: PatchingMenuProps) {
     const [isPatching, setIsPatching] = useState(false);
     const [logEvents, addLogEvent] = useLog();
     const [patchingError, setPatchingError] = useState(null as string | null);
+    const [manifestMod, setManifestMod] = useState({
+        add_permissions: [],
+        add_features: []
+    } as ManifestMod);
 
     const { onCompleted, modStatus, device, downgradingTo } = props;
     if(!isPatching) {
         return <div className='container mainContainer'>
             {downgradingTo !== null && <DowngradeMessage toVersion={downgradingTo}/>}
             {downgradingTo === null && <VersionSupportedMessage version={modStatus.app_info!.version} />}
-
+            <PermissionsMenu manifestMod={manifestMod} setManifestMod={mod => setManifestMod(mod)} />
             <h2 className='warning'>READ CAREFULLY</h2>
             <p>Mods and custom songs are not supported by Beat Games. You may experience bugs and crashes that you wouldn't in a vanilla game.</p>
             <b>In addition, by modding the game you will lose access to both vanilla leaderboards and vanilla multiplayer.</b> (Modded leaderboards/servers are available.)
@@ -173,7 +178,7 @@ function PatchingMenu(props: PatchingMenuProps) {
             <button className="modButton" onClick={async () => {
                 setIsPatching(true);
                 try {
-                    onCompleted(await patchApp(device, modStatus, downgradingTo, addLogEvent));
+                    onCompleted(await patchApp(device, modStatus, downgradingTo, manifestMod, addLogEvent));
                 } catch(e) {
                     setPatchingError(String(e));
                     setIsPatching(false);
