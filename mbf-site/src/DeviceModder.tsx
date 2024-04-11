@@ -80,11 +80,11 @@ export function DeviceModder(props: DeviceModderProps) {
                     <NextSteps />
                 </div>
 
-                <ModManager mods={modStatus.installed_mods}
+                <ModManager modStatus={modStatus}
                     setMods={mods => setModStatus({ ...modStatus, installed_mods: mods })}
                     device={device}
                     gameVersion={modStatus.app_info.version}
-                    quit={() => quit(undefined)}
+                    quit={quit}
                 />
             </>
         }   else    {
@@ -173,6 +173,7 @@ function PatchingMenu(props: PatchingMenuProps) {
             {downgradingTo === null && <VersionSupportedMessage version={modStatus.app_info!.version} />}
             
             <Collapsible title="Change App Permissions">
+                <p>Certain mods may find it useful for the app to request microphone permissions or access to the headset cameras. Due to the privacy implications, you need to enable permissions here if you want them.</p>
                 <PermissionsMenu manifestMod={manifestMod} setManifestMod={mod => setManifestMod(mod)} />
             </Collapsible>
             <h2 className='warning'>READ CAREFULLY</h2>
@@ -182,7 +183,7 @@ function PatchingMenu(props: PatchingMenuProps) {
             <button className="modButton" onClick={async () => {
                 setIsPatching(true);
                 try {
-                    onCompleted(await patchApp(device, modStatus, downgradingTo, manifestMod, addLogEvent));
+                    onCompleted(await patchApp(device, modStatus, downgradingTo, manifestMod, false, addLogEvent));
                 } catch(e) {
                     setPatchingError(String(e));
                     setIsPatching(false);

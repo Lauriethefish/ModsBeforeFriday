@@ -25,18 +25,10 @@
 
 .content {
     padding: 0px 10px 0px 10px;
-    transition: max-height 500ms ease-in-out;
+    transition: max-height 500ms;
     overflow: hidden;
 }
 
 .content > #bottom {
     padding-bottom: 10px;
-}
-
-.collapsed {
-    max-height: 0;
-}
-
-.open {
-    max-height: 370px;
 }

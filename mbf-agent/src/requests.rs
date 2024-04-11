@@ -67,7 +67,13 @@ pub enum Request {
         /// Settings such as debuggable = true and external storage permissions do not need to be specified here - 
         /// they will automatically be added no matter what.
         manifest_mod: ManifestMod,
-        install_core_mods: bool
+        
+        // If this is true, patching will skip adding the modloader and libunity.so and will ONLY change permissions.
+        // Patching will also not attempt to reinstall core mods.
+        //
+        // TODO: in the future, it might make sense for remodding to detect a change in the libunity.so (harder) 
+        // or libmainloader (easier) so that these can be easily updated.
+        remodding: bool
     },
 
     // Attempts to fix a blackscreen issue by removing PlayerData.dat from `/sdcard/...../files/`.

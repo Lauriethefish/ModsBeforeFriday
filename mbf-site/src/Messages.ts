@@ -8,7 +8,7 @@ export interface Patch {
     type: 'Patch',
     manifest_mod: ManifestMod,
     downgrade_to: string | null,
-    install_core_mods: boolean
+    remodding: boolean
 }
 
 export interface FixPlayerData {

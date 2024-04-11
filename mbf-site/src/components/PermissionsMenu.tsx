@@ -48,12 +48,8 @@ export function PermissionsMenu({ manifestMod, setManifestMod }: ManifestStatePr
     const [advanced, setAdvanced] = useState(false);
 
     return <>
-        <p>Certain mods may find it useful for the app to request microphone permissions or access to the headset cameras. Due to the privacy implications, you need to enable permissions here if you want them.</p>
-        
         {!advanced && <ToggleMenu manifestMod={manifestMod} setManifestMod={setManifestMod} />}
         {advanced && <TextFieldMenu manifestMod={manifestMod} setManifestMod={setManifestMod} />}
-
-        <br/>
         <button onClick={() => setAdvanced(!advanced)}>{advanced ? "Simple options" : "Advanced Options"}</button>
     </>
 }
@@ -91,5 +87,6 @@ export function TextFieldMenu({ manifestMod, setManifestMod }: ManifestStateProp
             ...manifestMod,
             add_features: newFeatures
         })} />
+        <br/>
     </>
 }

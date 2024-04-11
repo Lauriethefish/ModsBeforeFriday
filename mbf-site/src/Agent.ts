@@ -242,12 +242,13 @@ export async function patchApp(device: Adb,
   beforePatch: ModStatus,
   downgradeToVersion: string | null,
   manifestMod: ManifestMod,
+  remodding: boolean,
   eventSink: LogEventSink = null): Promise<ModStatus> {
   let response = await sendRequest(device, {
       type: 'Patch',
       downgrade_to: downgradeToVersion,
       manifest_mod: manifestMod,
-      install_core_mods: true
+      remodding
   }, eventSink);
 
   // Return the new mod status assumed after patching

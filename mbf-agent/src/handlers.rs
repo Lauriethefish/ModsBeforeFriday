@@ -15,7 +15,8 @@ use log::{error, info, warn};
 pub fn handle_request(request: Request) -> Result<Response> {
     match request {
         Request::GetModStatus => handle_get_mod_status(),
-        Request::Patch { downgrade_to , install_core_mods, manifest_mod} => handle_patch(downgrade_to, install_core_mods, manifest_mod),
+        Request::Patch { downgrade_to , remodding, manifest_mod} => 
+            handle_patch(downgrade_to, remodding, manifest_mod),
         Request::SetModsEnabled {
             statuses
         } => run_mod_action(statuses),
@@ -349,7 +350,7 @@ fn handle_fix_player_data() -> Result<Response> {
     }
 }
 
-fn handle_patch(downgrade_to: Option<String>, install_cores: bool, manifest_mod: ManifestMod) -> Result<Response> {
+fn handle_patch(downgrade_to: Option<String>, repatch: bool, manifest_mod: ManifestMod) -> Result<Response> {
     let app_info = get_app_info()?
         .ok_or(anyhow!("Cannot patch when app not installed"))?;
 
@@ -367,7 +368,7 @@ fn handle_patch(downgrade_to: Option<String>, install_cores: bool, manifest_mod:
         patching::downgrade_and_mod_apk(Path::new(TEMP_PATH), &app_info, version_diffs, manifest_mod)
             .context("Failed to downgrade nad patch APK")
     }   else {
-        patching::mod_current_apk(Path::new(TEMP_PATH), &app_info, manifest_mod)
+        patching::mod_current_apk(Path::new(TEMP_PATH), &app_info, manifest_mod, repatch)
             .context("Failed to patch APK")
     };
 
@@ -382,7 +383,7 @@ fn handle_patch(downgrade_to: Option<String>, install_cores: bool, manifest_mod:
 
     let mut mod_manager = ModManager::new();
     
-    if install_cores {
+    if !repatch {
         info!("Wiping all existing mods");
         mod_manager.wipe_all_mods().context("Failed to wipe existing mods")?;
         mod_manager.load_mods()?; // Should load no mods.
