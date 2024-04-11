@@ -3,11 +3,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 const BLOCK_FALL_SPEED = 10/1000;
 const BLOCK_ROTATION_SPEED = 0.2/1000;
-const BLOCK_SCALE_RANGE = 0.4;//0.3;
-const BLOCK_BRIGHTNESS_RANGE = 0.4;//0.30;
+const BLOCK_SCALE_RANGE = 0.4;
+const BLOCK_BRIGHTNESS_RANGE = 0.4;
 const BLOCK_VALUE_SAFETY_LIMIT = 0.1;
 const BLOCK_ANIMATION_AVERAGE_LIFETIME = 5000;
 const BLOCK_ANIMATION_LIFETIME_RANGE = 1000;
+const BLOCK_DENSITY = 0.0001;
 
 export class FallingBlockParticle {
 	type:number = 0;
@@ -24,15 +25,16 @@ export class FallingBlockParticle {
 
 	node:SVGElement;
 	animation:Animation|null = null;
+	static onExit:Function|null = null;
 
-	constructor(svg:SVGSVGElement){
+	constructor(svg:SVGSVGElement, start_at_top:boolean=false){
 		this.node = createSvgNode("g");
 		svg.appendChild(this.node);
-		this.randomise_state(false);
+		this.randomise_state(start_at_top);
 	}
 
 	randomise_state(start_at_top:boolean = true){
-		this.type = Math.floor(2*Math.random());
+		this.type = Math.floor(3*Math.random());
 		this.angular_velocity = (2*Math.random()-1)*BLOCK_ROTATION_SPEED;
 
 		this.rotation = 1-(2*Math.random()-1)*Math.PI;
@@ -59,13 +61,11 @@ export class FallingBlockParticle {
 
 		this.velocity = [BLOCK_FALL_SPEED*Math.cos(drop_angle), BLOCK_FALL_SPEED*Math.sin(drop_angle)];	//	Calculate the velocity of the block
 
+		//	Estimate the time needed for the block to reach the bottom of the screen, and calculate how quickly the block should get brighter/bigger based on that estimate.
 		let time_est = (window.innerHeight - this.position[1] + end_scale)/this.velocity[1];
 		this.scale_change_speed = (end_scale-this.scale)/time_est;
 
-		//limiter = 2*Math.random()-1;	//	Make bright blocks more likely to darken, and dark blocks more likely to lighten up.
-		//offset = Math.random();
-		this.brightness_change_speed = (this.brightness-end_brightness)/time_est;
-		//this.brightness_change_speed = ((2-Math.abs(limiter))*offset-1+limiter) * BLOCK_BRIGHTNESS_SPEED;
+		if(this.type!==3)this.brightness_change_speed = (this.brightness-end_brightness)/time_est;
 
 
 		this.animation = null;
@@ -75,7 +75,9 @@ export class FallingBlockParticle {
 
 	update_node(){
 		while(this.node.lastChild)this.node.removeChild(this.node.lastChild);
-		this.node.classList.forEach((c)=>this.node.classList.remove(c));
+		this.node.classList.remove("block");
+		this.node.classList.remove("red-block");
+		this.node.classList.remove("bomb");
 
 		switch(this.type){
 			case 0:
@@ -107,6 +109,14 @@ export class FallingBlockParticle {
 					d: "M -40 -40 L 40 -40 L 40 -30 L 0 -20 L -40 -30 Z"
 				}));
 				break;
+			case 2:
+				this.node.classList.add("bomb");
+				this.node.appendChild(createSvgNode("path", {
+					d:"M 16.588 25.261 L 0.271 25.261 L -9.292 58.594 L -8.873 25.26 L -19.645 25.26 L -24.671 29.566 L -21.536 21.708 L -25.928 6.658 L -66.658 9.545 L -28.483 -2.096 L -31.32 -11.818 L -30.336 -12.56 L -41.991 -20.297 L -24.148 -17.223 L -17.527 -22.213 L -32.214 -56.515 L -9.796 -28.04 L -5.567 -31.228 L -2.62 -47.336 L 0.907 -33.318 L 13.827 -23.318 L 46.439 -48.293 L 21.605 -17.299 L 26.002 -13.896 L 39.033 -14.184 L 27.412 -7.903 L 24.15 2.09 L 60.606 22.849 L 21.106 11.417 L 18.779 18.547 L 25.405 33.345 L 16.652 25.066 L 16.588 25.261 Z",
+
+				}));
+				break;
+
 		}
 	}
 	update_progress(delta_time:number){
@@ -118,7 +128,11 @@ export class FallingBlockParticle {
 			this.brightness = state.brightness;
 		}
 		if((this.position[1] > 100*this.scale + window.innerHeight) || (this.position[0] < -100*this.scale) || (this.position[0] > 100*this.scale + window.innerWidth)){
-			this.randomise_state();
+			if(FallingBlockParticle.onExit) {
+				FallingBlockParticle.onExit(this);
+			}else{
+				this.randomise_state();
+			}
 		}else{
 			this.update_animation();
 		}
@@ -158,8 +172,8 @@ export function AnimatedBackground(){
 	}) as SVGSVGElement;
 	let defs = createSvgNode("defs", {});
 	let gradient = createSvgNode("radialGradient", {id:"bomb-gradient"});
-	gradient.appendChild(createSvgNode("stop", { offset:0.05, style:"stop-color: rgb(57, 57, 57);"}));
-	gradient.appendChild(createSvgNode("stop", { offset:0.75, style:"stop-color: rgb(14, 14, 14);"}));
+	gradient.appendChild(createSvgNode("stop", { offset:0, style:"stop-color: rgb(20, 20, 20);"}));
+	gradient.appendChild(createSvgNode("stop", { offset:0.75, style:"stop-color: rgb(3, 3, 3);"}));
 	defs.appendChild(gradient);
 	svg.appendChild(defs);
 
@@ -169,11 +183,30 @@ export function AnimatedBackground(){
 		svg.setAttribute("viewBox", `0 0 ${window.innerWidth} ${window.innerHeight}`);
 	});
 
-	let particles = [];
+	let particles:FallingBlockParticle[] = [];
 
-	for(let i=0; i<100; i++){
+	for(let i=0; i<(window.innerWidth*window.innerHeight*BLOCK_DENSITY); i++){
 		particles.push(new FallingBlockParticle(svg));
 	}
+	setInterval(()=>{
+		if(particles.length < (window.innerWidth*window.innerHeight*BLOCK_DENSITY)){
+			console.log("Adding more",(window.innerWidth*window.innerHeight*BLOCK_DENSITY), particles.length);
+			FallingBlockParticle.onExit = null;
+			particles.push(new FallingBlockParticle(svg, true));
+			return;
+		}
+		if(particles.length > Math.ceil(window.innerWidth*window.innerHeight*BLOCK_DENSITY)){
+			FallingBlockParticle.onExit = (p:FallingBlockParticle)=>{
+				if(particles.length > Math.ceil(window.innerWidth*window.innerHeight*BLOCK_DENSITY)){
+					console.log("Deleting excess",(window.innerWidth*window.innerHeight*BLOCK_DENSITY), particles.length);
+					particles.splice(particles.findIndex((e)=>(e===p)), 1);
+				}else{
+					FallingBlockParticle.onExit = null;
+				}
+			};
+		}
+	},500);
+		console.log(window.innerWidth*window.innerHeight*BLOCK_DENSITY);
 }
 
 function createSvgNode(tag:string, attributes:any = {}){

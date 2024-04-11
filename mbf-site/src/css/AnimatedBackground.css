@@ -32,6 +32,12 @@
 	fill: rgb(185, 186, 255);
 }
 
+.bomb path {
+	fill: url("#bomb-gradient");
+	stroke: rgb(0, 0, 0);
+	transform-box: fill-box;
+	transform-origin: 50% 50%;
+}
 .red-block rect {
 	stroke: rgb(80, 0, 0);
 	fill: rgb(120, 0, 0);
@@ -39,13 +45,6 @@
 .red-block path {
 	stroke: rgb(255, 0, 0);
 	fill: rgb(255, 232, 232);
-}
-.green-block rect {
-	fill: rgb(0, 120, 0);
-}
-.green-block path {
-	stroke: rgb(0, 255, 0);
-	fill: rgb(150, 254, 150);
 }
 .hidden {
 	display: none;
