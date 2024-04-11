@@ -1,14 +1,16 @@
 import "./css/AnimatedBackground.css";
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-const BLOCK_FALL_SPEED = 100/1000;
-//const BLOCK_FALL_SPEED = 20/1000;
+//const BLOCK_FALL_SPEED = 100/1000;
+const BLOCK_FALL_SPEED = 20/1000;
 const BLOCK_ROTATION_SPEED = 0.25/1000;
-const BLOCK_SCALE_RANGE = 0.5;
-const BLOCK_SCALE_SPEED = 0.01/1000;
+const BLOCK_SCALE_RANGE = 0.3;
+const BLOCK_SCALE_SPEED = 0.003/1000;
 const BLOCK_BRIGHTNESS_RANGE = 0.30;
-const BLOCK_BRIGHTNESS_SPEED = 0.01/1000;
+const BLOCK_BRIGHTNESS_SPEED = 0.003/1000;
 const BLOCK_VALUE_SAFETY_LIMIT = 0.2;
+const BLOCK_ANIMATION_AVERAGE_LIFETIME = 5000;
+const BLOCK_ANIMATION_LIFETIME_RANGE = 1000;
 
 export class FallingBlockParticle {
 	type:number = 0;
@@ -39,12 +41,14 @@ export class FallingBlockParticle {
 		this.rotation = 1-(2*Math.random()-1)*Math.PI;
 
 		let limiter = 2*Math.random()-1;	//	Make small blocks more likely to grow, and big blocks more likely to shrink.
+		let offset = Math.random();
 		this.scale = 1-limiter*BLOCK_SCALE_RANGE;
-		this.scale_change_speed = ((2-Math.abs(limiter))*Math.random()-1+limiter) * BLOCK_SCALE_SPEED;
+		this.scale_change_speed = ((2-Math.abs(limiter))*offset-1+limiter) * BLOCK_SCALE_SPEED;
 
-		limiter = 2*Math.random()-1;	//	Make bright blocks more likely to darken, and dark blocks more likely to lighten up.
+		//limiter = 2*Math.random()-1;	//	Make bright blocks more likely to darken, and dark blocks more likely to lighten up.
+		//offset = Math.random();
 		this.brightness = 1+limiter*BLOCK_BRIGHTNESS_RANGE;
-		this.brightness_change_speed = ((2-Math.abs(limiter))*Math.random()-1+limiter) * BLOCK_BRIGHTNESS_SPEED;
+		this.brightness_change_speed = ((2-Math.abs(limiter))*offset-1+limiter) * BLOCK_BRIGHTNESS_SPEED;
 
 		let start_x_percentage = Math.random();	//	Figure out where the block should spawn
 		this.position = [
@@ -105,11 +109,11 @@ export class FallingBlockParticle {
 	update_progress(delta_time:number){
 		if(delta_time > 0){
 			console.log(`Animation update: delta_time = ${delta_time}`);
-			this.position[0] += this.velocity[0] * delta_time;
-			this.position[1] += this.velocity[1] * delta_time;
-			this.rotation += this.angular_velocity * delta_time;
-			this.scale = Math.min(Math.max(this.scale + this.scale_change_speed * delta_time, 1-BLOCK_VALUE_SAFETY_LIMIT-BLOCK_SCALE_RANGE), 1+BLOCK_VALUE_SAFETY_LIMIT+BLOCK_SCALE_RANGE);
-			this.brightness = Math.min(Math.max(this.brightness + this.brightness_change_speed * delta_time, 1-BLOCK_VALUE_SAFETY_LIMIT-BLOCK_BRIGHTNESS_RANGE), 1+BLOCK_VALUE_SAFETY_LIMIT+BLOCK_BRIGHTNESS_RANGE);
+			let state = this.calculate_next_state(delta_time);
+			this.position = state.position;
+			this.rotation = state.rotation;
+			this.scale = state.scale;
+			this.brightness = state.brightness;
 		}
 		if((this.position[1] > 100*this.scale + window.innerHeight) || (this.position[0] < -100*this.scale) || (this.position[0] > 100*this.scale + window.innerWidth)){
 			this.randomise_state();
@@ -117,11 +121,25 @@ export class FallingBlockParticle {
 			this.update_animation();
 		}
 	}
+	calculate_next_state(delta_time:number){
+		let state:{position:[number,number],rotation:number,scale:number,brightness:number} = {
+			position:[
+				this.position[0] + this.velocity[0] * delta_time,
+				this.position[1] + this.velocity[1] * delta_time
+			],
+			rotation: this.rotation + this.angular_velocity * delta_time,
+			scale: Math.min(Math.max(this.scale + this.scale_change_speed * delta_time, 1-BLOCK_VALUE_SAFETY_LIMIT-BLOCK_SCALE_RANGE), 1+BLOCK_VALUE_SAFETY_LIMIT+BLOCK_SCALE_RANGE),
+			brightness: Math.min(Math.max(this.brightness + this.brightness_change_speed * delta_time, 1-BLOCK_VALUE_SAFETY_LIMIT-BLOCK_BRIGHTNESS_RANGE), 1+BLOCK_VALUE_SAFETY_LIMIT+BLOCK_BRIGHTNESS_RANGE)
+		};
+		return state;
+	}
 	update_animation(){
-		const pass_time = 2000;
+		let pass_time = BLOCK_ANIMATION_AVERAGE_LIFETIME + (2*Math.random()-1)*BLOCK_ANIMATION_LIFETIME_RANGE;
+
+		let next_state = this.calculate_next_state(pass_time);
 		let keyframes = [
 			{ transform: `translate(${this.position[0]}px, ${this.position[1]}px) rotate(${this.rotation}rad) scale(${this.scale})`, filter: `brightness(${this.brightness})` },
-			{ transform: `translate(${this.position[0]}px, ${this.position[1]}px) rotate(${this.rotation}rad) scale(${this.scale})`, filter: `brightness(${this.brightness})` },
+			{ transform: `translate(${next_state.position[0]}px, ${next_state.position[1]}px) rotate(${next_state.rotation}rad) scale(${next_state.scale})`, filter: `brightness(${next_state.brightness})` }
 		];
 		this.animation = this.node.animate(keyframes, pass_time);
 		this.animation.onfinish = ()=>{
