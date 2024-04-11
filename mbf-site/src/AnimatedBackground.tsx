@@ -1,13 +1,28 @@
 import "./css/AnimatedBackground.css";
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-const BLOCK_FALL_SPEED = 10/1000;
-const BLOCK_ROTATION_SPEED = 0.2/1000;
+//	Speed (in pixels per millisecond) at which the blocks will move
+const BLOCK_FALL_SPEED = 10 /1000;
+
+//	Maximum speed at which the blocks will rotate (in radians per millisecond). Speed and direction are randomised per block.
+const BLOCK_ROTATION_SPEED = 0.2 /1000;
+
+//	How big/small the blocks should be on average. The value of 0.4 means that the blocks will be scaled by a value between 0.6 and 1.4.
+//	The exact value is randomised, and the actual speed at which the scale changes is calculated based on the value provided here.
 const BLOCK_SCALE_RANGE = 0.4;
+//	Same as above but for brightness instead of size.
 const BLOCK_BRIGHTNESS_RANGE = 0.4;
+
+//	The above values are used to estimate how quickly the brightness and scale will change, but if the window is resized the blocks which have already been spawned cannot have these speeds recalculated, and will keep using them until they go offscreen.
+//	This value determines how far the brightness and scale can go from the originally predicted values before being clamped.
 const BLOCK_VALUE_SAFETY_LIMIT = 0.1;
+
+//	How often on average each block should have its animation recalculated (in milliseconds). The actual value will be randomised to prevent blocks from combining into large batches.
 const BLOCK_ANIMATION_AVERAGE_LIFETIME = 5000;
+//	How far from the average animation lifetime the actual animation lifetime can be (in milliseconds)
 const BLOCK_ANIMATION_LIFETIME_RANGE = 1000;
+
+//	Amount of blocks per pixel. If the amount of blocks on screen differs too much blocks will be added/removed.
 const BLOCK_DENSITY = 0.000065;
 
 export class FallingBlockParticle {
