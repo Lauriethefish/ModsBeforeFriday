@@ -1,14 +1,11 @@
 import "./css/AnimatedBackground.css";
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-//const BLOCK_FALL_SPEED = 100/1000;
-const BLOCK_FALL_SPEED = 20/1000;
-const BLOCK_ROTATION_SPEED = 0.25/1000;
+const BLOCK_FALL_SPEED = 10/1000;
+const BLOCK_ROTATION_SPEED = 0.2/1000;
 const BLOCK_SCALE_RANGE = 0.4;//0.3;
-//const BLOCK_SCALE_SPEED = 0.003/1000;
 const BLOCK_BRIGHTNESS_RANGE = 0.4;//0.30;
-//const BLOCK_BRIGHTNESS_SPEED = 0.003/1000;
-const BLOCK_VALUE_SAFETY_LIMIT = 0.2;
+const BLOCK_VALUE_SAFETY_LIMIT = 0.1;
 const BLOCK_ANIMATION_AVERAGE_LIFETIME = 5000;
 const BLOCK_ANIMATION_LIFETIME_RANGE = 1000;
 
