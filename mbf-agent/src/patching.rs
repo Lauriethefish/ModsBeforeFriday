@@ -187,7 +187,7 @@ fn apply_diff(from_path: &Path,
     }
 
     // Carry out the downgrade
-    info!("Applying patch");
+    info!("Applying patch (This step may take a few minutes)");
     let mut output_handle = OpenOptions::new()
         .truncate(true)
         .create(true)
