@@ -8,7 +8,7 @@ const BLOCK_BRIGHTNESS_RANGE = 0.4;
 const BLOCK_VALUE_SAFETY_LIMIT = 0.1;
 const BLOCK_ANIMATION_AVERAGE_LIFETIME = 5000;
 const BLOCK_ANIMATION_LIFETIME_RANGE = 1000;
-const BLOCK_DENSITY = 0.0001;
+const BLOCK_DENSITY = 0.000065;
 
 export class FallingBlockParticle {
 	type:number = 0;
@@ -34,13 +34,13 @@ export class FallingBlockParticle {
 	}
 
 	randomise_state(start_at_top:boolean = true){
-		this.type = Math.floor(3*Math.random());
+		this.type = Math.abs(Math.floor(7*Math.random())-2);
 		this.angular_velocity = (2*Math.random()-1)*BLOCK_ROTATION_SPEED;
 
 		this.rotation = 1-(2*Math.random()-1)*Math.PI;
 
-		let start = 2*Math.random()-1;	//	Make small blocks more likely to grow, and big blocks more likely to shrink.
-		let end = 2*Math.random()-1;	//	Make small blocks more likely to grow, and big blocks more likely to shrink.
+		let start = 2*Math.random()-1;
+		let end = 2*Math.random()-1;
 
 		this.scale = 1-start*BLOCK_SCALE_RANGE;
 		let end_scale = 1-end*BLOCK_SCALE_RANGE;
@@ -65,7 +65,7 @@ export class FallingBlockParticle {
 		let time_est = (window.innerHeight - this.position[1] + end_scale)/this.velocity[1];
 		this.scale_change_speed = (end_scale-this.scale)/time_est;
 
-		if(this.type!==3)this.brightness_change_speed = (this.brightness-end_brightness)/time_est;
+		if(this.type!==4)this.brightness_change_speed = (this.brightness-end_brightness)/time_est;
 
 
 		this.animation = null;
@@ -91,9 +91,27 @@ export class FallingBlockParticle {
 					ry: 20,
 				}));
 				this.node.appendChild(createSvgNode("path", {
-					d: "M -40 -40 L 40 -40 L 40 -30 L 0 -20 L -40 -30 Z"
+					d: "M -40 -40 L 40 -40 L 40 -30 L 0 -10 L -40 -30 Z"
 				}));
 				break;
+			case 2:
+				this.node.classList.add("block");
+				this.node.appendChild(createSvgNode("rect", {
+					x:-50,
+					y:-50,
+					width: 100,
+					height: 100,
+					rx: 20,
+					ry: 20,
+				}));
+				this.node.appendChild(createSvgNode("ellipse", {
+					cx:0,
+					cy:0,
+					rx:20,
+					ry:20
+				}));
+				break;
+				
 			case 1:
 				this.node.classList.add("block");
 				this.node.classList.add("red-block");
@@ -106,10 +124,28 @@ export class FallingBlockParticle {
 					ry: 20,
 				}));
 				this.node.appendChild(createSvgNode("path", {
-					d: "M -40 -40 L 40 -40 L 40 -30 L 0 -20 L -40 -30 Z"
+					d: "M -40 -40 L 40 -40 L 40 -30 L 0 -10 L -40 -30 Z"
 				}));
 				break;
-			case 2:
+			case 3:
+				this.node.classList.add("block");
+				this.node.classList.add("red-block");
+				this.node.appendChild(createSvgNode("rect", {
+					x:-50,
+					y:-50,
+					width: 100,
+					height: 100,
+					rx: 20,
+					ry: 20,
+				}));
+				this.node.appendChild(createSvgNode("ellipse", {
+					cx:0,
+					cy:0,
+					rx:20,
+					ry:20
+				}));
+				break;
+			case 4:
 				this.node.classList.add("bomb");
 				this.node.appendChild(createSvgNode("path", {
 					d:"M 16.588 25.261 L 0.271 25.261 L -9.292 58.594 L -8.873 25.26 L -19.645 25.26 L -24.671 29.566 L -21.536 21.708 L -25.928 6.658 L -66.658 9.545 L -28.483 -2.096 L -31.32 -11.818 L -30.336 -12.56 L -41.991 -20.297 L -24.148 -17.223 L -17.527 -22.213 L -32.214 -56.515 L -9.796 -28.04 L -5.567 -31.228 L -2.62 -47.336 L 0.907 -33.318 L 13.827 -23.318 L 46.439 -48.293 L 21.605 -17.299 L 26.002 -13.896 L 39.033 -14.184 L 27.412 -7.903 L 24.15 2.09 L 60.606 22.849 L 21.106 11.417 L 18.779 18.547 L 25.405 33.345 L 16.652 25.066 L 16.588 25.261 Z",
