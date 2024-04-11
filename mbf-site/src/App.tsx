@@ -22,8 +22,13 @@ async function connect(
   try {
     connection = await quest.connect();
   } catch(err) {
-    throw new Error("Some other app is trying to access your quest, e.g. SideQuest." + 
-    " Please restart your computer to close any SideQuest background processes, then try again. (Running `adb kill-server` will fix this.)");
+    // Some other ADB daemon is hogging the connection, so we can't get to the Quest.
+    // On Windows, this can be easily fixed with a Win + R and a command. 
+    // On Mac/Linux/Android, using the terminal is harder and so we will just instruct to restart their device.
+    const fixInstructions = isViewingOnWindows() ? "To fix this, close SideQuest if you have it open, press Win + R and type the following text, and finally press enter.\ntaskkill /IM adb.exe /F\nAlternatively, restart your computer." 
+      : `To fix this, restart your ${isViewingOnMobile() ? "phone" : "computer"}.`
+
+    throw new Error("Some other app is trying to access your quest, e.g. SideQuest.\n" + fixInstructions);
   }
   const keyStore: AdbWebCredentialStore = new AdbWebCredentialStore("ModsBeforeFriday");
   
@@ -134,6 +139,11 @@ function App() {
       transition={Bounce}
       hideProgressBar={true} />
   </div>
+}
+
+function isViewingOnWindows(): boolean {
+  // Deprecated but still works for our purposes.
+  return navigator.appVersion.indexOf("Win") != -1;
 }
 
 function isViewingOnMobile() {
