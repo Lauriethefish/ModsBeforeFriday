@@ -42,7 +42,7 @@
 	stroke: rgb(80, 0, 0);
 	fill: rgb(120, 0, 0);
 }
-.red-block path {
+.red-block path,ellipse {
 	stroke: rgb(255, 0, 0);
 	fill: rgb(255, 232, 232);
 }
