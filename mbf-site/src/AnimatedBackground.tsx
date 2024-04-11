@@ -226,7 +226,6 @@ export function AnimatedBackground(){
 	}
 	setInterval(()=>{
 		if(particles.length < (window.innerWidth*window.innerHeight*BLOCK_DENSITY)){
-			console.log("Adding more",(window.innerWidth*window.innerHeight*BLOCK_DENSITY), particles.length);
 			FallingBlockParticle.onExit = null;
 			particles.push(new FallingBlockParticle(svg, true));
 			return;
@@ -234,7 +233,6 @@ export function AnimatedBackground(){
 		if(particles.length > Math.ceil(window.innerWidth*window.innerHeight*BLOCK_DENSITY)){
 			FallingBlockParticle.onExit = (p:FallingBlockParticle)=>{
 				if(particles.length > Math.ceil(window.innerWidth*window.innerHeight*BLOCK_DENSITY)){
-					console.log("Deleting excess",(window.innerWidth*window.innerHeight*BLOCK_DENSITY), particles.length);
 					particles.splice(particles.findIndex((e)=>(e===p)), 1);
 				}else{
 					FallingBlockParticle.onExit = null;
@@ -242,7 +240,6 @@ export function AnimatedBackground(){
 			};
 		}
 	},500);
-		console.log(window.innerWidth*window.innerHeight*BLOCK_DENSITY);
 }
 
 function createSvgNode(tag:string, attributes:any = {}){
