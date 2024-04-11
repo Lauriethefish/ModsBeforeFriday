@@ -4,10 +4,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 //const BLOCK_FALL_SPEED = 100/1000;
 const BLOCK_FALL_SPEED = 20/1000;
 const BLOCK_ROTATION_SPEED = 0.25/1000;
-const BLOCK_SCALE_RANGE = 0.3;
-const BLOCK_SCALE_SPEED = 0.003/1000;
-const BLOCK_BRIGHTNESS_RANGE = 0.30;
-const BLOCK_BRIGHTNESS_SPEED = 0.003/1000;
+const BLOCK_SCALE_RANGE = 0.4;//0.3;
+//const BLOCK_SCALE_SPEED = 0.003/1000;
+const BLOCK_BRIGHTNESS_RANGE = 0.4;//0.30;
+//const BLOCK_BRIGHTNESS_SPEED = 0.003/1000;
 const BLOCK_VALUE_SAFETY_LIMIT = 0.2;
 const BLOCK_ANIMATION_AVERAGE_LIFETIME = 5000;
 const BLOCK_ANIMATION_LIFETIME_RANGE = 1000;
@@ -40,15 +40,13 @@ export class FallingBlockParticle {
 
 		this.rotation = 1-(2*Math.random()-1)*Math.PI;
 
-		let limiter = 2*Math.random()-1;	//	Make small blocks more likely to grow, and big blocks more likely to shrink.
-		let offset = Math.random();
-		this.scale = 1-limiter*BLOCK_SCALE_RANGE;
-		this.scale_change_speed = ((2-Math.abs(limiter))*offset-1+limiter) * BLOCK_SCALE_SPEED;
+		let start = 2*Math.random()-1;	//	Make small blocks more likely to grow, and big blocks more likely to shrink.
+		let end = 2*Math.random()-1;	//	Make small blocks more likely to grow, and big blocks more likely to shrink.
 
-		//limiter = 2*Math.random()-1;	//	Make bright blocks more likely to darken, and dark blocks more likely to lighten up.
-		//offset = Math.random();
-		this.brightness = 1+limiter*BLOCK_BRIGHTNESS_RANGE;
-		this.brightness_change_speed = ((2-Math.abs(limiter))*offset-1+limiter) * BLOCK_BRIGHTNESS_SPEED;
+		this.scale = 1-start*BLOCK_SCALE_RANGE;
+		let end_scale = 1-end*BLOCK_SCALE_RANGE;
+		this.brightness = 1-start*BLOCK_BRIGHTNESS_RANGE;
+		let end_brightness = 1-end*BLOCK_BRIGHTNESS_RANGE;
 
 		let start_x_percentage = Math.random();	//	Figure out where the block should spawn
 		this.position = [
@@ -63,6 +61,14 @@ export class FallingBlockParticle {
 		let drop_angle = Math.random() * Math.PI/2+Math.PI/4;	//	Calculate the angle at which the block will be moving
 
 		this.velocity = [BLOCK_FALL_SPEED*Math.cos(drop_angle), BLOCK_FALL_SPEED*Math.sin(drop_angle)];	//	Calculate the velocity of the block
+
+		let time_est = (window.innerHeight - this.position[1] + end_scale)/this.velocity[1];
+		this.scale_change_speed = (end_scale-this.scale)/time_est;
+
+		//limiter = 2*Math.random()-1;	//	Make bright blocks more likely to darken, and dark blocks more likely to lighten up.
+		//offset = Math.random();
+		this.brightness_change_speed = (this.brightness-end_brightness)/time_est;
+		//this.brightness_change_speed = ((2-Math.abs(limiter))*offset-1+limiter) * BLOCK_BRIGHTNESS_SPEED;
 
 
 		this.animation = null;
@@ -108,7 +114,6 @@ export class FallingBlockParticle {
 	}
 	update_progress(delta_time:number){
 		if(delta_time > 0){
-			console.log(`Animation update: delta_time = ${delta_time}`);
 			let state = this.calculate_next_state(delta_time);
 			this.position = state.position;
 			this.rotation = state.rotation;
@@ -143,7 +148,7 @@ export class FallingBlockParticle {
 		];
 		this.animation = this.node.animate(keyframes, pass_time);
 		this.animation.onfinish = ()=>{
-			this.update_progress(1*(this.animation?.currentTime as number));
+			this.update_progress(this.animation?.currentTime as number);
 		}
 		this.animation.onremove
 	}
@@ -154,6 +159,12 @@ export function AnimatedBackground(){
 		id:"anim-bg",
 		viewBox:`0 0 ${window.innerWidth} ${window.innerHeight}`
 	}) as SVGSVGElement;
+	let defs = createSvgNode("defs", {});
+	let gradient = createSvgNode("radialGradient", {id:"bomb-gradient"});
+	gradient.appendChild(createSvgNode("stop", { offset:0.05, style:"stop-color: rgb(57, 57, 57);"}));
+	gradient.appendChild(createSvgNode("stop", { offset:0.75, style:"stop-color: rgb(14, 14, 14);"}));
+	defs.appendChild(gradient);
+	svg.appendChild(defs);
 
 	document.body.appendChild(svg);
 
