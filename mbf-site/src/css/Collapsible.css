@@ -12,6 +12,7 @@
     align-items: center;
     height: 20px;
     transition: background-color 200ms;
+    cursor: pointer;
 }
 
 .collapsibleTitle:hover {
