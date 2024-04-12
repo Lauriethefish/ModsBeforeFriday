@@ -1,5 +1,4 @@
 import "./css/AnimatedBackground.css";
-import { useCallback, useEffect, useRef, useState } from 'react';
 
 //	Speed (in pixels per millisecond) at which the blocks will move
 const BLOCK_FALL_SPEED = 10 /1000;
