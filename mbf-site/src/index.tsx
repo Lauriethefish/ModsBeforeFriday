@@ -16,10 +16,8 @@ root.render(
   <App />
 );
 
-if(Animation){
-  const bodyElement:HTMLBodyElement = document.getElementsByTagName("body")[0];
-  
-  AnimatedBackground(bodyElement);
+if(Animation){  
+  AnimatedBackground();
 }
 
 // If you want to start measuring performance in your app, pass a function

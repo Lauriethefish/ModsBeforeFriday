@@ -216,7 +216,7 @@ export class FallingBlockParticle {
 	}
 }
 
-export function AnimatedBackground(){
+export function AnimatedBackground() {
 	let svg = createSvgNode("svg", {
 		id:"anim-bg",
 		viewBox:`0 0 ${window.innerWidth} ${window.innerHeight}`
@@ -234,7 +234,7 @@ export function AnimatedBackground(){
 		svg.setAttribute("viewBox", `0 0 ${window.innerWidth} ${window.innerHeight}`);
 	});
 
-	let particles:FallingBlockParticle[] = [];
+	let particles: FallingBlockParticle[] = [];
 
 	for(let i=0; i<(window.innerWidth*window.innerHeight*BLOCK_DENSITY); i++){
 		particles.push(new FallingBlockParticle(svg));
@@ -254,7 +254,7 @@ export function AnimatedBackground(){
 				}
 			};
 		}
-	},500);
+	}, 500);
 }
 
 function createSvgNode(tag:string, attributes:any = {}){
