@@ -13,11 +13,11 @@ import { ModStatus } from '../Messages';
 
 export function OptionsMenu({ device, quit, modStatus }: {
     device: Adb,
-    quit: (err: unknown) => void
+    quit: (err: unknown | null) => void
     modStatus: ModStatus}) {
     return <div className="container mainContainer" id="toolsContainer">
         <Collapsible title="Mod tools" defaultOpen>
-            <ModTools device={device} quit={() => quit(undefined)} />
+            <ModTools device={device} quit={() => quit(null)} />
         </Collapsible>
         <Collapsible title="ADB log" defaultOpen>
             <AdbLogger device={device}/>
