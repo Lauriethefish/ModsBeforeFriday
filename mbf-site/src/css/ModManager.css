@@ -87,7 +87,6 @@
 .mod-list {
     display: grid;
     grid-auto-columns: auto 1fr auto;
-    gap: 0.3em 1em;
     max-width: 1024px;
     grid-auto-rows: auto;
 }

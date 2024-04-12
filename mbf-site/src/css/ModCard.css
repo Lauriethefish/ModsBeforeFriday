@@ -55,13 +55,19 @@
 .descriptionText {
     font-size: smaller;
     grid-column: 2;
-    margin: auto 0px;
+    margin-right: 10px;
+    margin-left: 10px;
+    margin-top: auto;
+    text-wrap: wrap;
+    max-width: 30rem;
 }
 
 @media screen and (max-width: 700px) {
     .descriptionText {
         grid-row: 2;
         grid-column: 1/4;
+        margin-left: 0;
+        margin-right: 0;
     }
     #removeMod > img {
         width: 27px;
