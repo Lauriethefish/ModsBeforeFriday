@@ -67,7 +67,7 @@ pub enum Request {
         /// Settings such as debuggable = true and external storage permissions do not need to be specified here - 
         /// they will automatically be added no matter what.
         manifest_mod: ManifestMod,
-        
+
         // If this is true, patching will skip adding the modloader and libunity.so and will ONLY change permissions.
         // Patching will also not attempt to reinstall core mods.
         //
@@ -78,7 +78,7 @@ pub enum Request {
 
     // Attempts to fix a blackscreen issue by removing PlayerData.dat from `/sdcard/...../files/`.
     // (and copying it to /sdcard/ModsBeforeFriday so it isn't lost. It will also be copied to the datakeeper directory iff there isn't already one there)
-    // (This occurs when the permissions set by MBF copying the file lead to the gmae not being able to open it, typically on Quest 3,
+    // (This occurs when the permissions set by MBF copying the file lead to the game not being able to open it, typically on Quest 3,
     // unfortunately chmod 777 doesn't seem to fix the issue.)
     // Gives a `FixedPlayerData` response.
     FixPlayerData,

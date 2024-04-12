@@ -11,6 +11,7 @@ use crate::axml::{Attribute, AttributeValue, AxmlReader, AxmlWriter, Event};
 
 const ANDROID_NS_URI: &str = "http://schemas.android.com/apk/res/android";
 const RESOURCE_ID_TABLE: &[u8] = include_bytes!("resourceIds.bin");
+const METADATA_TAG: &str = "com.modsbeforefriday.modded";
 
 pub struct ManifestInfo {
     pub package_version: String
@@ -138,6 +139,7 @@ impl ManifestMod {
 
         let mut existing_features = HashSet::new();
         let mut existing_permissions = HashSet::new();
+        let mut skipping_subsequent = false;
 
         while let Some(mut ev) = reader.read_next_event().context("Failed to read original manifest")? {
             let is_end_of_manifest = match &mut ev { // Determine if the current event is the final tag: </manifest>
@@ -145,14 +147,17 @@ impl ManifestMod {
                     if &**name == "application" && self.debuggable {
                         info!("Setting debuggable to `{}`", self.debuggable);
                         modified |= Self::apply_debuggable(attributes, res_ids);
-                    }   else if &**name == "uses-permission" {
-                        // Silently fail for elements without a name attribute
-                        // TODO: figure out why some elements in the Beat Saber manifest don't have one.
+                    }   else if &**name == "meta-data" && Self::get_name_attribute(attributes) // Locate existing modded metadata tag
+                        .is_ok_and(|name| &*name == METADATA_TAG) {
+                        skipping_subsequent = true; // Skip adding permissions/feats to the manifest that were added last time we patched.
+                    }   else if &**name == "uses-permission" && !skipping_subsequent {
+                        // Silently fail for permissions without a name attribute
+                        // TODO: figure out why some permissions/features in the Beat Saber manifest don't have one.
                         let _ = Self::get_name_attribute(attributes)
-                            .map(|perm| existing_permissions.insert(perm));
-                    }   else if &**name == "uses-feature" {
+                            .map(|permission| existing_permissions.insert(permission));
+                    }   else if &**name == "uses-feature" && !skipping_subsequent {
                         let _ = Self::get_name_attribute(attributes)
-                        .map(|feature| existing_features.insert(feature));
+                            .map(|feature| existing_features.insert(feature));
                     }
                     false
                 },
@@ -162,9 +167,17 @@ impl ManifestMod {
             };
 
             if is_end_of_manifest {
-                // Write out permissions and features just before the final (closing) tag
                 let uses_feature: Rc<str> = "uses-feature".into();
                 let uses_permission: Rc<str> = "uses-permission".into();
+                // Before writing out the permissions and features, write a metadata tag indicating that the app was modded by MBF.
+                write_valued_element(writer,
+                    "meta-data".into(),
+                    METADATA_TAG.to_string().into(),
+                    AttributeValue::Boolean(true),
+                    res_ids
+                );
+
+                // Write out permissions and features just before the final (closing) tag
                 for feature in &self.add_features {
                     if !existing_features.contains(feature) {
                         info!("Adding feature `{feature}`");
@@ -179,10 +192,14 @@ impl ManifestMod {
                         modified = true;
                     }
                 }
+                // Make sure that the final closing tag gets written
+                skipping_subsequent = false;
             }
 
-            writer.write_event(ev);
-        };
+            if !skipping_subsequent {
+                writer.write_event(ev);
+            }
+        }
 
         Ok(modified)
     }
@@ -222,6 +239,29 @@ impl ResourceIds {
     }
 }
 
+// Writes an element with the "name" and "value attributes"
+fn write_valued_element<W: Write>(writer: &mut AxmlWriter<W>,
+    element_name: Rc<str>,
+    name: Rc<str>,
+    value: AttributeValue,
+    res_ids: &ResourceIds) {
+    writer.write_event(Event::StartElement {
+        attributes: vec![
+            name_attribute(name, res_ids),
+            value_attribute(value, res_ids)
+        ],
+        name: element_name.clone(),
+        namespace: None,
+        line_num: 0
+    });
+    writer.write_event(Event::EndElement {
+        name: element_name,
+        namespace: None,
+        line_num: 0
+    })
+}
+
+// Writes an element with the "name" attribute.
 fn write_named_element<W: Write>(writer: &mut AxmlWriter<W>, element_name: Rc<str>, name_value: Rc<str>, res_ids: &ResourceIds) {
     writer.write_event(Event::StartElement {
         attributes: vec![name_attribute(name_value, res_ids)],
@@ -238,6 +278,10 @@ fn write_named_element<W: Write>(writer: &mut AxmlWriter<W>, element_name: Rc<st
 
 fn name_attribute(name: Rc<str>, res_ids: &ResourceIds) -> Attribute {
     android_attribute("name", AttributeValue::String(name), res_ids)
+}
+
+fn value_attribute(value: AttributeValue, res_ids: &ResourceIds) -> Attribute {
+    android_attribute("value", value, res_ids)
 }
 
 fn android_attribute(name: &str, value: AttributeValue, res_ids: &ResourceIds) -> Attribute {
