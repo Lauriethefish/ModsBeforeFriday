@@ -19,6 +19,15 @@
     background-color: rgb(25, 25, 25);
 }
 
+@media screen and (max-width: 700px) {
+    .collapsible {
+        background-color: rgb(20, 20, 20);
+    }
+    .collapsibleTitle {
+        background-color: rgb(35, 35, 35);
+    }
+}
+
 .collapsibleTitle > p {
     font-size: 20px;
     margin-left: auto;
