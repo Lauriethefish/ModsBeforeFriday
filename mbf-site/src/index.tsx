@@ -16,9 +16,7 @@ root.render(
   <App />
 );
 
-if(Animation){
-  const bodyElement:HTMLBodyElement = document.getElementsByTagName("body")[0];
-  
+if(Animation){  
   AnimatedBackground();
 }
 

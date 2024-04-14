@@ -40,6 +40,3 @@ ar = "<contents OF AR_aarch64-linux-android environment variable>"
 ### Debugging site
 To serve the site for testing, navigate to `./mbf-site` and run `yarn start`.
 (you may need to `yarn install` first).
-
-### TODO LIST
-- Add automatic downgrading, will be needed in the future.

@@ -16,13 +16,13 @@ h3 {
 .container {
     background-color: rgba(0, 0, 0, 0.9);
     padding: 20px;
+    margin: 5px;
     border-radius: 10px;
     width: fit-content;
 }
 
 .mainContainer {
     max-width: 40rem;
-    margin: 5px;
 }
 
 button {
@@ -47,4 +47,13 @@ button:hover {
 @font-face {
     font-family: Consolas;
     src: local('Consolas'), format("ttf"), url("../fonts/Consolas.ttf")
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+.fadeIn {
+    animation: fadeIn 0.5s;
 }

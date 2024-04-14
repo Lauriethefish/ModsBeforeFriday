@@ -67,10 +67,12 @@ function ChooseDevice() {
       </>
     }
   } else if(authing) {
-    return <div className='container mainContainer'>
+    return <div className='container mainContainer fadeIn'>
       <h2>Allow connection in headset</h2>
       <p>Put on your headset and click <b>"Always allow from this computer"</b></p>
       <p>(You should only have to do this once.)</p>
+      <h4>Already pressed allow?</h4>
+      <p>Sometimes the connection fails, despite you allowing access in your Quest. <br/>If this happens, try refreshing the page and re-selecting your device.</p>
     </div>
   } else  {
     return <>
@@ -149,7 +151,7 @@ function isViewingOnWindows(): boolean {
 }
 
 function isViewingOnMobile() {
-  return (navigator.maxTouchPoints ?? 0) > 0;
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 }
 
 // Kindly provided by Pierre
@@ -196,7 +198,7 @@ function SupportedBrowsers() {
     return <>
       <ul>
         <li>Google Chrome for Android 122 or newer</li>
-        <li>Opera Mobile 80 or newer</li>
+        <li>Edge for Android 123 or newer</li>
       </ul>
       <h3 className='fireFox'>Firefox for Android is NOT supported</h3>
     </>

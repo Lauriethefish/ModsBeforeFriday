@@ -30,9 +30,10 @@ export function DeviceModder(props: DeviceModderProps) {
             .catch(err => quit(err));
     }, [device, quit]);
 
+    // Fun "ocean" of IF statements, hopefully covering every possible state of an installation!
     if(modStatus === null) {
-        return <div className='container mainContainer'>
-            <h2>Checking Beat Saber installation</h2>
+        return <div className='container mainContainer fadeIn'>
+            <h2>Checking Beat Saber installation...</h2>
         </div>
     }   else if(modStatus.app_info === null) {
         return <div className='container mainContainer'>
@@ -54,6 +55,10 @@ export function DeviceModder(props: DeviceModderProps) {
 
         if(downgradeVersion === undefined) {
             return <NotSupported version={modStatus.app_info.version} device={device} quit={() => quit(undefined)} />
+        }   else if(modStatus.app_info.loader_installed !== null) {
+            // App is already patched, and we COULD in theory downgrade this version normally, but since it has been modified, the diffs will not work.
+            // Therefore, they need to reinstall the latest version.
+            return <IncompatibleAlreadyModded installedVersion={modStatus.app_info.version} device={device} quit={() => quit(undefined)}/>
         }   else    {
             return <PatchingMenu 
                 modStatus={modStatus}
@@ -69,7 +74,7 @@ export function DeviceModder(props: DeviceModderProps) {
             return <>
                 <div className='container mainContainer'>
                     <h1>App is modded</h1>
-                    <p>Beat Saber is already modded on your Quest, and the version that's installed is compatible with mods.</p>
+                    <p>Your Beat Saber install is modded, and its version is compatible with mods.</p>
 
                     <InstallStatus
                         modStatus={modStatus}
@@ -221,7 +226,7 @@ function DowngradeMessage({ toVersion }: { toVersion: string }) {
         <p>MBF has detected that your version of Beat Saber doesn't support mods!</p>
 
         <p>Fortunately for you, your version can be downgraded automatically to the latest moddable version: {trimGameVersion(toVersion)}</p>
-        <p><span className='warning'>NOTE:</span> By downgrading, you will lose access to any DLCs or other content that is not present in version {trimGameVersion(toVersion)}. If you decide to stop using mods and reinstall vanilla Beat Saber, however, then you will get this content back.</p>
+        <p><span className='warning'><b>NOTE:</b></span> By downgrading, you will lose access to any DLCs or other content that is not present in version {trimGameVersion(toVersion)}. If you decide to stop using mods and reinstall vanilla Beat Saber, however, then you will get this content back.</p>
     </>
 }
 
@@ -264,6 +269,21 @@ function IncompatibleLoader(props: IncompatibleLoaderProps) {
             quit();
         }}>Uninstall Beat Saber</button>
     </div>
+}
+
+function IncompatibleAlreadyModded({ device, quit, installedVersion }: { device: Adb,
+    quit: () => void, installedVersion: string }) {
+        return <div className='container mainContainer'>
+            <h1>Incompatible Version Patched</h1>
+
+            <p>Your Beat Saber app has a modloader installed, but the game version ({trimGameVersion(installedVersion)}) has no support for mods!</p>
+            <p>To fix this, uninstall Beat Saber and reinstall the latest version. MBF can then downgrade this automatically to the latest moddable version.</p>
+
+            <button onClick={async () => {
+                await uninstallBeatSaber(device);
+                quit();
+            }}>Uninstall Beat Saber</button>
+        </div>
 }
 
 function NextSteps() {
