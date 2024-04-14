@@ -11,6 +11,7 @@ import { Bounce, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 
+
 async function connect(
   setAuthing: () => void): Promise<Adb | null> {
  const device_manager = new AdbDaemonWebUsbDeviceManager(navigator.usb);
