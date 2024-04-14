@@ -18,7 +18,7 @@ pem = "3.0.3"
 anyhow = "1.0.79"
 libflate = "2.0.0"
 crc = "3.0.1"
-serde = { version = "1.0.197", features = ["derive"] }
+serde = { version = "1.0.197", features = ["derive", "rc"] }
 serde_json = "1.0.115"
 semver = { version = "1.0.22", features = ["serde"] }
 ureq = "2.9.6"

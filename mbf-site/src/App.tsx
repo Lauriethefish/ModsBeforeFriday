@@ -12,6 +12,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import { calculateBlockCount } from './AnimatedBackground';
 
 
+
 async function connect(
   setAuthing: () => void): Promise<Adb | null> {
  const device_manager = new AdbDaemonWebUsbDeviceManager(navigator.usb);
@@ -24,8 +25,13 @@ async function connect(
   try {
     connection = await quest.connect();
   } catch(err) {
-    throw new Error("Some other app is trying to access your quest, e.g. SideQuest." + 
-    " Please restart your computer to close any SideQuest background processes, then try again. (Running `adb kill-server` will fix this.)");
+    // Some other ADB daemon is hogging the connection, so we can't get to the Quest.
+    // On Windows, this can be easily fixed with a Win + R and a command. 
+    // On Mac/Linux/Android, using the terminal is harder and so we will just instruct to restart their device.
+    const fixInstructions = isViewingOnWindows() ? "To fix this, close SideQuest if you have it open, press Win + R and type the following text, and finally press enter.\ntaskkill /IM adb.exe /F\nAlternatively, restart your computer." 
+      : `To fix this, restart your ${isViewingOnMobile() ? "phone" : "computer"}.`
+
+    throw new Error("Some other app is trying to access your quest, e.g. SideQuest.\n" + fixInstructions);
   }
   const keyStore: AdbWebCredentialStore = new AdbWebCredentialStore("ModsBeforeFriday");
 
@@ -45,15 +51,22 @@ function ChooseDevice() {
   const [connectError, setConnectError] = useState(null as string | null);
 
   if(chosenDevice !== null) {
-    return <>
-      <DeviceModder device={chosenDevice} quit={(err) => {
-        if(err != null) {
-          setConnectError(String(err));
-        }
-        chosenDevice.close().catch(err => console.warn("Failed to close device " + err));
-        setChosenDevice(null);
-      }} />
-    </>
+    if(chosenDevice.banner.model === "Quest") { // "Quest" not "Quest 2/3"
+      return <div className='container mainContainer'>
+        <h1>Quest 1 Not Supported</h1>
+        <p>ModsBeforeFriday has detected that you're using a Quest 1, which is no longer supported for modding Beat Saber.</p>
+      </div>
+    } else {
+      return <>
+        <DeviceModder device={chosenDevice} quit={(err) => {
+          if(err != null) {
+            setConnectError(String(err));
+          }
+          chosenDevice.close().catch(err => console.warn("Failed to close device " + err));
+          setChosenDevice(null);
+        }} />
+      </>
+    }
   } else if(authing) {
     return <div className='container mainContainer'>
       <h2>Allow connection in headset</h2>
@@ -74,9 +87,11 @@ function ChooseDevice() {
             try {
               device = await connect(() => setAuthing(true));
             } catch(e) {
+              console.log("Failed to connect: " + e);
               setConnectError(String(e));
               return;
             }
+            
             setAuthing(false);
             if(device !== null) {
               setChosenDevice(device);
@@ -127,6 +142,11 @@ function App() {
       transition={Bounce}
       hideProgressBar={true} />
   </div>
+}
+
+function isViewingOnWindows(): boolean {
+  // Deprecated but still works for our purposes.
+  return navigator.appVersion.indexOf("Win") != -1;
 }
 
 function isViewingOnMobile() {

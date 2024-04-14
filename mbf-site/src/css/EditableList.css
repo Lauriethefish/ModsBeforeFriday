@@ -1,0 +1,44 @@
+#editableList {
+    font-family: Consolas;
+    background-color: rgb(20, 20, 20);
+    border-radius: 5px;
+    padding: 5px;
+}
+
+#editableList > p {
+    margin: 0px;
+    font-size: 15px;
+    cursor: pointer;
+}
+
+#editableList > p:hover {
+    text-decoration: line-through;
+}
+
+#editableList > input[type=text] {
+    background-color: transparent;
+    color: white;
+    font-family: Consolas;
+    border-color: transparent;
+    font-size: 15px;
+    width: 100%;
+}
+
+#editableList > input[type=text]:invalid {
+    color: rgb(252, 74, 74);
+}
+
+#listTitle {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    margin-top: 0px;
+    gap: 10px;
+}
+
+#listTitle > button {
+    width: 30px;
+    height: 30px;
+    padding: 0px;
+    font-size: x-large;
+}

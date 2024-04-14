@@ -25,7 +25,7 @@ export function Modal(props: ModalProps) {
 interface ErrorModalProps {
     isVisible: boolean,
     title: string,
-    description: string,
+    description?: string,
     onClose: () => void
 }
 
@@ -35,7 +35,7 @@ export function ErrorModal(props: ErrorModalProps) {
             <img src={AlertIcon} alt="A warning triangle" />
             <h1>{props.title}</h1>
         </div>
-        <p>{props.description}</p>
+        {props.description?.split('\n').map(line => <p key={line}>{line}</p>)}
 
         <div className="confirmButtons">
             <button onClick={props.onClose}>OK</button>

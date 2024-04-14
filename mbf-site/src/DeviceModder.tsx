@@ -6,7 +6,9 @@ import './css/DeviceModder.css';
 import { LogWindow, useLog } from './components/LogWindow';
 import { ErrorModal, Modal } from './components/Modal';
 import { ModManager } from './components/ModManager';
-import { trimGameVersion } from './Models';
+import { ManifestMod, trimGameVersion } from './Models';
+import { PermissionsMenu } from './components/PermissionsMenu';
+import { Collapsible } from './components/Collapsible';
 
 interface DeviceModderProps {
     device: Adb,
@@ -78,11 +80,11 @@ export function DeviceModder(props: DeviceModderProps) {
                     <NextSteps />
                 </div>
 
-                <ModManager mods={modStatus.installed_mods}
+                <ModManager modStatus={modStatus}
                     setMods={mods => setModStatus({ ...modStatus, installed_mods: mods })}
                     device={device}
                     gameVersion={modStatus.app_info.version}
-                    quit={() => quit(undefined)}
+                    quit={quit}
                 />
             </>
         }   else    {
@@ -159,13 +161,21 @@ function PatchingMenu(props: PatchingMenuProps) {
     const [isPatching, setIsPatching] = useState(false);
     const [logEvents, addLogEvent] = useLog();
     const [patchingError, setPatchingError] = useState(null as string | null);
+    const [manifestMod, setManifestMod] = useState({
+        add_permissions: [],
+        add_features: []
+    } as ManifestMod);
 
     const { onCompleted, modStatus, device, downgradingTo } = props;
     if(!isPatching) {
         return <div className='container mainContainer'>
             {downgradingTo !== null && <DowngradeMessage toVersion={downgradingTo}/>}
             {downgradingTo === null && <VersionSupportedMessage version={modStatus.app_info!.version} />}
-
+            
+            <Collapsible title="Change App Permissions">
+                <p>Certain mods may find it useful for the app to request microphone permissions or access to the headset cameras. Due to the privacy implications, you need to enable permissions here if you want them.</p>
+                <PermissionsMenu manifestMod={manifestMod} setManifestMod={mod => setManifestMod(mod)} />
+            </Collapsible>
             <h2 className='warning'>READ CAREFULLY</h2>
             <p>Mods and custom songs are not supported by Beat Games. You may experience bugs and crashes that you wouldn't in a vanilla game.</p>
             <b>In addition, by modding the game you will lose access to both vanilla leaderboards and vanilla multiplayer.</b> (Modded leaderboards/servers are available.)
@@ -173,7 +183,7 @@ function PatchingMenu(props: PatchingMenuProps) {
             <button className="modButton" onClick={async () => {
                 setIsPatching(true);
                 try {
-                    onCompleted(await patchApp(device, modStatus, downgradingTo, addLogEvent));
+                    onCompleted(await patchApp(device, modStatus, downgradingTo, manifestMod, false, addLogEvent));
                 } catch(e) {
                     setPatchingError(String(e));
                     setIsPatching(false);
@@ -199,7 +209,7 @@ function PatchingMenu(props: PatchingMenuProps) {
 function VersionSupportedMessage({ version }: { version: string }) {
     return <>
         <h1>Install Custom Songs</h1>
-        <p>Your app has version: {version}, which is supported by mods!</p>
+        <p>Your app has version {trimGameVersion(version)}, which is supported by mods!</p>
         <p>To get your game ready for custom songs, ModsBeforeFriday will next patch your Beat Saber app and install some essential mods.
         Once this is done, you will be able to manage your custom songs <b>inside the game.</b></p>
     </>
@@ -210,8 +220,8 @@ function DowngradeMessage({ toVersion }: { toVersion: string }) {
         <h1>Downgrade and set up mods</h1>
         <p>MBF has detected that your version of Beat Saber doesn't support mods!</p>
 
-        <p>Fortunately for you, your version can be downgraded automatically to the latest moddable version: {toVersion}</p>
-        <p><span className='warning'>NOTE:</span> By downgrading, you will lose access to any DLCs or other content that is not present in version {toVersion}. If you decide to stop using mods and reinstall vanilla Beat Saber, however, then you will get this content back.</p>
+        <p>Fortunately for you, your version can be downgraded automatically to the latest moddable version: {trimGameVersion(toVersion)}</p>
+        <p><span className='warning'>NOTE:</span> By downgrading, you will lose access to any DLCs or other content that is not present in version {trimGameVersion(toVersion)}. If you decide to stop using mods and reinstall vanilla Beat Saber, however, then you will get this content back.</p>
     </>
 }
 

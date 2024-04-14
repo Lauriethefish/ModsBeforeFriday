@@ -10,22 +10,23 @@ import '../css/ModManager.css';
 import { LogEventSink, importFile, importModUrl, removeMod, setModStatuses } from "../Agent";
 import { toast } from "react-toastify";
 import { ModRepoBrowser } from "./ModRepoBrowser";
-import { ImportedMod } from "../Messages";
+import { ImportedMod, ModStatus } from "../Messages";
 import { OptionsMenu } from "./OptionsMenu";
 
 interface ModManagerProps {
-    mods: Mod[],
     gameVersion: string,
-    setMods: (mods: Mod[]) => void
+    setMods: (mods: Mod[]) => void,
+    modStatus: ModStatus,
     device: Adb,
-    quit: () => void
+    quit: (err: unknown) => void
 }
 
 type SelectedMenu = 'add' | 'current' | 'options';
 
 export function ModManager(props: ModManagerProps) {
-    const { mods, setMods, device, gameVersion, quit } = props;
-    
+    const { modStatus, setMods, device, gameVersion, quit } = props;
+    const mods = modStatus.installed_mods;
+
     const [isWorking, setWorking] = useState(false);
     const [logEvents, addLogEvent] = useLog();
     const [modError, setModError] = useState(null as string | null);
@@ -62,7 +63,7 @@ export function ModManager(props: ModManagerProps) {
         {menu === 'options' && <OptionsMenu
             device={device}
             quit={quit}
-            setError={err => setModError(err)}
+            modStatus={modStatus}
          />}
         
         <ErrorModal isVisible={modError != null}

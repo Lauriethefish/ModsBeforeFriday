@@ -1,0 +1,7 @@
+#namedSlider {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: first baseline;
+    gap: 10px;
+}

@@ -17,9 +17,14 @@ const LIB_UNITY_PATH: &str = "lib/arm64-v8a/libunity.so";
 const DIFF_DOWNLOAD_ATTEMPTS: u32 = 3;
 
 // Mods the currently installed version of the given app and reinstalls it, without doing any downgrading.
-pub fn mod_current_apk(temp_path: &Path, app_info: &AppInfo) -> Result<()> {
-    info!("Downloading unstripped libunity.so (this could take a minute)");
-    let libunity_path = save_libunity(temp_path, &app_info.version).context("Failed to save libunity.so")?;
+// If `manifest_only` is true, patching will only attempt to update permissions/features 
+pub fn mod_current_apk(temp_path: &Path, app_info: &AppInfo, manifest_mod: ManifestMod, manifest_only: bool) -> Result<()> {
+    let libunity_path = if manifest_only {
+        None
+    }   else    {
+        info!("Downloading unstripped libunity.so (this could take a minute)");
+        save_libunity(temp_path, &app_info.version).context("Failed to save libunity.so")?
+    };
 
     kill_app()?;
 
@@ -32,12 +37,15 @@ pub fn mod_current_apk(temp_path: &Path, app_info: &AppInfo) -> Result<()> {
     std::fs::create_dir(&obb_backup)?;
     let obb_backups = save_obbs(Path::new(APP_OBB_PATH), &obb_backup)?;
 
-    patch_and_reinstall(libunity_path, &temp_apk_path, temp_path, obb_backups)?;
+    patch_and_reinstall(libunity_path, &temp_apk_path, temp_path, obb_backups, manifest_mod, manifest_only)?;
     Ok(())
 }
 
 // Downgrades the APK/OBB files for the given app using the diffs provided, then reinstalls the app.
-pub fn downgrade_and_mod_apk(temp_path: &Path, app_info: &AppInfo, diffs: VersionDiffs) -> Result<()> {
+pub fn downgrade_and_mod_apk(temp_path: &Path,
+    app_info: &AppInfo,
+    diffs: VersionDiffs,
+    manifest_mod: ManifestMod) -> Result<()> {
     // Download libunity.so *for the downgraded version*
     info!("Downloading unstripped libunity.so (this could take a minute)");
     let libunity_path = save_libunity(temp_path, &diffs.to_version)
@@ -73,7 +81,7 @@ pub fn downgrade_and_mod_apk(temp_path: &Path, app_info: &AppInfo, diffs: Versio
         obb_backup_paths.push(obb_backup_path);
     }
 
-    patch_and_reinstall(libunity_path, &temp_apk_path, temp_path, obb_backup_paths)?;
+    patch_and_reinstall(libunity_path, &temp_apk_path, temp_path, obb_backup_paths, manifest_mod, false)?;
     Ok(())
 }
 
@@ -88,9 +96,11 @@ pub fn kill_app() -> Result<()> {
 fn patch_and_reinstall(libunity_path: Option<PathBuf>,
     temp_apk_path: &Path,
     temp_path: &Path,
-    obb_paths: Vec<PathBuf>) -> Result<()> {
+    obb_paths: Vec<PathBuf>,
+    manifest_mod: ManifestMod,
+    manifest_only: bool) -> Result<()> {
     info!("Patching APK at {:?}", temp_path);
-    patch_apk_in_place(&temp_apk_path, libunity_path)?;
+    patch_apk_in_place(&temp_apk_path, libunity_path, manifest_mod, manifest_only)?;
 
     if Path::new(PLAYER_DATA_PATH).exists() {
         info!("Backing up player data");
@@ -183,7 +193,7 @@ fn apply_diff(from_path: &Path,
     }
 
     // Carry out the downgrade
-    info!("Applying patch");
+    info!("Applying patch (This step may take a few minutes)");
     let mut output_handle = OpenOptions::new()
         .truncate(true)
         .create(true)
@@ -330,37 +340,42 @@ pub fn install_modloader() -> Result<()> {
     Ok(())
 }
 
-fn patch_apk_in_place(path: impl AsRef<Path>, libunity_path: Option<PathBuf>) -> Result<()> {
+fn patch_apk_in_place(path: impl AsRef<Path>, libunity_path: Option<PathBuf>, manifest_mod: ManifestMod, manifest_only: bool) -> Result<()> {
     let file = OpenOptions::new()
         .read(true)
         .write(true)
         .open(path)
         .expect("Failed to open APK");
-    
+        
     let mut zip = zip::ZipFile::open(file).unwrap();
 
-    patch_manifest(&mut zip).context("Failed to patch manifest")?;
+    info!("Applying manifest mods");
+    patch_manifest(&mut zip, manifest_mod).context("Failed to patch manifest")?;
 
     let (priv_key, cert) = signing::load_cert_and_priv_key(DEBUG_CERT_PEM);
 
-    zip.delete_file(LIB_MAIN_PATH);
-    zip.write_file(LIB_MAIN_PATH, &mut Cursor::new(LIB_MAIN), FileCompression::Deflate)?;
-    add_modded_tag(&mut zip, ModTag {
-        patcher_name: "ModsBeforeFriday".to_string(),
-        patcher_version: Some("0.1.0".to_string()), // TODO: Get this from the frontend maybe?
-        modloader_name: "Scotland2".to_string(), // TODO: This should really be Libmainloader because SL2 isn't inside the APK
-        modloader_version: None // Temporary, but this field is universally considered to be option so this should be OK.
-    })?;
+    if !manifest_only {
+        info!("Adding libmainloader");
+        zip.delete_file(LIB_MAIN_PATH);
+        zip.write_file(LIB_MAIN_PATH, &mut Cursor::new(LIB_MAIN), FileCompression::Deflate)?;
+        add_modded_tag(&mut zip, ModTag {
+            patcher_name: "ModsBeforeFriday".to_string(),
+            patcher_version: Some("0.1.0".to_string()), // TODO: Get this from the frontend maybe?
+            modloader_name: "Scotland2".to_string(), // TODO: This should really be Libmainloader because SL2 isn't inside the APK
+            modloader_version: None // Temporary, but this field is universally considered to be option so this should be OK.
+        })?;
 
-    match libunity_path {
-        Some(unity_path) => {
-            let mut unity_stream = File::open(unity_path)?;
-            zip.write_file(LIB_UNITY_PATH, &mut unity_stream, FileCompression::Deflate)?;
-        },
-        None => warn!("No unstripped unity added to the APK! This might cause issues later")
+        info!("Adding unstripped libunity.so");
+        match libunity_path {
+            Some(unity_path) => {
+                let mut unity_stream = File::open(unity_path)?;
+                zip.write_file(LIB_UNITY_PATH, &mut unity_stream, FileCompression::Deflate)?;
+            },
+            None => warn!("No unstripped unity added to the APK! This might cause issues later")
+        }
     }
 
-
+    info!("Signing");
     zip.save_and_sign_v2(&cert, &priv_key).context("Failed to save APK")?;
 
     Ok(())
@@ -402,23 +417,28 @@ pub fn get_modloader_installed(apk: &mut ZipFile<File>) -> Result<Option<ModLoad
     }
 }
 
-fn patch_manifest(zip: &mut ZipFile<File>) -> Result<()> {
+fn patch_manifest(zip: &mut ZipFile<File>, additional_properties: ManifestMod) -> Result<()> {
     let contents = zip.read_file("AndroidManifest.xml").context("APK had no manifest")?;
     let mut cursor = Cursor::new(contents);
     let mut reader = AxmlReader::new(&mut cursor).context("Failed to read AXML manifest")?;
     let mut data_output = Cursor::new(Vec::new());
     let mut writer = AxmlWriter::new(&mut data_output);
 
-    let manifest = ManifestMod::new()
+    let manifest = additional_properties
         .debuggable(true)
         .with_permission("android.permission.MANAGE_EXTERNAL_STORAGE");
 
     let res_ids = ResourceIds::load()?;
     
     
-    manifest.apply_mod(&mut reader, &mut writer, &res_ids).context("Failed to apply mod")?;
+    let modified = manifest.apply_mod(&mut reader, &mut writer, &res_ids).context("Failed to apply mod")?;
 
     writer.finish().context("Failed to save AXML manifest")?;
+
+    if !modified {
+        info!("Manifest unmodified, not saving");
+        return Ok(());
+    }
 
     
     cursor.seek(std::io::SeekFrom::Start(0))?;

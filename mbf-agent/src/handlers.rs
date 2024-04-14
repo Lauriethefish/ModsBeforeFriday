@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use crate::{download_file, DOWNLOADS_PATH, PLAYER_DATA_BAK_PATH, PLAYER_DATA_PATH, SONGS_PATH, TEMP_PATH};
 use crate::{axml::AxmlReader, patching, zip::ZipFile};
 use crate::external_res::{get_diff_index, JsonPullError};
-use crate::manifest::ManifestInfo;
+use crate::manifest::{ManifestInfo, ManifestMod};
 use crate::mod_man::ModManager;
 use crate::requests::{AppInfo, CoreModsInfo, ModModel, Request, Response};
 use anyhow::{anyhow, Context, Result};
@@ -15,7 +15,8 @@ use log::{error, info, warn};
 pub fn handle_request(request: Request) -> Result<Response> {
     match request {
         Request::GetModStatus => handle_get_mod_status(),
-        Request::Patch { downgrade_to } => handle_patch(downgrade_to),
+        Request::Patch { downgrade_to , remodding, manifest_mod} => 
+            handle_patch(downgrade_to, remodding, manifest_mod),
         Request::SetModsEnabled {
             statuses
         } => run_mod_action(statuses),
@@ -349,7 +350,7 @@ fn handle_fix_player_data() -> Result<Response> {
     }
 }
 
-fn handle_patch(downgrade_to: Option<String>) -> Result<Response> {
+fn handle_patch(downgrade_to: Option<String>, repatch: bool, manifest_mod: ManifestMod) -> Result<Response> {
     let app_info = get_app_info()?
         .ok_or(anyhow!("Cannot patch when app not installed"))?;
 
@@ -364,9 +365,11 @@ fn handle_patch(downgrade_to: Option<String>) -> Result<Response> {
             .next()
             .ok_or(anyhow!("No diff existed to go from {} to {}", app_info.version, to_version))?;
 
-        patching::downgrade_and_mod_apk(Path::new(TEMP_PATH), &app_info, version_diffs)
+        patching::downgrade_and_mod_apk(Path::new(TEMP_PATH), &app_info, version_diffs, manifest_mod)
+            .context("Failed to downgrade nad patch APK")
     }   else {
-        patching::mod_current_apk(Path::new(TEMP_PATH), &app_info).context("Failed to patch APK")
+        patching::mod_current_apk(Path::new(TEMP_PATH), &app_info, manifest_mod, repatch)
+            .context("Failed to patch APK")
     };
 
     // No matter what, make sure that all temporary files are gone.
@@ -379,13 +382,16 @@ fn handle_patch(downgrade_to: Option<String>) -> Result<Response> {
     patching::install_modloader().context("Failed to save modloader")?;
 
     let mut mod_manager = ModManager::new();
-    info!("Wiping all existing mods");
-    mod_manager.wipe_all_mods().context("Failed to wipe existing mods")?;
-    mod_manager.load_mods()?; // Should load no mods.
-
-    install_core_mods(&mut mod_manager, get_app_info()?
-        .expect("Beat Saber should be installed after patching"))?;    
-
+    
+    if !repatch {
+        info!("Wiping all existing mods");
+        mod_manager.wipe_all_mods().context("Failed to wipe existing mods")?;
+        mod_manager.load_mods()?; // Should load no mods.
+    
+        install_core_mods(&mut mod_manager, get_app_info()?
+            .expect("Beat Saber should be installed after patching"))?;
+    }
+    
     Ok(Response::Mods { installed_mods: get_mod_models(mod_manager) })
 }
 

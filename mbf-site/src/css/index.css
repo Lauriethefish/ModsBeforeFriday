@@ -22,6 +22,7 @@ h3 {
 
 .mainContainer {
     max-width: 40rem;
+    margin: 5px;
 }
 
 button {
@@ -41,4 +42,9 @@ button:hover {
 
 .warning {
     color: red
+}
+
+@font-face {
+    font-family: Consolas;
+    src: local('Consolas'), format("ttf"), url("../fonts/Consolas.ttf")
 }

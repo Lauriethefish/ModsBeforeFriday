@@ -1,0 +1,18 @@
+.repatch {
+    font-size: large;
+}
+
+#toolsContainer {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+#toolsContainer button {
+    margin-top: 3px;
+    margin-bottom: 3px;
+}
+
+#modTools {
+    padding-top: 10px;
+}

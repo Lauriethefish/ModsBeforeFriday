@@ -13,6 +13,11 @@ interface CoreMod {
     verison: string
 }
 
+interface ManifestMod {
+    add_permissions: string[],
+    add_features: string[],
+}
+
 interface VersionedCoreMods {
     mods: [CoreMod]
 }
@@ -23,7 +28,8 @@ export type {
     Mod,
     CoreMod,
     VersionedCoreMods,
-    CoreModIndex
+    CoreModIndex,
+    ManifestMod
 }
 
 // Removes the build number, i.e. `_<big number>` suffix from the given game version.

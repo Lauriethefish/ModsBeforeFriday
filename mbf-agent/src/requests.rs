@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use semver::Version;
 use serde::{Deserialize, Serialize};
 
-use crate::mod_man::Mod;
+use crate::{manifest::ManifestMod, mod_man::Mod};
 
 #[derive(Serialize)]
 pub struct AppInfo {
@@ -52,19 +52,33 @@ pub enum Request {
     ImportModUrl {
         from_url: String,
     },
-    /// - Patches Beat Saber to add support for modloaders. (will not patch again if the app is already modded)
-    /// - Optionally, downgrades the game if downgrade_to is Some
+
+    /// - Patches Beat Saber to add support for modloaders.
+    /// - Optionally, downgrades the game to the given version if downgrade_to is Some
     /// - Saves the modloader to the appropriate locatioon on the Quest.
+    /// 
+    /// <OPTIONALLY, if `install_core_mods` is set to `true`>
     /// - Wipes any existing mods.
     /// - Installs the core mods for the current version.
     /// Returns a `Mods` response to update the frontend with the newly installed core mods.
     Patch {
-        downgrade_to: Option<String>
+        downgrade_to: Option<String>,
+        /// Any additional settings to add to the app manifest.
+        /// Settings such as debuggable = true and external storage permissions do not need to be specified here - 
+        /// they will automatically be added no matter what.
+        manifest_mod: ManifestMod,
+
+        // If this is true, patching will skip adding the modloader and libunity.so and will ONLY change permissions.
+        // Patching will also not attempt to reinstall core mods.
+        //
+        // TODO: in the future, it might make sense for remodding to detect a change in the libunity.so (harder) 
+        // or libmainloader (easier) so that these can be easily updated.
+        remodding: bool
     },
 
     // Attempts to fix a blackscreen issue by removing PlayerData.dat from `/sdcard/...../files/`.
     // (and copying it to /sdcard/ModsBeforeFriday so it isn't lost. It will also be copied to the datakeeper directory iff there isn't already one there)
-    // (This occurs when the permissions set by MBF copying the file lead to the gmae not being able to open it, typically on Quest 3,
+    // (This occurs when the permissions set by MBF copying the file lead to the game not being able to open it, typically on Quest 3,
     // unfortunately chmod 777 doesn't seem to fix the issue.)
     // Gives a `FixedPlayerData` response.
     FixPlayerData,
