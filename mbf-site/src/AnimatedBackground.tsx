@@ -23,7 +23,7 @@ const BLOCK_ANIMATION_AVERAGE_LIFETIME = 5000;
 const BLOCK_ANIMATION_LIFETIME_RANGE = 1000;
 
 //	Amount of blocks per pixel. If the amount of blocks on screen differs too much blocks will be added/removed.
-const BLOCK_DENSITY = 0.000065;
+const BLOCK_DENSITY = 0.00008;
 
 export class FallingBlockParticle {
 	type:number = 0;
@@ -237,18 +237,18 @@ export function AnimatedBackground(){
 
 	let particles:FallingBlockParticle[] = [];
 
-	for(let i=0; i<(window.innerWidth*window.innerHeight*BLOCK_DENSITY); i++){
+	for(let i=0; i<calculateBlockCount(); i++){
 		particles.push(new FallingBlockParticle(svg));
 	}
 	setInterval(()=>{
-		if(particles.length < (window.innerWidth*window.innerHeight*BLOCK_DENSITY)){
+		if(particles.length < calculateBlockCount()){
 			FallingBlockParticle.onExit = null;
 			particles.push(new FallingBlockParticle(svg, true));
 			return;
 		}
-		if(particles.length > Math.ceil(window.innerWidth*window.innerHeight*BLOCK_DENSITY)){
+		if(particles.length > Math.ceil(calculateBlockCount())){
 			FallingBlockParticle.onExit = (p:FallingBlockParticle)=>{
-				if(particles.length > Math.ceil(window.innerWidth*window.innerHeight*BLOCK_DENSITY)){
+				if(particles.length > Math.ceil(calculateBlockCount())){
 					particles.splice(particles.findIndex((e)=>(e===p)), 1);
 				}else{
 					FallingBlockParticle.onExit = null;
@@ -256,6 +256,9 @@ export function AnimatedBackground(){
 			};
 		}
 	},500);
+}
+export function calculateBlockCount(){
+	return Math.max(window.innerWidth*window.innerHeight*BLOCK_DENSITY/window.devicePixelRatio, 20);
 }
 
 function createSvgNode(tag:string, attributes:any = {}){
