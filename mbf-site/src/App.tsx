@@ -9,7 +9,6 @@ import { DeviceModder } from './DeviceModder';
 import { ErrorModal } from './components/Modal';
 import { Bounce, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { calculateBlockCount } from './AnimatedBackground';
 
 
 
