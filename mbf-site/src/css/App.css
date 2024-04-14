@@ -1,8 +1,14 @@
+:root, body {
+    width: 100%;
+    height: 100%;
+    margin: 0px;
+}
+
 body {
     background-color: #002040;
     align-items: center;
     font-family: Roboto;
-    color: white
+    color: white;
 }
 
 .initial {
@@ -31,7 +37,7 @@ h1:hover > .title {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 10px;
+    gap: 3px;
 }
 
 #chooseDevice {

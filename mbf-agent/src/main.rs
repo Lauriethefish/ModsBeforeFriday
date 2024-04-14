@@ -9,12 +9,30 @@ mod handlers;
 
 use crate::requests::Request;
 use anyhow::{Context, Result};
+use const_format::formatcp;
 use log::{error, Level};
 use requests::Response;
 use serde::{Deserialize, Serialize};
-use std::{fs::OpenOptions, io::{BufRead, BufReader, Write}, panic, path::Path, process::Command};
+use std::{fs::OpenOptions, io::{BufRead, BufReader, Read, Write}, panic, path::Path, process::Command};
 
-const APK_ID: &str = "com.beatgames.beatsaber";
+// Directories accessed by the agent, in one place so that they can be easily changed.
+pub const APK_ID: &str = "com.beatgames.beatsaber";
+pub const QMODS_DIR: &str = "/sdcard/ModsBeforeFriday/Mods";
+pub const MODLOADER_DIR: &str = formatcp!("/sdcard/ModData/{APK_ID}/Modloader");
+pub const LATE_MODS_DIR: &str = formatcp!("{MODLOADER_DIR}/mods");
+pub const EARLY_MODS_DIR: &str = formatcp!("{MODLOADER_DIR}/early_mods");
+pub const LIBS_DIR: &str = formatcp!("{MODLOADER_DIR}/libs");
+pub const APP_DATA_PATH: &str = formatcp!("/sdcard/Android/data/{APK_ID}/files");
+pub const PLAYER_DATA_PATH: &str = formatcp!("{APP_DATA_PATH}/PlayerData.dat");
+pub const PLAYER_DATA_BAK_PATH: &str = formatcp!("{APP_DATA_PATH}/PlayerData.dat.bak");
+pub const APP_OBB_PATH: &str = formatcp!("/sdcard/Android/obb/{APK_ID}/");
+
+pub const DATAKEEPER_PATH: &str = "/sdcard/ModData/com.beatgames.beatsaber/Mods/datakeeper/PlayerData.dat";
+pub const DATA_BACKUP_PATH: &str = "/sdcard/ModsBeforeFriday/PlayerData.backup.dat";
+
+pub const SONGS_PATH: &str = formatcp!("/sdcard/ModData/{APK_ID}/Mods/SongCore/CustomLevels");
+pub const DOWNLOADS_PATH: &str = "/data/local/tmp/mbf-downloads";
+pub const TEMP_PATH: &str = "/data/local/tmp/mbf-tmp";
 
 
 pub fn get_apk_path() -> Result<Option<String>> {
@@ -46,6 +64,26 @@ fn download_file(to: impl AsRef<Path>, url: &str) -> Result<()> {
 
     std::io::copy(&mut resp_body, &mut writer)?;
     Ok(())
+}
+
+fn copy_stream_progress<T: FnMut(usize) -> ()>(from: &mut impl Read,
+    to: &mut impl Write,
+    progress: &mut T
+    ) -> Result<()> {
+    let mut buffer = vec![0u8; 4096];
+
+    let mut total_read = 0;
+    loop {
+        let bytes_read = from.read(&mut buffer)?;
+        to.write(&buffer[0..bytes_read])?;
+
+        if bytes_read == 0  {
+            break Ok(());
+        }   else {
+            total_read += bytes_read;
+            progress(total_read);
+        }
+    } 
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

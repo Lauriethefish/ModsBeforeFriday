@@ -12,19 +12,20 @@ export function ModRepoCard({ mod, onInstall, update }: { mod: ModRepoMod, onIns
         {!hasCover && <div id="defaultCover">
             <img src={ModIcon} width={40} />
         </div>}
-        <div>
+        <div className="mod-repo-card-info">
             <p id="modDetails">{mod.name} v{mod.version}</p>
             <p id="author">by {mod.author}</p>
             <p>{mod.description}</p>
             <div id="auxOptions">
-                <a href={mod.source} target="_blank"><button>View source code</button></a>
+                <a href={mod.source} target="_blank"><button>View source</button></a>
                 {mod.source.includes("github") && 
-                    <a href={mod.source + "/issues"} target="_blank"><button>Report a bug</button></a>}
+                    <a href={mod.source + "/issues"} target="_blank"><button>Report bug</button></a>}
+
+                <button id="installMod" onClick={onInstall}>
+                    {update ? "Update" : "Install"}
+                    <img src={DownloadIcon} />
+                </button>
             </div>
         </div>
-        <button id="installMod" onClick={onInstall}>
-            {update ? "Update" : "Install"}
-            <img src={DownloadIcon} />
-        </button>
     </div>
 }

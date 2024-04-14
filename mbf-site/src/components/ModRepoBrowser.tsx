@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { ModRepo, ModRepoMod, loadRepo } from "../ModsRepo";
 import { ModRepoCard } from "./ModRepoCard";
-import { toast } from "react-toastify";
 import { gt as semverGt } from "semver";
 import { Mod } from "../Models";
 
@@ -26,34 +25,34 @@ export function ModRepoBrowser(props: ModRepoBrowserProps) {
 
     if(modRepo === null) {
         if(failedToLoad) {
-            return <p>
+            return <div className="container">
                 <h1>Failed to load mods</h1>
                 <p>Please check that your internet is working.</p>
                 <button onClick={() => {
                     setAttempt(attempt + 1);
                     setFailedToLoad(false);
                 }}>Try again</button>
-            </p>
+            </div>
         }   else    {
             return <h1>Loading mods...</h1>
         }
-    }   
+    }
     else if(gameVersion in modRepo) {
         return <>
-            {latestVersions(modRepo[gameVersion]).map(mod => {
-                const existingInstall = props.existingMods
-                .find(existing => existing.id === mod.id);
+            <div className="mod-list">
+                {latestVersions(modRepo[gameVersion]).map(mod => {
+                    const existingInstall = props.existingMods
+                    .find(existing => existing.id === mod.id);
 
-                if(existingInstall !== undefined && existingInstall?.version === mod.version) {
-                    return <span key={mod.id} style={ {display: "none"} } />
-                }   else    {
-                    return <ModRepoCard
-                        mod={mod}
-                        key={mod.id}
-                        update={existingInstall !== undefined}
-                        onInstall={() => onDownload(mod.download)} />
-                }
-            })}
+                    if(existingInstall === undefined || existingInstall?.version !== mod.version) {
+                        return <ModRepoCard
+                            mod={mod}
+                            key={mod.id}
+                            update={existingInstall !== undefined}
+                            onInstall={() => onDownload(mod.download)} />
+                    }
+                })}
+            </div>
         </>
     }   else    {
         return <>

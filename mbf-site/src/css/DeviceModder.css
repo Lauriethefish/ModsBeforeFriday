@@ -5,3 +5,7 @@
     font-size: medium;
     margin-top: 10px;
 }
+
+h2.warning {
+    margin-top: 15px;
+}

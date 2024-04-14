@@ -1,29 +1,32 @@
-import { SetStateAction, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { LogWindow, useLog } from "./LogWindow";
-import { Mod } from "../Models";
-import { YesNoModal, ErrorModal, Modal } from "./Modal";
+import { Mod, trimGameVersion } from "../Models";
+import { ErrorModal, Modal } from "./Modal";
 import { Adb } from '@yume-chan/adb';
 import { ModCard } from "./ModCard";
-import ModIcon from '../icons/mod-icon.svg'
 import UploadIcon from '../icons/upload.svg';
+import ToolsIcon from '../icons/tools-icon.svg';
 import '../css/ModManager.css';
 import { LogEventSink, importFile, importModUrl, removeMod, setModStatuses } from "../Agent";
 import { toast } from "react-toastify";
 import { ModRepoBrowser } from "./ModRepoBrowser";
-import { ImportedMod } from "../Messages";
+import { ImportedMod, ModStatus } from "../Messages";
+import { OptionsMenu } from "./OptionsMenu";
 
 interface ModManagerProps {
-    mods: Mod[],
     gameVersion: string,
-    setMods: (mods: Mod[]) => void
-    device: Adb
+    setMods: (mods: Mod[]) => void,
+    modStatus: ModStatus,
+    device: Adb,
+    quit: (err: unknown) => void
 }
 
-type SelectedMenu = 'add' | 'current';
+type SelectedMenu = 'add' | 'current' | 'options';
 
 export function ModManager(props: ModManagerProps) {
-    const { mods, setMods, device, gameVersion } = props;
-    
+    const { modStatus, setMods, device, gameVersion, quit } = props;
+    const mods = modStatus.installed_mods;
+
     const [isWorking, setWorking] = useState(false);
     const [logEvents, addLogEvent] = useLog();
     const [modError, setModError] = useState(null as string | null);
@@ -33,15 +36,19 @@ export function ModManager(props: ModManagerProps) {
     return <>
         <Title menu={menu} setMenu={setMenu}/>
         
-        {menu === 'add' && <AddModsMenu
-            mods={mods}
-            setMods={setMods}
-            setWorking={working => setWorking(working)}
-            gameVersion={gameVersion}
-            setError={err => setModError(err)}
-            device={device}
-            addLogEvent={addLogEvent}
-        />}
+        {/* We use a style with display: none when hiding this menu, as this avoids remounting the component,
+            which would fetch the mods index again. */}
+        <div style={menu === 'add' ? {} : { display: 'none' }}>
+            <AddModsMenu
+                mods={mods}
+                setMods={setMods}
+                setWorking={working => setWorking(working)}
+                gameVersion={gameVersion}
+                setError={err => setModError(err)}
+                device={device}
+                addLogEvent={addLogEvent}
+            />
+        </div>
         
         {menu === 'current' && <InstalledModsMenu
             mods={mods}
@@ -52,6 +59,12 @@ export function ModManager(props: ModManagerProps) {
             device={device}
             addLogEvent={addLogEvent}
         />}
+        
+        {menu === 'options' && <OptionsMenu
+            device={device}
+            quit={quit}
+            modStatus={modStatus}
+         />}
         
         <ErrorModal isVisible={modError != null}
             title={"Failed to sync mods"}
@@ -74,15 +87,15 @@ interface TitleProps {
 function Title(props: TitleProps) {
     const { menu, setMenu } = props;
 
-    return <div className='container noPadding'>
-        <div className="horizontalCenter">
-            <div className={menu === 'current' ? "selected" : "notSelected"}>
-                <h1 onClick={() => setMenu('current')}>Your Mods</h1>
-            </div>
-            <img src={ModIcon} />
-            <div className={menu === 'add' ? "selected" : "notSelected"}>
-                <h1 onClick={() => setMenu('add')}>Add Mods</h1>
-            </div>
+    return <div className='container noPadding horizontalCenter'>
+        <div className={`tab-header ${menu === 'current' ? "selected":""}`}>
+            <h1 onClick={() => setMenu('current')}>Your Mods</h1>
+        </div>
+        <span className={`tab-header ${menu === 'options' ? "selected":""}`}>
+            <img onClick={() => setMenu('options')} src={ToolsIcon} />
+        </span>
+        <div className={`tab-header ${menu === 'add' ? "selected":""}`}>
+            <h1 onClick={() => setMenu('add')}>Add Mods</h1>
         </div>
     </div>
 }
@@ -111,7 +124,7 @@ function InstalledModsMenu(props: ModMenuProps) {
     const hasChanges = Object.keys(changes).length > 0;
 
     return <>
-        <button id="syncButton" className={hasChanges ? "" : "hidden"} onClick={async () => {
+        {hasChanges && <button id="syncButton" onClick={async () => {
             setChanges({});
             console.log("Installing mods, statuses requested: " + JSON.stringify(changes));
             try {
@@ -134,28 +147,30 @@ function InstalledModsMenu(props: ModMenuProps) {
             }  finally {
                 setWorking(false);
             }
-        }}>Sync Changes</button>
+        }}>Sync Changes</button>}
 
-        {mods.map(mod => <ModCard
-            gameVersion={gameVersion}
-            mod={mod}
-            key={mod.id}
-            onRemoved={async () => {
-                setWorking(true);
-                try {
-                    setMods(await removeMod(device, mod.id, addLogEvent));
-                }   catch(e) {
-                    setError(String(e));
-                }   finally {
-                    setWorking(false);
-                }
-            }}
-            onEnabledChanged={enabled => {
-                const newChanges = { ...changes };
-                newChanges[mod.id] = enabled;
-                setChanges(newChanges);
-            }}/>
-        )}
+		<div className="mod-list">
+			{mods.map(mod => <ModCard
+				gameVersion={gameVersion}
+				mod={mod}
+				key={mod.id}
+				onRemoved={async () => {
+					setWorking(true);
+					try {
+						setMods(await removeMod(device, mod.id, addLogEvent));
+					}   catch(e) {
+						setError(String(e));
+					}   finally {
+						setWorking(false);
+					}
+				}}
+				onEnabledChanged={enabled => {
+					const newChanges = { ...changes };
+					newChanges[mod.id] = enabled;
+					setChanges(newChanges);
+				}}/>
+			)}
+		</div>
     </>
 }
 
@@ -200,14 +215,14 @@ function AddModsMenu(props: ModMenuProps) {
         const versionMismatch = gameVersion !== null && gameVersion !== imported_mod.game_version;
         if(versionMismatch) {
             // Don't install a mod by default if its version mismatches: we want the user to understand the consequences
-            setError("The mod `" + imported_id + "` was not enabled automatically as it is not designed for game version v" + gameVersion + ".");
+            setError("The mod `" + imported_id + "` was not enabled automatically as it is not designed for game version v" + trimGameVersion(gameVersion) + ".");
         }   else    {
             setMods(await setModStatuses(device, { [imported_id]: true }, addLogEvent));
             toast("Successfully downloaded and installed " + imported_id + " v" + imported_mod.version)
         }
     }
 
-    return <>
+    return <div className="verticalCenter">
         <UploadButton onUploaded={async file => {
             console.log("Importing " + file.name);
             try {
@@ -238,7 +253,7 @@ function AddModsMenu(props: ModMenuProps) {
                 setWorking(false);
             }
         }} />
-    </>
+    </div>
 }
 
 

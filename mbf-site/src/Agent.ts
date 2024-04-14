@@ -1,7 +1,7 @@
 import { AdbSync, AdbSyncWriteOptions, Adb, encodeUtf8 } from '@yume-chan/adb';
 import { ConsumableReadableStream, Consumable, DecodeUtf8Stream, ConcatStringStream } from '@yume-chan/stream-extra';
-import { Request, Response, LogMsg, ModStatus, Mods, ImportedMod, ImportResult } from "./Messages";
-import { Mod } from './Models';
+import { Request, Response, LogMsg, ModStatus, Mods, ImportedMod, ImportResult, FixedPlayerData } from "./Messages";
+import { ManifestMod, Mod } from './Models';
 
 const AgentPath: string = "/data/local/tmp/mbf-agent";
 
@@ -18,22 +18,7 @@ function readableStreamBodge(array: Uint8Array): ConsumableReadableStream<Uint8A
   });
 }
 
-async function saveAgent(sync: AdbSync) {
-  console.log("Downloading agent");
-  const agent: Uint8Array = await downloadAgent();
-
-  // TODO: properly use readable streams
-  const file: ConsumableReadableStream<Uint8Array> = readableStreamBodge(agent);
-
-  const options: AdbSyncWriteOptions = {
-    filename: AgentPath,
-    file
-  };
-
-  await sync.write(options);
-}
-
-async function prepareAgent(adb: Adb) {
+export async function prepareAgent(adb: Adb) {
   const sync = await adb.sync();
   console.group("Pushing agent");
   try {
@@ -48,6 +33,21 @@ async function prepareAgent(adb: Adb) {
     sync.dispose();
     console.groupEnd();
   }
+}
+
+async function saveAgent(sync: AdbSync) {
+  console.log("Downloading agent");
+  const agent: Uint8Array = await downloadAgent();
+
+  // TODO: properly use readable streams
+  const file: ConsumableReadableStream<Uint8Array> = readableStreamBodge(agent);
+
+  const options: AdbSyncWriteOptions = {
+    filename: AgentPath,
+    file
+  };
+
+  await sync.write(options);
 }
   
 async function downloadAgent(): Promise<Uint8Array> {
@@ -165,7 +165,7 @@ async function sendRequest(adb: Adb, request: Request, eventSink: LogEventSink =
 }
 
 // Gets the status of mods from the quest, i.e. whether the app is patched, and what mods are currently installed.
-async function loadModStatus(device: Adb): Promise<ModStatus> {
+export async function loadModStatus(device: Adb): Promise<ModStatus> {
   await prepareAgent(device);
 
   return await sendRequest(device, {
@@ -174,7 +174,7 @@ async function loadModStatus(device: Adb): Promise<ModStatus> {
 }
 
 // Tells the backend to attempt to uninstall/install the given mods, depending on the new install status provided in `changesRequested`.
-async function setModStatuses(device: Adb,
+export async function setModStatuses(device: Adb,
   changesRequested: { [id: string]: boolean },
   eventSink: LogEventSink = null): Promise<Mod[]> {
   let response = await sendRequest(device, {
@@ -186,7 +186,7 @@ async function setModStatuses(device: Adb,
 }
 
 
-async function importFile(device: Adb,
+export async function importFile(device: Adb,
     file: File,
     eventSink: LogEventSink = null): Promise<ImportResult> {
   const sync = await device.sync();
@@ -213,7 +213,7 @@ async function importFile(device: Adb,
   }
 }
 
-async function importModUrl(device: Adb,
+export async function importModUrl(device: Adb,
 url: string,
 eventSink: LogEventSink = null) {
   const response = await sendRequest(device, {
@@ -224,7 +224,7 @@ eventSink: LogEventSink = null) {
   return response as ImportedMod;
 }
 
-async function removeMod(device: Adb,
+export async function removeMod(device: Adb,
   mod_id: string,
   eventSink: LogEventSink = null) {
   let response = await sendRequest(device, {
@@ -238,11 +238,17 @@ async function removeMod(device: Adb,
 // Instructs the agent to patch the app, adding the modloader and installing the core mods.
 // Updates the ModStatus `beforePatch` to reflect the state of the installation after patching.
 // (will not patch if the APK is already modded - will just extract the modloader and install core mods.)
-async function patchApp(device: Adb,
+export async function patchApp(device: Adb,
   beforePatch: ModStatus,
+  downgradeToVersion: string | null,
+  manifestMod: ManifestMod,
+  remodding: boolean,
   eventSink: LogEventSink = null): Promise<ModStatus> {
   let response = await sendRequest(device, {
-      type: 'Patch'
+      type: 'Patch',
+      downgrade_to: downgradeToVersion,
+      manifest_mod: manifestMod,
+      remodding
   }, eventSink);
 
   // Return the new mod status assumed after patching
@@ -251,11 +257,12 @@ async function patchApp(device: Adb,
       'type': 'ModStatus',
       app_info: {
           loader_installed: 'Scotland2',
-          version: beforePatch.app_info!.version
+          version: downgradeToVersion ?? beforePatch.app_info!.version
       },
       core_mods: {
           all_core_mods_installed: true,
-          supported_versions: beforePatch.core_mods!.supported_versions
+          supported_versions: beforePatch.core_mods!.supported_versions,
+          downgrade_versions: []
       },
       modloader_present: true,
       installed_mods: (response as Mods).installed_mods
@@ -264,7 +271,7 @@ async function patchApp(device: Adb,
 
 // Instructs the agent to download and install any missing/outdated core mods, as well as push the modloader to the required location.
 // Should fix many common issues with an install.
-async function quickFix(device: Adb,
+export async function quickFix(device: Adb,
   beforeFix: ModStatus,
   eventSink: LogEventSink = null): Promise<ModStatus> {
   let response = await sendRequest(device, {
@@ -278,19 +285,17 @@ async function quickFix(device: Adb,
       core_mods: {
           all_core_mods_installed: true,
           supported_versions: beforeFix.core_mods!.supported_versions,
+          downgrade_versions: beforeFix.core_mods!.downgrade_versions
       },
       installed_mods: (response as Mods).installed_mods,
       modloader_present: true
   }
 }
 
-export {
-  prepareAgent,
-  loadModStatus,
-  setModStatuses,
-  removeMod,
-  patchApp,
-  quickFix,
-  importFile,
-  importModUrl
-};
+// Attempts to fix the black screen issue on Quest 3.
+export async function fixPlayerData(device: Adb,
+  eventSink: LogEventSink = null): Promise<boolean> {
+  let response = await sendRequest(device, { type: 'FixPlayerData' }, eventSink);
+
+  return (response as FixedPlayerData).existed
+}

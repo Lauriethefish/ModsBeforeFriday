@@ -1,0 +1,44 @@
+.collapsible {
+    background-color: rgb(10, 10, 10);
+    border-radius: 5px;
+}
+
+.collapsibleTitle {
+    padding: 10px;
+    border-radius: 5px;
+    background-color: rgb(15, 15, 15);
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    height: 20px;
+    transition: background-color 200ms;
+    cursor: pointer;
+}
+
+.collapsibleTitle:hover {
+    background-color: rgb(25, 25, 25);
+}
+
+@media screen and (max-width: 700px) {
+    .collapsible {
+        background-color: rgb(20, 20, 20);
+    }
+    .collapsibleTitle {
+        background-color: rgb(35, 35, 35);
+    }
+}
+
+.collapsibleTitle > p {
+    font-size: 20px;
+    margin-left: auto;
+}
+
+.content {
+    padding: 0px 10px 0px 10px;
+    transition: max-height 500ms;
+    overflow: hidden;
+}
+
+.content > #bottom {
+    padding-bottom: 10px;
+}

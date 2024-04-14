@@ -1,13 +1,14 @@
 import { Adb } from '@yume-chan/adb';
-import { loadModStatus, patchApp, prepareAgent, quickFix } from "./Agent";
+import { loadModStatus, patchApp, quickFix } from "./Agent";
 import { useEffect, useState } from 'react';
-import { LogMsg, ModLoader, ModStatus } from './Messages';
+import { ModLoader, ModStatus } from './Messages';
 import './css/DeviceModder.css';
 import { LogWindow, useLog } from './components/LogWindow';
-import { Mods } from './Messages';
 import { ErrorModal, Modal } from './components/Modal';
 import { ModManager } from './components/ModManager';
-import { ModRepoBrowser } from './components/ModRepoBrowser';
+import { ManifestMod, trimGameVersion } from './Models';
+import { PermissionsMenu } from './components/PermissionsMenu';
+import { Collapsible } from './components/Collapsible';
 
 interface DeviceModderProps {
     device: Adb,
@@ -15,11 +16,11 @@ interface DeviceModderProps {
     quit: (err: unknown | null) => void
 }
 
-async function uninstallBeatSaber(device: Adb) {
+export async function uninstallBeatSaber(device: Adb) {
     await device.subprocess.spawnAndWait("pm uninstall com.beatgames.beatsaber");
 }
 
-export default function DeviceModder(props: DeviceModderProps) {
+export function DeviceModder(props: DeviceModderProps) {
     const [modStatus, setModStatus] = useState(null as ModStatus | null);
     const { device, quit } = props;
 
@@ -29,9 +30,10 @@ export default function DeviceModder(props: DeviceModderProps) {
             .catch(err => quit(err));
     }, [device, quit]);
 
+    // Fun "ocean" of IF statements, hopefully covering every possible state of an installation!
     if(modStatus === null) {
-        return <div className='container mainContainer'>
-            <h2>Checking Beat Saber installation</h2>
+        return <div className='container mainContainer fadeIn'>
+            <h2>Checking Beat Saber installation...</h2>
         </div>
     }   else if(modStatus.app_info === null) {
         return <div className='container mainContainer'>
@@ -46,30 +48,48 @@ export default function DeviceModder(props: DeviceModderProps) {
                 <br />This occurs on your Quest's connection. Please make sure that WiFi is enabled, then refresh the page.</p>
         </div>
     }   else if(!(modStatus.core_mods.supported_versions.includes(modStatus.app_info.version))) {
-        return <NotSupported version={modStatus.app_info.version} supportedVersions={modStatus.core_mods.supported_versions}/>
+        // Check if we can downgrade to a supported version
+        const downgradeVersion = modStatus.core_mods
+            .downgrade_versions
+            .find(version => modStatus.core_mods!.supported_versions.includes(version));
+
+        if(downgradeVersion === undefined) {
+            return <NotSupported version={modStatus.app_info.version} device={device} quit={() => quit(undefined)} />
+        }   else if(modStatus.app_info.loader_installed !== null) {
+            // App is already patched, and we COULD in theory downgrade this version normally, but since it has been modified, the diffs will not work.
+            // Therefore, they need to reinstall the latest version.
+            return <IncompatibleAlreadyModded installedVersion={modStatus.app_info.version} device={device} quit={() => quit(undefined)}/>
+        }   else    {
+            return <PatchingMenu 
+                modStatus={modStatus}
+                onCompleted={status => setModStatus(status)}
+                device={device}
+                downgradingTo={downgradeVersion}
+            />
+        }
+
     }   else if(modStatus.app_info.loader_installed !== null)   {
         let loader = modStatus.app_info.loader_installed;
         if(loader === 'Scotland2') {
             return <>
                 <div className='container mainContainer'>
                     <h1>App is modded</h1>
-                    <p>Beat Saber is already modded on your Quest, and the version that's installed is compatible with mods.</p>
+                    <p>Your Beat Saber install is modded, and its version is compatible with mods.</p>
 
                     <InstallStatus
                         modStatus={modStatus}
                         device={device}
                         onFixed={status => setModStatus(status)}
                     />
-
-
                     <h4>Not sure what to do next?</h4>
                     <NextSteps />
                 </div>
 
-                <ModManager mods={modStatus.installed_mods}
+                <ModManager modStatus={modStatus}
                     setMods={mods => setModStatus({ ...modStatus, installed_mods: mods })}
                     device={device}
                     gameVersion={modStatus.app_info.version}
+                    quit={quit}
                 />
             </>
         }   else    {
@@ -80,24 +100,8 @@ export default function DeviceModder(props: DeviceModderProps) {
             device={device}
             modStatus={modStatus}
             onCompleted={modStatus => setModStatus(modStatus)}
-        />
+            downgradingTo={null} />
     }
-}
-
-interface NotSupportedProps {
-    version: string,
-    supportedVersions: string[]
-}
-
-function NotSupported(props: NotSupportedProps) {
-    return <div className='container mainContainer'>
-        <h1>Unsupported Version</h1>
-        <p>You have Beat Saber v{props.version} installed, but this version has no support for mods!</p>
-        <p>To install custom songs, one of the following versions is needed:</p>
-        <ul>
-            {props.supportedVersions.map(ver => <li>{ver}</li>)}
-        </ul>
-    </div>
 }
 
 interface InstallStatusProps {
@@ -154,22 +158,29 @@ function InstallStatus(props: InstallStatusProps) {
 interface PatchingMenuProps {
     modStatus: ModStatus
     device: Adb,
-    onCompleted: (newStatus: ModStatus) => void
+    onCompleted: (newStatus: ModStatus) => void,
+    downgradingTo: string | null
 }
 
 function PatchingMenu(props: PatchingMenuProps) {
     const [isPatching, setIsPatching] = useState(false);
     const [logEvents, addLogEvent] = useLog();
     const [patchingError, setPatchingError] = useState(null as string | null);
+    const [manifestMod, setManifestMod] = useState({
+        add_permissions: [],
+        add_features: []
+    } as ManifestMod);
 
-    const { onCompleted, modStatus, device } = props;
+    const { onCompleted, modStatus, device, downgradingTo } = props;
     if(!isPatching) {
         return <div className='container mainContainer'>
-            <h1>Install Custom Songs</h1>
-            <p>Your app has version: {props.modStatus.app_info?.version}, which is supported by mods!</p>
-            <p>To get your game ready for custom songs, ModsBeforeFriday will next patch your Beat Saber app and install some essential mods.
-            Once this is done, you will be able to manage your custom songs <b>inside the game.</b></p>
-
+            {downgradingTo !== null && <DowngradeMessage toVersion={downgradingTo}/>}
+            {downgradingTo === null && <VersionSupportedMessage version={modStatus.app_info!.version} />}
+            
+            <Collapsible title="Change App Permissions">
+                <p>Certain mods may find it useful for the app to request microphone permissions or access to the headset cameras. Due to the privacy implications, you need to enable permissions here if you want them.</p>
+                <PermissionsMenu manifestMod={manifestMod} setManifestMod={mod => setManifestMod(mod)} />
+            </Collapsible>
             <h2 className='warning'>READ CAREFULLY</h2>
             <p>Mods and custom songs are not supported by Beat Games. You may experience bugs and crashes that you wouldn't in a vanilla game.</p>
             <b>In addition, by modding the game you will lose access to both vanilla leaderboards and vanilla multiplayer.</b> (Modded leaderboards/servers are available.)
@@ -177,7 +188,7 @@ function PatchingMenu(props: PatchingMenuProps) {
             <button className="modButton" onClick={async () => {
                 setIsPatching(true);
                 try {
-                    onCompleted(await patchApp(device, modStatus, addLogEvent));
+                    onCompleted(await patchApp(device, modStatus, downgradingTo, manifestMod, false, addLogEvent));
                 } catch(e) {
                     setPatchingError(String(e));
                     setIsPatching(false);
@@ -200,10 +211,49 @@ function PatchingMenu(props: PatchingMenuProps) {
     }
 }
 
+function VersionSupportedMessage({ version }: { version: string }) {
+    return <>
+        <h1>Install Custom Songs</h1>
+        <p>Your app has version {trimGameVersion(version)}, which is supported by mods!</p>
+        <p>To get your game ready for custom songs, ModsBeforeFriday will next patch your Beat Saber app and install some essential mods.
+        Once this is done, you will be able to manage your custom songs <b>inside the game.</b></p>
+    </>
+}
+
+function DowngradeMessage({ toVersion }: { toVersion: string }) {
+    return <>
+        <h1>Downgrade and set up mods</h1>
+        <p>MBF has detected that your version of Beat Saber doesn't support mods!</p>
+
+        <p>Fortunately for you, your version can be downgraded automatically to the latest moddable version: {trimGameVersion(toVersion)}</p>
+        <p><span className='warning'><b>NOTE:</b></span> By downgrading, you will lose access to any DLCs or other content that is not present in version {trimGameVersion(toVersion)}. If you decide to stop using mods and reinstall vanilla Beat Saber, however, then you will get this content back.</p>
+    </>
+}
+
 interface IncompatibleLoaderProps {
     loader: ModLoader,
     device: Adb,
     quit: () => void
+}
+
+function NotSupported({ version, quit, device }: { version: string, quit: () => void, device: Adb }) {
+    return <div className='container mainContainer'>
+        <h1>Unsupported Version</h1>
+        <p className='warning'>Read this message in full before asking for help if needed!</p>
+
+        <p>You have Beat Saber v{trimGameVersion(version)} installed, but this version has no support for mods!</p>
+        <p>Normally, MBF would attempt to downgrade (un-update) your Beat Saber version to a version with mod support, but this is only possible if you have the latest version of Beat Saber installed.</p>
+        <p>Please uninstall Beat Saber using the button below, then reinstall the latest version of Beat Saber using the Meta store.</p>
+
+        <h4>Already have the latest version?</h4>
+        <p>When a new Beat Saber version is added, the developer(s) of MBF must add the new version so you can downgrade. They're probably asleep right now, so give it a few hours.</p>
+
+
+        <button onClick={async () => {
+            await uninstallBeatSaber(device);
+            quit();
+        }}>Uninstall Beat Saber</button>
+    </div>
 }
 
 function IncompatibleLoader(props: IncompatibleLoaderProps) {
@@ -219,6 +269,21 @@ function IncompatibleLoader(props: IncompatibleLoaderProps) {
             quit();
         }}>Uninstall Beat Saber</button>
     </div>
+}
+
+function IncompatibleAlreadyModded({ device, quit, installedVersion }: { device: Adb,
+    quit: () => void, installedVersion: string }) {
+        return <div className='container mainContainer'>
+            <h1>Incompatible Version Patched</h1>
+
+            <p>Your Beat Saber app has a modloader installed, but the game version ({trimGameVersion(installedVersion)}) has no support for mods!</p>
+            <p>To fix this, uninstall Beat Saber and reinstall the latest version. MBF can then downgrade this automatically to the latest moddable version.</p>
+
+            <button onClick={async () => {
+                await uninstallBeatSaber(device);
+                quit();
+            }}>Uninstall Beat Saber</button>
+        </div>
 }
 
 function NextSteps() {
