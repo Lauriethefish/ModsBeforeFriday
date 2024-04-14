@@ -33,7 +33,7 @@ export function DeviceModder(props: DeviceModderProps) {
     // Fun "ocean" of IF statements, hopefully covering every possible state of an installation!
     if(modStatus === null) {
         return <div className='container mainContainer'>
-            <h2>Checking Beat Saber installation</h2>
+            <h2>Checking Beat Saber installation...</h2>
         </div>
     }   else if(modStatus.app_info === null) {
         return <div className='container mainContainer'>
@@ -74,7 +74,7 @@ export function DeviceModder(props: DeviceModderProps) {
             return <>
                 <div className='container mainContainer'>
                     <h1>App is modded</h1>
-                    <p>Beat Saber is already modded on your Quest, and the version that's installed is compatible with mods.</p>
+                    <p>Your Beat Saber install is modded, and its version is compatible with mods.</p>
 
                     <InstallStatus
                         modStatus={modStatus}
