@@ -148,7 +148,7 @@ function isViewingOnWindows(): boolean {
 }
 
 function isViewingOnMobile() {
-  return (navigator.maxTouchPoints ?? 0) > 0;
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 }
 
 // Kindly provided by Pierre
@@ -195,7 +195,7 @@ function SupportedBrowsers() {
     return <>
       <ul>
         <li>Google Chrome for Android 122 or newer</li>
-        <li>Opera Mobile 80 or newer</li>
+        <li>Edge for Android 123 or newer</li>
       </ul>
       <h3 className='fireFox'>Firefox for Android is NOT supported</h3>
     </>
