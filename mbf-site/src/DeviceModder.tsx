@@ -32,7 +32,7 @@ export function DeviceModder(props: DeviceModderProps) {
 
     // Fun "ocean" of IF statements, hopefully covering every possible state of an installation!
     if(modStatus === null) {
-        return <div className='container mainContainer'>
+        return <div className='container mainContainer fadeIn'>
             <h2>Checking Beat Saber installation...</h2>
         </div>
     }   else if(modStatus.app_info === null) {

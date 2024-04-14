@@ -66,10 +66,12 @@ function ChooseDevice() {
       </>
     }
   } else if(authing) {
-    return <div className='container mainContainer'>
+    return <div className='container mainContainer fadeIn'>
       <h2>Allow connection in headset</h2>
       <p>Put on your headset and click <b>"Always allow from this computer"</b></p>
       <p>(You should only have to do this once.)</p>
+      <h4>Already pressed allow?</h4>
+      <p>Sometimes the connection fails, despite you allowing access in your Quest. <br/>If this happens, try refreshing the page and re-selecting your device.</p>
     </div>
   } else  {
     return <>
