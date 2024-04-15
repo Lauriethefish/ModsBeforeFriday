@@ -38,7 +38,7 @@ export function ModManager(props: ModManagerProps) {
         
         {/* We use a style with display: none when hiding this menu, as this avoids remounting the component,
             which would fetch the mods index again. */}
-        <div style={menu === 'add' ? {} : { display: 'none' }}>
+        <div className={menu === 'add' ? "" : "hidden"}>
             <AddModsMenu
                 mods={mods}
                 setMods={setMods}

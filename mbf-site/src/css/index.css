@@ -57,3 +57,9 @@ button:hover {
 .fadeIn {
     animation: fadeIn 0.5s;
 }
+
+.hidden {
+    width: 0;
+    height: 0;
+    overflow: hidden;
+}
