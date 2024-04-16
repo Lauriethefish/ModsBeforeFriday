@@ -336,6 +336,7 @@ pub fn install_modloader() -> Result<()> {
     let mut handle = OpenOptions::new()
         .create(true)
         .write(true)
+        .truncate(true)
         .open(loader_path)?;
     handle.write_all(MODLOADER)?;
     Ok(())
