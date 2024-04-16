@@ -53,7 +53,7 @@ pub fn downgrade_and_mod_apk(temp_path: &Path,
 
     // Download the diff files
     let diffs_path = temp_path.join("diffs");
-    std::fs::create_dir(&diffs_path)?;
+    std::fs::create_dir_all(&diffs_path)?;
     info!("Downloading diffs needed to downgrade Beat Saber (this could take a LONG time, make a cup of tea)");
     download_diffs(&diffs_path, &diffs)?;
 
@@ -66,7 +66,7 @@ pub fn downgrade_and_mod_apk(temp_path: &Path,
 
     // Downgrade the obb files, copying them to a temporary directory in the process.
     let obb_backup_dir = temp_path.join("obbs");
-    std::fs::create_dir(&obb_backup_dir)?;
+    std::fs::create_dir_all(&obb_backup_dir)?;
     let mut obb_backup_paths = Vec::new();
     for obb_diff in &diffs.obb_diffs {
         let obb_path = Path::new(APP_OBB_PATH).join(&obb_diff.file_name);

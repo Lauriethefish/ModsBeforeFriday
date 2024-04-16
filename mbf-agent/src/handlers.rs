@@ -366,7 +366,7 @@ fn handle_patch(downgrade_to: Option<String>, repatch: bool, manifest_mod: Manif
             .ok_or(anyhow!("No diff existed to go from {} to {}", app_info.version, to_version))?;
 
         patching::downgrade_and_mod_apk(Path::new(TEMP_PATH), &app_info, version_diffs, manifest_mod)
-            .context("Failed to downgrade nad patch APK")
+            .context("Failed to downgrade and patch APK")
     }   else {
         patching::mod_current_apk(Path::new(TEMP_PATH), &app_info, manifest_mod, repatch)
             .context("Failed to patch APK")
