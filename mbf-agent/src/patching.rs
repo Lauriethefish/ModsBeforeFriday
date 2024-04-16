@@ -34,7 +34,7 @@ pub fn mod_current_apk(temp_path: &Path, app_info: &AppInfo, manifest_mod: Manif
 
     info!("Saving OBB files");
     let obb_backup = temp_path.join("obbs");
-    std::fs::create_dir(&obb_backup)?;
+    std::fs::create_dir_all(&obb_backup)?;
     let obb_backups = save_obbs(Path::new(APP_OBB_PATH), &obb_backup)?;
 
     patch_and_reinstall(libunity_path, &temp_apk_path, temp_path, obb_backups, manifest_mod, manifest_only)?;
