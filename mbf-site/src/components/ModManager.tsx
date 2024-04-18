@@ -188,6 +188,7 @@ function UploadButton({ onUploaded }: { onUploaded: (file: File) => void}) {
                 if(files !== null) {
                     onUploaded(files[0]);
                 }
+                ev.target.value = "";
             }}
         />
     </button>
