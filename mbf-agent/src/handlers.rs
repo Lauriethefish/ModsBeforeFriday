@@ -248,7 +248,7 @@ fn attempt_file_copy(from_path: PathBuf, file_ext: String, mod_manager: ModManag
         let mod_ref = (**m).borrow();
         match mod_ref.manifest()
             .copy_extensions.iter()
-            .filter(|ext| ext.extension == file_ext)
+            .filter(|ext| ext.extension.eq_ignore_ascii_case(&file_ext))
             .next() 
         {
             Some(copy_ext) => {
