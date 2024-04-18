@@ -117,7 +117,9 @@ impl ModManager {
             let manifest = &mod_info.manifest;
             let mod_files_present = manifest.mod_files.iter().all(|file| early_mod_files.contains(file))
                 && manifest.library_files.iter().all(|file| libraries.contains(file))
-                && manifest.late_mod_files.iter().all(|file| late_mod_files.contains(file));
+                && manifest.late_mod_files.iter().all(|file| late_mod_files.contains(file))
+                && manifest.file_copies.iter().map(|copy| &copy.destination)
+                    .all(|dest| Path::new(dest).exists());
 
             mod_info.installed = mod_files_present;
         }
