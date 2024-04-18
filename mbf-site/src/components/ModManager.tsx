@@ -235,7 +235,7 @@ function AddModsMenu(props: ModMenuProps) {
                 }   else if(importResult.type === 'ImportedSong') {
                     toast("Successfully imported song " + file.name);
                 }   else    {
-                    onModImported(importResult);
+                    await onModImported(importResult);
                 }
             }   catch(e)   {
                 setError("Failed to import file: " + e);
