@@ -42,14 +42,23 @@ impl ModManager {
         QMODS_DIR
     }
 
+    // Removes a directory and all its files recursively, if that directory already exists.
+    fn remove_dir_if_exists(path: impl AsRef<Path>) -> Result<()> {
+        if path.as_ref().exists() {
+            std::fs::remove_dir_all(path).context("Failed to remove directory")?;
+        }
+
+        Ok(())
+    }
+
     // Removes ALL mod and library files and deletes ALL mods from the current game.
     pub fn wipe_all_mods(&mut self) -> Result<()> {
         // Wipe absolutely everything: clean slate
         self.mods.clear();
-        std::fs::remove_dir_all(LATE_MODS_DIR)?;
-        std::fs::remove_dir_all(EARLY_MODS_DIR)?;
-        std::fs::remove_dir_all(LIBS_DIR)?;
-        std::fs::remove_dir_all(QMODS_DIR)?;
+        Self::remove_dir_if_exists(LATE_MODS_DIR)?;
+        Self::remove_dir_if_exists(EARLY_MODS_DIR)?;
+        Self::remove_dir_if_exists(LIBS_DIR)?;
+        Self::remove_dir_if_exists(QMODS_DIR)?;
         create_mods_dir()?;
         Ok(())
     }
