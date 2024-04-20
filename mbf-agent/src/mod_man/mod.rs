@@ -77,14 +77,22 @@ impl ModManager {
             if !entry.file_type()?.is_file() {
                 continue;
             }
-            let loaded_mod = Self::load_mod_from(mod_path)?;
 
-            // TODO: Report error of conflicting ID
-            if self.mods.contains_key(&loaded_mod.manifest.id) {
-                continue;
-            }
-    
-            self.mods.insert(loaded_mod.manifest.id.clone(), Rc::new(RefCell::new(loaded_mod)));
+            match Self::load_mod_from(mod_path.clone()) {
+                Ok(loaded_mod) =>  if !self.mods.contains_key(&loaded_mod.manifest.id) {
+                    self.mods.insert(loaded_mod.manifest.id.clone(), Rc::new(RefCell::new(loaded_mod)));
+                }   else    {
+                    warn!("Mod at {mod_path:?} had ID {}, but a mod with this ID already existed", loaded_mod.manifest.id);
+                },
+                Err(err) => {
+                    warn!("Failed to load mod from {mod_path:?}: {err}");
+                    // Attempt to delete the invalid mod
+                    match std::fs::remove_file(&mod_path) {
+                        Ok(_) => info!("Deleted invalid mod"),
+                        Err(err) => warn!("Failed to delete invalid mod at {mod_path:?}: {err}")
+                    }
+                }
+            };
         }
 
         self.update_mods_status().context("Failed to check if mods installed after loading")?;
@@ -117,7 +125,9 @@ impl ModManager {
             let manifest = &mod_info.manifest;
             let mod_files_present = manifest.mod_files.iter().all(|file| early_mod_files.contains(file))
                 && manifest.library_files.iter().all(|file| libraries.contains(file))
-                && manifest.late_mod_files.iter().all(|file| late_mod_files.contains(file));
+                && manifest.late_mod_files.iter().all(|file| late_mod_files.contains(file))
+                && manifest.file_copies.iter().map(|copy| &copy.destination)
+                    .all(|dest| Path::new(dest).exists());
 
             mod_info.installed = mod_files_present;
         }
