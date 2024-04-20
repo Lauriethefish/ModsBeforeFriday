@@ -24,6 +24,8 @@ semver = { version = "1.0.22", features = ["serde"] }
 ureq = "2.9.6"
 log = "0.4.21"
 const_format = "0.2.32"
+rustls = "0.22.4"
 
 [build-dependencies]
 ureq = "2.9.6"
+rustls = "0.22.4"
