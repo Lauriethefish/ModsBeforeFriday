@@ -17,7 +17,7 @@ jobs:
     env:
       CC_aarch64-linux-android: /home/runner/android-ndk-r26c/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android31-clang
       AR_aarch64-linux-android: /home/runner/android-ndk-r26c/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
-      BASE_URL: "/ModsBeforeFriday"
+#      BASE_URL: "/ModsBeforeFriday"
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
