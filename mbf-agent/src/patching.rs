@@ -34,7 +34,7 @@ pub fn mod_current_apk(temp_path: &Path, app_info: &AppInfo, manifest_mod: Manif
 
     info!("Saving OBB files");
     let obb_backup = temp_path.join("obbs");
-    std::fs::create_dir(&obb_backup)?;
+    std::fs::create_dir_all(&obb_backup)?;
     let obb_backups = save_obbs(Path::new(APP_OBB_PATH), &obb_backup)?;
 
     patch_and_reinstall(libunity_path, &temp_apk_path, temp_path, obb_backups, manifest_mod, manifest_only)?;
@@ -53,7 +53,7 @@ pub fn downgrade_and_mod_apk(temp_path: &Path,
 
     // Download the diff files
     let diffs_path = temp_path.join("diffs");
-    std::fs::create_dir(&diffs_path)?;
+    std::fs::create_dir_all(&diffs_path)?;
     info!("Downloading diffs needed to downgrade Beat Saber (this could take a LONG time, make a cup of tea)");
     download_diffs(&diffs_path, &diffs)?;
 
@@ -66,7 +66,7 @@ pub fn downgrade_and_mod_apk(temp_path: &Path,
 
     // Downgrade the obb files, copying them to a temporary directory in the process.
     let obb_backup_dir = temp_path.join("obbs");
-    std::fs::create_dir(&obb_backup_dir)?;
+    std::fs::create_dir_all(&obb_backup_dir)?;
     let mut obb_backup_paths = Vec::new();
     for obb_diff in &diffs.obb_diffs {
         let obb_path = Path::new(APP_OBB_PATH).join(&obb_diff.file_name);
@@ -336,6 +336,7 @@ pub fn install_modloader() -> Result<()> {
     let mut handle = OpenOptions::new()
         .create(true)
         .write(true)
+        .truncate(true)
         .open(loader_path)?;
     handle.write_all(MODLOADER)?;
     Ok(())

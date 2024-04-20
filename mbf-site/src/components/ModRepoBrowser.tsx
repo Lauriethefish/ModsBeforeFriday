@@ -39,7 +39,7 @@ export function ModRepoBrowser(props: ModRepoBrowserProps) {
     }
     else if(gameVersion in modRepo) {
         return <>
-            <div className="mod-list">
+            <div className="mod-list fadeIn">
                 {latestVersions(modRepo[gameVersion]).map(mod => {
                     const existingInstall = props.existingMods
                     .find(existing => existing.id === mod.id);

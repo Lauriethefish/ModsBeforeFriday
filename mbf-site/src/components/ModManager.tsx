@@ -38,7 +38,7 @@ export function ModManager(props: ModManagerProps) {
         
         {/* We use a style with display: none when hiding this menu, as this avoids remounting the component,
             which would fetch the mods index again. */}
-        <div style={menu === 'add' ? {} : { display: 'none' }}>
+        <div className={menu === 'add' ? "" : "hidden"}>
             <AddModsMenu
                 mods={mods}
                 setMods={setMods}
@@ -188,6 +188,7 @@ function UploadButton({ onUploaded }: { onUploaded: (file: File) => void}) {
                 if(files !== null) {
                     onUploaded(files[0]);
                 }
+                ev.target.value = "";
             }}
         />
     </button>
@@ -234,7 +235,7 @@ function AddModsMenu(props: ModMenuProps) {
                 }   else if(importResult.type === 'ImportedSong') {
                     toast("Successfully imported song " + file.name);
                 }   else    {
-                    onModImported(importResult);
+                    await onModImported(importResult);
                 }
             }   catch(e)   {
                 setError("Failed to import file: " + e);

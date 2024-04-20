@@ -248,7 +248,7 @@ fn attempt_file_copy(from_path: PathBuf, file_ext: String, mod_manager: ModManag
         let mod_ref = (**m).borrow();
         match mod_ref.manifest()
             .copy_extensions.iter()
-            .filter(|ext| ext.extension == file_ext)
+            .filter(|ext| ext.extension.eq_ignore_ascii_case(&file_ext))
             .next() 
         {
             Some(copy_ext) => {
@@ -366,7 +366,7 @@ fn handle_patch(downgrade_to: Option<String>, repatch: bool, manifest_mod: Manif
             .ok_or(anyhow!("No diff existed to go from {} to {}", app_info.version, to_version))?;
 
         patching::downgrade_and_mod_apk(Path::new(TEMP_PATH), &app_info, version_diffs, manifest_mod)
-            .context("Failed to downgrade nad patch APK")
+            .context("Failed to downgrade and patch APK")
     }   else {
         patching::mod_current_apk(Path::new(TEMP_PATH), &app_info, manifest_mod, repatch)
             .context("Failed to patch APK")
