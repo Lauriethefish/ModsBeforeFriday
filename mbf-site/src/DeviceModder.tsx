@@ -23,9 +23,10 @@ export async function uninstallBeatSaber(device: Adb) {
 export function DeviceModder(props: DeviceModderProps) {
     const [modStatus, setModStatus] = useState(null as ModStatus | null);
     const { device, quit } = props;
+    const [logEvents, addLogEvent] = useLog();
 
     useEffect(() => {
-        loadModStatus(device)
+        loadModStatus(device, addLogEvent)
             .then(data => setModStatus(data))
             .catch(err => quit(err));
     }, [device, quit]);
@@ -34,7 +35,8 @@ export function DeviceModder(props: DeviceModderProps) {
     if(modStatus === null) {
         return <div className='container mainContainer fadeIn'>
             <h2>Checking Beat Saber installation</h2>
-            <p style={{marginBottom: "0"}}>This might take a minute or so the first few times.</p>
+            <p>This might take a minute or so the first few times.</p>
+            <LogWindow events={logEvents} />
         </div>
     }   else if(modStatus.app_info === null) {
         return <div className='container mainContainer'>

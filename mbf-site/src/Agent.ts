@@ -18,17 +18,30 @@ function readableStreamBodge(array: Uint8Array): ConsumableReadableStream<Uint8A
   });
 }
 
-export async function prepareAgent(adb: Adb) {
+function logInfo(sink: LogEventSink, msg: string) {
+  console.log(msg);
+  if(sink !== null) {
+    sink({
+      type: "LogMsg",
+      level: "Info",
+      message: msg
+    })
+  }
+}
+
+export async function prepareAgent(adb: Adb, eventSink: LogEventSink) {
   const sync = await adb.sync();
-  console.group("Pushing agent");
+  console.group("Setting up agent on Quest");
+  logInfo(eventSink, "Preparing agent");
   try {
-    console.log("Removing existing agent");
+    logInfo(eventSink, "Removing existing agent");
     await adb.subprocess.spawnAndWait("rm " + AgentPath)
-    console.log("Writing new agent")
+    logInfo(eventSink, "Downloading agent, this might take a minute if it's not cached")
     await saveAgent(sync);
+    logInfo(eventSink, "Writing new agent");
     await adb.subprocess.spawnAndWait("chmod +x " + AgentPath);
 
-    console.log("Agent is ready");
+    logInfo(eventSink, "Agent is ready");
   } finally {
     sync.dispose();
     console.groupEnd();
@@ -36,7 +49,6 @@ export async function prepareAgent(adb: Adb) {
 }
 
 async function saveAgent(sync: AdbSync) {
-  console.log("Downloading agent");
   const agent: Uint8Array = await downloadAgent();
 
   // TODO: properly use readable streams
@@ -165,12 +177,12 @@ async function sendRequest(adb: Adb, request: Request, eventSink: LogEventSink =
 }
 
 // Gets the status of mods from the quest, i.e. whether the app is patched, and what mods are currently installed.
-export async function loadModStatus(device: Adb): Promise<ModStatus> {
-  await prepareAgent(device);
+export async function loadModStatus(device: Adb, eventSink: LogEventSink = null): Promise<ModStatus> {
+  await prepareAgent(device, eventSink);
 
   return await sendRequest(device, {
       type: 'GetModStatus'
-  }) as ModStatus;
+  }, eventSink) as ModStatus;
 }
 
 // Tells the backend to attempt to uninstall/install the given mods, depending on the new install status provided in `changesRequested`.
