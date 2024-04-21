@@ -18,7 +18,7 @@ export function EditableList({ list, setList, title }:
         </span>
 
 
-        <div id="editableList">
+        <div id="editableList" className="codeBox">
             {list.length > 0 || isAdding ? <>
                 {list.map(item => 
                     <p key={item}
@@ -26,7 +26,7 @@ export function EditableList({ list, setList, title }:
                         {item}
                     </p>
                 )}
-            </> : <>(None)</>}
+            </> : <>...</>}
 
             {isAdding && <input type="text" autoFocus
                 pattern="[A-Za-z0-9._]*"

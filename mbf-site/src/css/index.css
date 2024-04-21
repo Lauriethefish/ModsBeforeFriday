@@ -29,6 +29,13 @@ html {
     max-width: 40rem;
 }
 
+.codeBox {
+    font-family: Consolas;
+    background-color: #111111;
+    border-radius: 5px;
+    padding: 5px;    
+}
+
 button {
     background-color: #444444;
     border-radius: 10px;

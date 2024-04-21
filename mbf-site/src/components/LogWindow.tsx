@@ -34,7 +34,7 @@ export function LogWindow(props: LogWindowProps) {
         bottomDiv?.scrollIntoView();
     })
 
-    return <div id="logWindow">
+    return <div id="logWindow" className="codeBox">
         {props.events.map((event, idx) => <p className="logItem" key={idx}>{event.message}</p>)}
 
         <div ref={element => { bottomDiv = element }}/>
