@@ -75,10 +75,16 @@ interface SyncingModalProps {
 }
 
 export function SyncingModal(props: SyncingModalProps) {
-    return <Modal isVisible={props.isVisible}>
-        <div className='syncingWindow'>
-            <h1>{props.title}</h1>
-            <LogWindow events={props.logEvents} />
+    if(props.isVisible) {
+        return  <div className="modalBackground">
+            <div className="modal container screenWidth">
+                <div className="syncingWindow">
+                    <h1>{props.title}</h1>
+                    <LogWindow events={props.logEvents} />
+                </div>
+            </div>
         </div>
-    </Modal>
+    }   else   {
+        return <div className="modalBackground modalClosed"></div>
+    }
 }

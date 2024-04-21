@@ -21,6 +21,10 @@
     max-width: min(30rem, 95%);
 }
 
+.screenWidth {
+    width: min(30rem, 85vw);
+}
+
 .syncingWindow {
     display: flex;
     flex-direction: column;
