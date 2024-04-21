@@ -10,13 +10,14 @@ import { ErrorModal } from './components/Modal';
 import { Bounce, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
+type NoDeviceCause = "NoDeviceSelected" | "DeviceInUse";
 
 async function connect(
-  setAuthing: () => void): Promise<Adb | null> {
- const device_manager = new AdbDaemonWebUsbDeviceManager(navigator.usb);
+  setAuthing: () => void): Promise<Adb | NoDeviceCause> {
+  const device_manager = new AdbDaemonWebUsbDeviceManager(navigator.usb);
   const quest = await device_manager.requestDevice();
   if(quest === undefined) {
-    return null;
+    return "NoDeviceSelected";
   }
 
   let connection: AdbDaemonWebUsbConnection;
@@ -24,12 +25,7 @@ async function connect(
     connection = await quest.connect();
   } catch(err) {
     // Some other ADB daemon is hogging the connection, so we can't get to the Quest.
-    // On Windows, this can be easily fixed with a Win + R and a command. 
-    // On Mac/Linux/Android, using the terminal is harder and so we will just instruct to restart their device.
-    const fixInstructions = isViewingOnWindows() ? "To fix this, close SideQuest if you have it open, press Win + R and type the following text, and finally press enter.\ntaskkill /IM adb.exe /F\nAlternatively, restart your computer." 
-      : `To fix this, restart your ${isViewingOnMobile() ? "phone" : "computer"}.`
-
-    throw new Error("Some other app is trying to access your quest, e.g. SideQuest.\n" + fixInstructions);
+    return "DeviceInUse";
   }
   const keyStore: AdbWebCredentialStore = new AdbWebCredentialStore("ModsBeforeFriday");
 
@@ -47,6 +43,7 @@ function ChooseDevice() {
   const [authing, setAuthing] = useState(false);
   const [chosenDevice, setChosenDevice] = useState(null as Adb | null);
   const [connectError, setConnectError] = useState(null as string | null);
+  const [deviceInUse, setDeviceInUse] = useState(false);
 
   if(chosenDevice !== null) {
     if(chosenDevice.banner.model === "Quest") { // "Quest" not "Quest 2/3"
@@ -85,7 +82,16 @@ function ChooseDevice() {
             let device: Adb | null;
 
             try {
-              device = await connect(() => setAuthing(true));
+              const result = await connect(() => setAuthing(true));
+              if(result === "NoDeviceSelected") {
+                device = null;
+              } else if(result === "DeviceInUse") {
+                setDeviceInUse(true);
+                return;
+              } else  {
+                device = result;
+              }
+
             } catch(e) {
               console.log("Failed to connect: " + e);
               setConnectError(String(e));
@@ -101,12 +107,31 @@ function ChooseDevice() {
           }}>Connect to Quest</button>
 
           <ErrorModal isVisible={connectError != null}
-            title={"Failed to connect to device"}
-            description={connectError!}
+            title="Failed to connect to device"
+            description={connectError}
             onClose={() => setConnectError(null)}/>
+
+          <ErrorModal isVisible={deviceInUse}
+            onClose={() => setDeviceInUse(false)}
+            title="Device in use">
+              <DeviceInUse />
+          </ErrorModal>
         </div>
       </>
   }
+}
+
+function DeviceInUse() {
+ return <>
+  <p>Some other app is trying to access your Quest, e.g. SideQuest.</p>
+  {isViewingOnWindows() ? 
+    <>
+      <p>To fix this, close SideQuest if you have it open, press <span className="codeBox">Win + R</span> and type the following text, and finally press enter.</p>
+      <span className="codeBox">taskkill /IM adb.exe /F</span>  
+      <p>Alternatively, restart your computer.</p>
+    </>
+    : <p>To fix this, restart your {isViewingOnMobile() ? "phone" : "computer"}.</p>}
+ </>
 }
 
 function Title() {
