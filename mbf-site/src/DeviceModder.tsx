@@ -34,6 +34,7 @@ export function DeviceModder(props: DeviceModderProps) {
     if(modStatus === null) {
         return <div className='container mainContainer fadeIn'>
             <h2>Checking Beat Saber installation</h2>
+            <p style={{marginBottom: "0"}}>This might take a minute or so the first few times.</p>
         </div>
     }   else if(modStatus.app_info === null) {
         return <div className='container mainContainer'>
