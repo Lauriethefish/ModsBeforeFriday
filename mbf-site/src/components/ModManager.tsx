@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
-import { LogWindow, useLog } from "./LogWindow";
+import { useLog } from "./LogWindow";
 import { Mod, trimGameVersion } from "../Models";
-import { ErrorModal, Modal } from "./Modal";
+import { ErrorModal, SyncingModal } from "./Modal";
 import { Adb } from '@yume-chan/adb';
 import { ModCard } from "./ModCard";
 import UploadIcon from '../icons/upload.svg';
@@ -70,12 +70,7 @@ export function ModManager(props: ModManagerProps) {
             title={"Failed to sync mods"}
             description={modError!}
             onClose={() => setModError(null)} />
-        <Modal isVisible={isWorking}>
-            <div className='syncingWindow'>
-                <h1>Syncing Mods...</h1>
-                <LogWindow events={logEvents} />
-            </div>
-        </Modal>
+        <SyncingModal isVisible={isWorking} title="Syncing Mods..." logEvents={logEvents} />
     </>
 }
 

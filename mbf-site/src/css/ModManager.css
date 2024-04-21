@@ -42,17 +42,6 @@
     padding: 10px;
 }
 
-.syncingWindow:has(> .modal) {
-    width: min(30rem, 90vw);
-    max-width: none;
-}
-
-.syncingWindow {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
 .tab-header.selected {
     background-color: rgb(17, 39, 243);
 }

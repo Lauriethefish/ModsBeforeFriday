@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { ModLoader, ModStatus } from './Messages';
 import './css/DeviceModder.css';
 import { LogWindow, useLog } from './components/LogWindow';
-import { ErrorModal, Modal } from './components/Modal';
+import { ErrorModal, Modal, SyncingModal } from './components/Modal';
 import { ModManager } from './components/ModManager';
 import { ManifestMod, trimGameVersion } from './Models';
 import { PermissionsMenu } from './components/PermissionsMenu';
@@ -140,13 +140,7 @@ function InstallStatus(props: InstallStatusProps) {
                 }
             }}>Fix issues</button>
 
-            <Modal isVisible={fixing}>
-                <div className='syncingWindow'>
-                    <h1>Fixing issues</h1>
-                    <LogWindow events={logEvents} />
-                </div>
-            </Modal>
-
+            <SyncingModal isVisible={fixing} title="Fixing issues" logEvents={logEvents} />
             <ErrorModal title="Failed to fix issues"
                 description={error!}
                 isVisible={error != null}

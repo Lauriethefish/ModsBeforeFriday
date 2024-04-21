@@ -16,10 +16,15 @@
 }
 
 .modal {
-    margin: auto;
+    margin: 5rem auto auto;
     background-color: #1f1f1f;
-    margin-top: 5rem;
-    max-width: min(30rem, 90%);
+    max-width: min(30rem, 95%);
+}
+
+.syncingWindow {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
 
 #errorTitle {

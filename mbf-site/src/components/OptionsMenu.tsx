@@ -3,7 +3,7 @@ import { uninstallBeatSaber } from '../DeviceModder';
 import { useEffect, useState } from 'react';
 import { fixPlayerData, patchApp } from '../Agent';
 import { toast } from 'react-toastify';
-import { ErrorModal, Modal } from './Modal';
+import { ErrorModal, Modal, SyncingModal } from './Modal';
 import { PermissionsMenu } from './PermissionsMenu';
 import { ManifestMod } from '../Models';
 import '../css/OptionsMenu.css'
@@ -107,11 +107,7 @@ function RepatchMenu({ device, modStatus, quit }: {
             }
         }}>Repatch game</button>
 
-        <Modal isVisible={isPatching}>
-            <h2>Repatching Beat Saber</h2>
-            <br/>
-            <LogWindow events={logs}/>
-        </Modal>
+        <SyncingModal title="Repatching Beat Saber" isVisible={isPatching} logEvents={logs} />
     </>
 }
 

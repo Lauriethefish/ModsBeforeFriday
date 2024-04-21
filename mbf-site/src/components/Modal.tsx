@@ -2,6 +2,8 @@ import { ReactNode } from "react";
 import AlertIcon from '../icons/alert-triangle.svg'
 
 import '../css/Modal.css';
+import { LogMsg } from "../Messages";
+import { LogWindow } from "./LogWindow";
 
 interface ModalProps {
     children: ReactNode,
@@ -62,6 +64,21 @@ export function YesNoModal(props: YesNoModalProps) {
         <div className="confirmButtons">
             <button onClick={props.onYes}>Yes</button>
             <button onClick={props.onNo}>No</button>
+        </div>
+    </Modal>
+}
+
+interface SyncingModalProps {
+    isVisible: boolean,
+    title: string,
+    logEvents: LogMsg[]
+}
+
+export function SyncingModal(props: SyncingModalProps) {
+    return <Modal isVisible={props.isVisible}>
+        <div className='syncingWindow'>
+            <h1>{props.title}</h1>
+            <LogWindow events={props.logEvents} />
         </div>
     </Modal>
 }
