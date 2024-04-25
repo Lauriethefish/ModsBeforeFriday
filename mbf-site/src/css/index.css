@@ -52,7 +52,8 @@ button:hover {
 }
 
 .warning {
-    color: red
+    color: red;
+    font-weight: bold;
 }
 
 @font-face {
