@@ -52,7 +52,7 @@ export function DeviceModder(props: DeviceModderProps) {
             <p>To mod Beat Saber, MBF needs to download files such as a mod loader and several essential mods. 
                 <br />This occurs on your Quest's connection. Please make sure that WiFi is enabled, then refresh the page.</p>
         </div>
-    }   else if(!(modStatus.core_mods.supported_versions.includes(modStatus.app_info.version)) && isDeveloperUrl) {
+    }   else if(!(modStatus.core_mods.supported_versions.includes(modStatus.app_info.version)) && !isDeveloperUrl) {
         // Check if we can downgrade to a supported version
         const downgradeVersion = modStatus.core_mods
             .downgrade_versions
