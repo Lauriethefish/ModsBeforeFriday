@@ -20,6 +20,8 @@ export async function uninstallBeatSaber(device: Adb) {
     await device.subprocess.spawnAndWait("pm uninstall com.beatgames.beatsaber");
 }
 
+const isDeveloperUrl: boolean = new URLSearchParams(window.location.search).get("dev") === "true";
+
 export function DeviceModder(props: DeviceModderProps) {
     const [modStatus, setModStatus] = useState(null as ModStatus | null);
     const { device, quit } = props;
@@ -50,7 +52,7 @@ export function DeviceModder(props: DeviceModderProps) {
             <p>To mod Beat Saber, MBF needs to download files such as a mod loader and several essential mods. 
                 <br />This occurs on your Quest's connection. Please make sure that WiFi is enabled, then refresh the page.</p>
         </div>
-    }   else if(!(modStatus.core_mods.supported_versions.includes(modStatus.app_info.version)) && !IsDeveloperUrl()) {
+    }   else if(!(modStatus.core_mods.supported_versions.includes(modStatus.app_info.version)) && isDeveloperUrl) {
         // Check if we can downgrade to a supported version
         const downgradeVersion = modStatus.core_mods
             .downgrade_versions
@@ -79,8 +81,8 @@ export function DeviceModder(props: DeviceModderProps) {
                     <h1>App is modded</h1>
                     <p>Your Beat Saber install is modded, and its version is compatible with mods.</p>
 
-                    {IsDeveloperUrl() ? <>
-                        <p className="warning">Core mod functionality is disabled (/dev URL)</p>
+                    {isDeveloperUrl ? <>
+                        <p className="warning">Core mod functionality is disabled.</p>
                     </> : <>
                         <InstallStatus
                                 modStatus={modStatus}
@@ -108,10 +110,6 @@ export function DeviceModder(props: DeviceModderProps) {
             onCompleted={modStatus => setModStatus(modStatus)}
             downgradingTo={null} />
     }
-}
-
-function IsDeveloperUrl(): boolean {
-    return window.location.href.indexOf("/dev") != -1;
 }
 
 interface InstallStatusProps {
@@ -192,7 +190,7 @@ function PatchingMenu(props: PatchingMenuProps) {
             <button className="modButton" onClick={async () => {
                 setIsPatching(true);
                 try {
-                    onCompleted(await patchApp(device, modStatus, downgradingTo, manifestMod, false, IsDeveloperUrl(), addLogEvent));
+                    onCompleted(await patchApp(device, modStatus, downgradingTo, manifestMod, false, isDeveloperUrl, addLogEvent));
                 } catch(e) {
                     setPatchingError(String(e));
                     setIsPatching(false);
@@ -218,7 +216,7 @@ function PatchingMenu(props: PatchingMenuProps) {
 function VersionSupportedMessage({ version }: { version: string }) {
     return <>
         <h1>Install Custom Songs</h1>
-        {IsDeveloperUrl() ? 
+        {isDeveloperUrl ? 
             <p className="warning">Mod development mode engaged: bypassing version check.
             This will not help you unless you are a mod developer!</p> : <>
             <p>Your app has version {trimGameVersion(version)}, which is supported by mods!</p>
