@@ -98,7 +98,7 @@ function RepatchMenu({ device, modStatus, quit }: {
                 // TODO: Right now we do not set the mod status back to the DeviceModder state for it.
                 // This is fine at the moment since repatching does not update this state in any important way,
                 // but would be a problem if repatching did update it!
-                await patchApp(device, modStatus, null, manifestMod, true, addLogEvent);
+                await patchApp(device, modStatus, null, manifestMod, true, false, addLogEvent);
             }   catch(e) {
                 // Force a quit so the app rechecks the state of the install is correct.
                 quit("Failed to remod Beat Saber: the install is now likely in an invalid state!: " + e);

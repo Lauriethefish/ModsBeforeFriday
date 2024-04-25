@@ -8,6 +8,7 @@ export interface Patch {
     type: 'Patch',
     manifest_mod: ManifestMod,
     downgrade_to: string | null,
+    allow_no_core_mods: boolean
     remodding: boolean
 }
 

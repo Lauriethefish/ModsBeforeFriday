@@ -15,8 +15,8 @@ use log::{error, info, warn};
 pub fn handle_request(request: Request) -> Result<Response> {
     match request {
         Request::GetModStatus => handle_get_mod_status(),
-        Request::Patch { downgrade_to , remodding, manifest_mod} => 
-            handle_patch(downgrade_to, remodding, manifest_mod),
+        Request::Patch { downgrade_to , remodding, manifest_mod, allow_no_core_mods} => 
+            handle_patch(downgrade_to, remodding, manifest_mod, allow_no_core_mods),
         Request::SetModsEnabled {
             statuses
         } => run_mod_action(statuses),
@@ -350,7 +350,7 @@ fn handle_fix_player_data() -> Result<Response> {
     }
 }
 
-fn handle_patch(downgrade_to: Option<String>, repatch: bool, manifest_mod: ManifestMod) -> Result<Response> {
+fn handle_patch(downgrade_to: Option<String>, repatch: bool, manifest_mod: ManifestMod, allow_no_core_mods: bool) -> Result<Response> {
     let app_info = get_app_info()?
         .ok_or(anyhow!("Cannot patch when app not installed"))?;
 
@@ -388,8 +388,15 @@ fn handle_patch(downgrade_to: Option<String>, repatch: bool, manifest_mod: Manif
         mod_manager.wipe_all_mods().context("Failed to wipe existing mods")?;
         mod_manager.load_mods()?; // Should load no mods.
     
-        install_core_mods(&mut mod_manager, get_app_info()?
-            .expect("Beat Saber should be installed after patching"))?;
+        match install_core_mods(&mut mod_manager, get_app_info()?
+            .ok_or(anyhow!("Beat Saber should be installed after patching"))?) {
+                Ok(_) => info!("Successfully installed all core mods"),
+                Err(err) => if allow_no_core_mods {
+                    warn!("Failed to install core mods: {err}")
+                }   else    {
+                    return Err(err).context("Failed to install core mods")
+                }
+            }
     }
     
     Ok(Response::Mods { installed_mods: get_mod_models(mod_manager) })

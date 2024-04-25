@@ -56,8 +56,6 @@ pub enum Request {
     /// - Patches Beat Saber to add support for modloaders.
     /// - Optionally, downgrades the game to the given version if downgrade_to is Some
     /// - Saves the modloader to the appropriate locatioon on the Quest.
-    /// 
-    /// <OPTIONALLY, if `install_core_mods` is set to `true`>
     /// - Wipes any existing mods.
     /// - Installs the core mods for the current version.
     /// Returns a `Mods` response to update the frontend with the newly installed core mods.
@@ -73,7 +71,9 @@ pub enum Request {
         //
         // TODO: in the future, it might make sense for remodding to detect a change in the libunity.so (harder) 
         // or libmainloader (easier) so that these can be easily updated.
-        remodding: bool
+        remodding: bool,
+        // If this is true, patching will not be failed if core mods cannot be found for the version.
+        allow_no_core_mods: bool
     },
 
     // Attempts to fix a blackscreen issue by removing PlayerData.dat from `/sdcard/...../files/`.

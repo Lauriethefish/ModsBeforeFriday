@@ -50,7 +50,7 @@ export function DeviceModder(props: DeviceModderProps) {
             <p>To mod Beat Saber, MBF needs to download files such as a mod loader and several essential mods. 
                 <br />This occurs on your Quest's connection. Please make sure that WiFi is enabled, then refresh the page.</p>
         </div>
-    }   else if(!(modStatus.core_mods.supported_versions.includes(modStatus.app_info.version))) {
+    }   else if(!(modStatus.core_mods.supported_versions.includes(modStatus.app_info.version)) && !IsDeveloperUrl()) {
         // Check if we can downgrade to a supported version
         const downgradeVersion = modStatus.core_mods
             .downgrade_versions
@@ -79,13 +79,16 @@ export function DeviceModder(props: DeviceModderProps) {
                     <h1>App is modded</h1>
                     <p>Your Beat Saber install is modded, and its version is compatible with mods.</p>
 
-                    <InstallStatus
-                        modStatus={modStatus}
-                        device={device}
-                        onFixed={status => setModStatus(status)}
-                    />
-                    <h4>Not sure what to do next?</h4>
-                    <NextSteps />
+                    {IsDeveloperUrl() ? <>
+                        <p className="warning">Core mod functionality is disabled (/dev URL)</p>
+                    </> : <>
+                        <InstallStatus
+                                modStatus={modStatus}
+                                device={device}
+                                onFixed={status => setModStatus(status)}/>
+                            <h4>Not sure what to do next?</h4>
+                        <NextSteps />
+                    </>}
                 </div>
 
                 <ModManager modStatus={modStatus}
@@ -105,6 +108,10 @@ export function DeviceModder(props: DeviceModderProps) {
             onCompleted={modStatus => setModStatus(modStatus)}
             downgradingTo={null} />
     }
+}
+
+function IsDeveloperUrl(): boolean {
+    return window.location.href.indexOf("/dev") != -1;
 }
 
 interface InstallStatusProps {
@@ -185,7 +192,7 @@ function PatchingMenu(props: PatchingMenuProps) {
             <button className="modButton" onClick={async () => {
                 setIsPatching(true);
                 try {
-                    onCompleted(await patchApp(device, modStatus, downgradingTo, manifestMod, false, addLogEvent));
+                    onCompleted(await patchApp(device, modStatus, downgradingTo, manifestMod, false, IsDeveloperUrl(), addLogEvent));
                 } catch(e) {
                     setPatchingError(String(e));
                     setIsPatching(false);
@@ -211,9 +218,13 @@ function PatchingMenu(props: PatchingMenuProps) {
 function VersionSupportedMessage({ version }: { version: string }) {
     return <>
         <h1>Install Custom Songs</h1>
-        <p>Your app has version {trimGameVersion(version)}, which is supported by mods!</p>
-        <p>To get your game ready for custom songs, ModsBeforeFriday will next patch your Beat Saber app and install some essential mods.
-        Once this is done, you will be able to manage your custom songs <b>inside the game.</b></p>
+        {IsDeveloperUrl() ? 
+            <p className="warning">Mod development mode engaged: bypassing version check.
+            This will not help you unless you are a mod developer!</p> : <>
+            <p>Your app has version {trimGameVersion(version)}, which is supported by mods!</p>
+            <p>To get your game ready for custom songs, ModsBeforeFriday will next patch your Beat Saber app and install some essential mods.
+            Once this is done, you will be able to manage your custom songs <b>inside the game.</b></p>
+        </>}
     </>
 }
 

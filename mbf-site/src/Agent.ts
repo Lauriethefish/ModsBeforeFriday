@@ -255,11 +255,13 @@ export async function patchApp(device: Adb,
   downgradeToVersion: string | null,
   manifestMod: ManifestMod,
   remodding: boolean,
+  allow_no_core_mods: boolean,
   eventSink: LogEventSink = null): Promise<ModStatus> {
   let response = await sendRequest(device, {
       type: 'Patch',
       downgrade_to: downgradeToVersion,
       manifest_mod: manifestMod,
+      allow_no_core_mods: allow_no_core_mods,
       remodding
   }, eventSink);
 
