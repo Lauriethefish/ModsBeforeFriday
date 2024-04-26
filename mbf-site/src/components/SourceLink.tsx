@@ -10,5 +10,5 @@ export function CornerSourceLink() {
 }
 
 export function SmallSourceLink() {
-    return <a href={SourceUrl} target="_blank" rel="noopener noreferrer" className="mobileOnly">View Source Code</a>;
+    return <a href={SourceUrl} target="_blank" rel="noopener noreferrer" className="mobileOnly">Source Code</a>;
 }

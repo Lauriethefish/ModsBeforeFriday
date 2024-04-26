@@ -13,8 +13,12 @@ h3 {
     margin-bottom: 0;
 }
 
+a {
+    color: rgb(0, 102, 255);
+}
+
 a:visited {
-    color: rgb(206, 14, 62);
+    color: rgb(183, 0, 255);
 }
 
 a {
