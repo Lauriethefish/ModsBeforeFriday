@@ -6,6 +6,7 @@ mod patching;
 mod external_res;
 mod mod_man;
 mod handlers;
+mod data_fix;
 
 use crate::requests::Request;
 use anyhow::{Context, Result};

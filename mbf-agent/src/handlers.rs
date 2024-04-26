@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
-use crate::{download_file, DOWNLOADS_PATH, PLAYER_DATA_BAK_PATH, PLAYER_DATA_PATH, SONGS_PATH, TEMP_PATH};
+use crate::{data_fix, download_file, DATAKEEPER_PATH, DOWNLOADS_PATH, PLAYER_DATA_BAK_PATH, PLAYER_DATA_PATH, SONGS_PATH, TEMP_PATH};
 use crate::{axml::AxmlReader, patching, zip::ZipFile};
 use crate::external_res::{get_diff_index, JsonPullError};
 use crate::manifest::{ManifestInfo, ManifestMod};
@@ -329,6 +329,13 @@ fn handle_quick_fix() -> Result<Response> {
 fn handle_fix_player_data() -> Result<Response> {
     patching::kill_app()?; // Kill app, in case it's still stuck in a hanging state
 
+    let mut did_work = false;
+    if Path::new(DATAKEEPER_PATH).exists() {
+        info!("Fixing color scheme issues");
+        data_fix::fix_colour_schemes(DATAKEEPER_PATH)?;
+        did_work = true;
+    }
+    
     if Path::new(PLAYER_DATA_PATH).exists() {
         info!("Backing up player data");
         patching::backup_player_data()?;
@@ -338,16 +345,14 @@ fn handle_fix_player_data() -> Result<Response> {
         if Path::new(PLAYER_DATA_BAK_PATH).exists() {
             std::fs::remove_file(PLAYER_DATA_BAK_PATH)?;
         }
-        
-        Ok(Response::FixedPlayerData {
-            existed: true
-        })
+        did_work = true;
     }   else {
         warn!("No player data found to \"fix\"");
-        Ok(Response::FixedPlayerData {
-            existed: false
-        })
     }
+
+    Ok(Response::FixedPlayerData {
+        existed: did_work
+    })
 }
 
 fn handle_patch(downgrade_to: Option<String>, repatch: bool, manifest_mod: ManifestMod, allow_no_core_mods: bool) -> Result<Response> {

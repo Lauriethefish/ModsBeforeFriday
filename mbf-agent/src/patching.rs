@@ -2,7 +2,7 @@ use std::{fs::{File, OpenOptions}, io::{BufReader, Cursor, Read, Seek, Write}, p
 
 use anyhow::{Context, Result, anyhow};
 use log::{error, info, warn};
-use crate::{axml::{AxmlReader, AxmlWriter}, copy_stream_progress, external_res::{self, Diff, VersionDiffs}, requests::{AppInfo, ModLoader}, zip::{self, ZIP_CRC}, ModTag, APK_ID, APP_OBB_PATH, DATAKEEPER_PATH, DATA_BACKUP_PATH, PLAYER_DATA_PATH};
+use crate::{axml::{AxmlReader, AxmlWriter}, copy_stream_progress, data_fix::fix_colour_schemes, external_res::{self, Diff, VersionDiffs}, requests::{AppInfo, ModLoader}, zip::{self, ZIP_CRC}, ModTag, APK_ID, APP_OBB_PATH, DATAKEEPER_PATH, DATA_BACKUP_PATH, PLAYER_DATA_PATH};
 use crate::manifest::{ManifestMod, ResourceIds};
 use crate::zip::{signing, FileCompression, ZipFile};
 
@@ -107,6 +107,14 @@ fn patch_and_reinstall(libunity_path: Option<PathBuf>,
         backup_player_data().context("Failed to backup player data")?;
     }   else    {
         info!("No player data to backup");
+    }
+
+    if Path::new(DATAKEEPER_PATH).exists() {
+        info!("Fixing colour schemes in backed up PlayerData.dat");
+        match fix_colour_schemes(DATAKEEPER_PATH) {
+            Ok(_) => {},
+            Err(err) => warn!("Failed to fix colour schemes: {err}")
+        }
     }
 
     reinstall_modded_app(&temp_apk_path)?;
