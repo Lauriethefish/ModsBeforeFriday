@@ -1,0 +1,30 @@
+.sourceLink {
+    position: fixed;
+    bottom: 0;
+    right: 0;
+
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 5px;
+}
+
+.mobileOnly {
+    display: none;
+}
+
+@media screen and (max-width: 1200px) {
+    .sourceLink {
+        display: none;
+    }
+
+    .mobileOnly {
+        display: inline;
+    }
+}
+
+.sourceLink > p {
+    margin: 0;
+}

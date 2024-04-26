@@ -13,6 +13,14 @@ h3 {
     margin-bottom: 0;
 }
 
+a:visited {
+    color: rgb(206, 14, 62);
+}
+
+a {
+    font-weight: bold;
+}
+
 html {
     overflow-y: scroll;
 }

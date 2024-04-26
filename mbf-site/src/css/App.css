@@ -36,8 +36,9 @@ h1:hover > .title {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 3px;
+    justify-content: first baseline;
+    height: 100vh;
+    gap: 0px;
 }
 
 #chooseDevice {

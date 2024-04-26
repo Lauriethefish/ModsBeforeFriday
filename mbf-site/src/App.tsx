@@ -9,6 +9,7 @@ import { DeviceModder } from './DeviceModder';
 import { ErrorModal } from './components/Modal';
 import { Bounce, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { CornerSourceLink, SmallSourceLink } from './components/SourceLink';
 
 type NoDeviceCause = "NoDeviceSelected" | "DeviceInUse";
 
@@ -145,6 +146,7 @@ function Title() {
       <span className="title">riday</span>
       <span className="initial">!</span>
     </h1>
+    <SmallSourceLink />
     <p>The easiest way to install custom songs for Beat Saber on Quest!</p>
   </>
 }
@@ -160,6 +162,7 @@ function AppContents() {
 function App() {
   return <div className='main'>
     <AppContents />
+    <CornerSourceLink />
     <ToastContainer
       position="bottom-right"
       theme="dark"
