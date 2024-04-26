@@ -50,6 +50,10 @@
     background-color: rgb(17, 39, 243);
 }
 
+.tab-header.selected {
+    cursor: default;
+}
+
 .noPadding {
     padding: 0;
 }
@@ -59,6 +63,7 @@
     padding: 10px;
     border-radius: 10px;
     transition: background 200ms;
+    cursor: pointer;
 }
 
 .tab-header:hover {

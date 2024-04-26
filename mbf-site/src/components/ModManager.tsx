@@ -83,14 +83,17 @@ function Title(props: TitleProps) {
     const { menu, setMenu } = props;
 
     return <div className='container noPadding horizontalCenter'>
-        <div className={`tab-header ${menu === 'current' ? "selected":""}`}>
-            <h1 onClick={() => setMenu('current')}>Your Mods</h1>
+        <div className={`tab-header ${menu === 'current' ? "selected":""}`}
+            onClick={() => setMenu('current')}>
+            <h1>Your Mods</h1>
         </div>
-        <span className={`tab-header ${menu === 'options' ? "selected":""}`}>
-            <img onClick={() => setMenu('options')} src={ToolsIcon} />
+        <span className={`tab-header ${menu === 'options' ? "selected":""}`}
+            onClick={() => setMenu('options')}>
+            <img src={ToolsIcon} />
         </span>
-        <div className={`tab-header ${menu === 'add' ? "selected":""}`}>
-            <h1 onClick={() => setMenu('add')}>Add Mods</h1>
+        <div className={`tab-header ${menu === 'add' ? "selected":""}`}
+            onClick={() => setMenu('add')}>
+            <h1>Add Mods</h1>
         </div>
     </div>
 }
