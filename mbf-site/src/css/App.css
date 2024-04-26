@@ -38,7 +38,7 @@ h1:hover > .title {
     align-items: center;
     justify-content: first baseline;
     height: 100vh;
-    gap: 0px;
+    gap: 3px;
 }
 
 #chooseDevice {
