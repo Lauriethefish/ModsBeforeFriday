@@ -406,7 +406,9 @@ fn delete_file_names(file_paths: &[String], exclude: HashSet<String>, within: im
         }
 
         let stored_path = within.as_ref().join(file_name);
-        std::fs::remove_file(stored_path)?;
+        if stored_path.exists() {
+            std::fs::remove_file(stored_path)?;
+        }
     }
 
     Ok(())
