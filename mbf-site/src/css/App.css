@@ -37,8 +37,13 @@ h1:hover > .title {
     flex-direction: column;
     align-items: center;
     justify-content: first baseline;
-    height: 100vh;
     gap: 3px;
+}
+
+@media screen and (min-width: 1200px) {
+    .main {
+        height: 100vh;
+    }
 }
 
 #chooseDevice {

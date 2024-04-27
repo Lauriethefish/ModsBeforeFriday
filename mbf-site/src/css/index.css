@@ -68,6 +68,12 @@ button:hover {
     float: right;
 }
 
+@media screen and (max-width: 700px) {
+    .discreetButton {
+        background-color: rgba(175, 175, 175, 0.13);
+    }
+}
+
 .warning {
     color: red;
     font-weight: bold;

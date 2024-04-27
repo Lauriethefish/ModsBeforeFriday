@@ -185,7 +185,7 @@ function PatchingMenu(props: PatchingMenuProps) {
             <b>In addition, by modding the game you will lose access to both vanilla leaderboards and vanilla multiplayer.</b> (Modded leaderboards/servers are available.)
             <br/>
             <div>
-                <button className="discreetButton" id="permissionsButton" onClick={() => setSelectingPerms(true)}>Change Permissions</button>
+                <button className="discreetButton" id="permissionsButton" onClick={() => setSelectingPerms(true)}>Patch Options</button>
                 <button className="largeCenteredButton" onClick={async () => {
                     setIsPatching(true);
                     try {
