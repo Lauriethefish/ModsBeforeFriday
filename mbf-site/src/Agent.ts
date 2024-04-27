@@ -30,9 +30,34 @@ function logInfo(sink: LogEventSink, msg: string) {
 }
 
 export async function prepareAgent(adb: Adb, eventSink: LogEventSink) {
+  logInfo(eventSink, "Preparing agent: used to communicate with your Quest.");
+
+  const resp = await fetch("mbf-agent.sha1");
+  let existingUpToDate = false;
+  if(resp.ok) {
+    let latestSha1 = (await resp.text()).trim().toUpperCase();
+    console.log("Latest agent SHA1 " + latestSha1);
+
+    const exsitingSha1 = (await adb.subprocess.spawnAndWait(`sha1sum ${AgentPath} | cut -f 1 -d " "`)).stdout
+      .trim()
+      .toUpperCase();
+    console.log("Existing agent SHA1: " + exsitingSha1);
+    existingUpToDate = latestSha1 == exsitingSha1.trim().toUpperCase();
+  } else  {
+    console.warn("Failed to check SHA1 of agent: it will be redownloaded every time");
+  }
+
+  if(existingUpToDate) {
+    logInfo(eventSink, "Agent is up to date");
+  } else  {
+    await overwriteAgent(adb, eventSink);
+  }
+
+}
+
+export async function overwriteAgent(adb: Adb, eventSink: LogEventSink) {
   const sync = await adb.sync();
-  console.group("Setting up agent on Quest");
-  logInfo(eventSink, "Preparing agent");
+  console.group("Downloading and overwriting agent on Quest");
   try {
     logInfo(eventSink, "Removing existing agent");
     await adb.subprocess.spawnAndWait("rm " + AgentPath)

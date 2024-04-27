@@ -44,6 +44,8 @@ jobs:
         run: cargo build --manifest-path=mbf-agent/Cargo.toml --target aarch64-linux-android --release
       - name: Copy agent
         run: cp ./mbf-agent/target/aarch64-linux-android/release/mbf-agent ./mbf-site/public/mbf-agent
+      - name: Generate agent checksum
+        run: sha1sum ./mbf-site/public/mbf-agent | cut -f 1 -d " " > ./mbf-site/public/mbf-agent.sha1
       - name: yarn install
         run: yarn --cwd ./mbf-site install
       - name: yarn build
