@@ -63,6 +63,11 @@ button:hover {
     transition-duration: 200ms;
 }
 
+.discreetButton {
+    background-color: rgba(105, 105, 105, 0.13);
+    float: right;
+}
+
 .warning {
     color: red;
     font-weight: bold;

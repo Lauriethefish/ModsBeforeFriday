@@ -168,6 +168,7 @@ function PatchingMenu(props: PatchingMenuProps) {
     const [isPatching, setIsPatching] = useState(false);
     const [logEvents, addLogEvent] = useLog();
     const [patchingError, setPatchingError] = useState(null as string | null);
+    const [selectingPerms, setSelectingPerms] = useState(false);
     const [manifestMod, setManifestMod] = useState({
         add_permissions: [],
         add_features: []
@@ -179,29 +180,38 @@ function PatchingMenu(props: PatchingMenuProps) {
             {downgradingTo !== null && <DowngradeMessage toVersion={downgradingTo}/>}
             {downgradingTo === null && <VersionSupportedMessage version={modStatus.app_info!.version} />}
             
-            <Collapsible title="Change App Permissions">
-                <p>Certain mods may find it useful for the app to request microphone permissions or access to the headset cameras.</p>
-                <PermissionsMenu manifestMod={manifestMod} setManifestMod={mod => setManifestMod(mod)} />
-            </Collapsible>
             <h2 className='warning'>READ CAREFULLY</h2>
             <p>Mods and custom songs are not supported by Beat Games. You may experience bugs and crashes that you wouldn't in a vanilla game.</p>
             <b>In addition, by modding the game you will lose access to both vanilla leaderboards and vanilla multiplayer.</b> (Modded leaderboards/servers are available.)
-
-            <button className="modButton" onClick={async () => {
-                setIsPatching(true);
-                try {
-                    onCompleted(await patchApp(device, modStatus, downgradingTo, manifestMod, false, isDeveloperUrl, addLogEvent));
-                } catch(e) {
-                    setPatchingError(String(e));
-                    setIsPatching(false);
-                }
-            }}>Mod the app</button>
+            <br/>
+            <div>
+                <button className="discreetButton" id="permissionsButton" onClick={() => setSelectingPerms(true)}>Change Permissions</button>
+                <button className="largeCenteredButton" onClick={async () => {
+                    setIsPatching(true);
+                    try {
+                        onCompleted(await patchApp(device, modStatus, downgradingTo, manifestMod, false, isDeveloperUrl, addLogEvent));
+                    } catch(e) {
+                        setPatchingError(String(e));
+                        setIsPatching(false);
+                    }
+                }}>Mod the app</button>
+            </div>
 
             <ErrorModal
                 isVisible={patchingError != null}
                 title={"Failed to install mods"}
                 description={'An error occured while patching ' + patchingError}
                 onClose={() => setPatchingError(null)}/>
+
+            <Modal isVisible={selectingPerms}>
+                <h2>Change Permissions</h2>
+                <p>Certain mods require particular Android permissions to be set on the Beat Saber app in order to work correctly.</p>
+                <p>(You can change these permissions later, so don't worry about enabling them all now unless you know which ones you need.)</p>
+                <PermissionsMenu manifestMod={manifestMod}
+                    setManifestMod={manifestMod => setManifestMod(manifestMod)}/>
+                <button className="largeCenteredButton" onClick={() => setSelectingPerms(false)}>Confirm permissions</button>
+            </Modal>
+                
         </div>
     }   else    {
         return <div className='container mainContainer'>

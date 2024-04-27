@@ -1,4 +1,4 @@
-.modButton {
+.largeCenteredButton {
     font-size: larger;
     margin: 0 auto;
     display: block;
@@ -8,4 +8,14 @@
 
 h2.warning {
     margin-top: 15px;
+}
+
+div:has(#permissionsButton) {
+    position: relative;
+}
+
+#permissionsButton {
+    position: absolute;
+    right: 0;
+    bottom: 0;
 }
