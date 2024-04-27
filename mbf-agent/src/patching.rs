@@ -332,7 +332,7 @@ fn patch_apk_in_place(path: impl AsRef<Path>, libunity_path: Option<PathBuf>, ma
             modloader_version: None // Temporary, but this field is universally considered to be option so this should be OK.
         })?;
 
-        info!("Adding unstripped libunity.so");
+        info!("Adding unstripped libunity.so (this may take up to a minute)");
         match libunity_path {
             Some(unity_path) => {
                 let mut unity_stream = File::open(unity_path)?;
