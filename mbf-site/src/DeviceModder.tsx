@@ -242,7 +242,7 @@ function DowngradeMessage({ toVersion }: { toVersion: string }) {
         <p>MBF has detected that your version of Beat Saber doesn't support mods!</p>
 
         <p>Fortunately for you, your version can be downgraded automatically to the latest moddable version: {trimGameVersion(toVersion)}</p>
-        <p><span className='warning'><b>NOTE:</b></span> By downgrading, you will lose access to any DLCs or other content that is not present in version {trimGameVersion(toVersion)}. If you decide to stop using mods and reinstall vanilla Beat Saber, however, then you will get this content back.</p>
+        <p><span className='warning'><b>NOTE:</b></span> By downgrading, you will lose access to any DLC or other content that is not present in version {trimGameVersion(toVersion)}. If you decide to stop using mods and reinstall vanilla Beat Saber, however, then you will get this content back.</p>
     </>
 }
 
