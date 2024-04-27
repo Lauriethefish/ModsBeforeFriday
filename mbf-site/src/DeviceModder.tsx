@@ -180,7 +180,7 @@ function PatchingMenu(props: PatchingMenuProps) {
             {downgradingTo === null && <VersionSupportedMessage version={modStatus.app_info!.version} />}
             
             <Collapsible title="Change App Permissions">
-                <p>Certain mods may find it useful for the app to request microphone permissions or access to the headset cameras. Due to the privacy implications, you need to enable permissions here if you want them.</p>
+                <p>Certain mods may find it useful for the app to request microphone permissions or access to the headset cameras.</p>
                 <PermissionsMenu manifestMod={manifestMod} setManifestMod={mod => setManifestMod(mod)} />
             </Collapsible>
             <h2 className='warning'>READ CAREFULLY</h2>
