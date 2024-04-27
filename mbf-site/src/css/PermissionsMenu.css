@@ -5,3 +5,12 @@
     justify-content: first baseline;
     gap: 10px;
 }
+
+#advancedOptions {
+    background-color: rgba(105, 105, 105, 0.13);
+    float: right;
+}
+
+#advancedOptions:hover {
+    background-color: rgba(105, 105, 105, 0.5);
+}

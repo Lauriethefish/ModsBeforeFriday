@@ -48,9 +48,9 @@ export function PermissionsMenu({ manifestMod, setManifestMod }: ManifestStatePr
     const [advanced, setAdvanced] = useState(false);
 
     return <>
+        <button id="advancedOptions" onClick={() => setAdvanced(!advanced)}>{advanced ? "Simple options" : "Advanced Options"}</button>
         {!advanced && <ToggleMenu manifestMod={manifestMod} setManifestMod={setManifestMod} />}
         {advanced && <TextFieldMenu manifestMod={manifestMod} setManifestMod={setManifestMod} />}
-        <button onClick={() => setAdvanced(!advanced)}>{advanced ? "Simple options" : "Advanced Options"}</button>
     </>
 }
 
@@ -83,6 +83,7 @@ export function TextFieldMenu({ manifestMod, setManifestMod }: ManifestStateProp
             ...manifestMod,
             add_permissions: newPermissions
         })} />
+        <br/>
         <EditableList title="Features" list={manifestMod.add_features} setList={newFeatures => setManifestMod({
             ...manifestMod,
             add_features: newFeatures

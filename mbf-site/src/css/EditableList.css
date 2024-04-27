@@ -26,7 +26,13 @@
     flex-direction: row;
     align-items: center;
     margin-top: 0px;
+    margin-bottom: 10px;
     gap: 10px;
+}
+
+#listTitle > h4 {
+    margin-top: 0px;
+    margin-bottom: 0px;
 }
 
 #listTitle > button {

@@ -91,8 +91,7 @@ function RepatchMenu({ device, modStatus, quit }: {
         <p>Certain mods require particular Android permissions to be enabled in order to work. 
             To change the permisions, you will need to re-patch your game, which can be done automatically with the button below.</p>
         <PermissionsMenu manifestMod={manifestMod} setManifestMod={mod => setManifestMod(mod)}/>
-        <br/><br/>
-        <button className="repatch" onClick={async () => {
+        <button onClick={async () => {
             setPatching(true);
             try {
                 // TODO: Right now we do not set the mod status back to the DeviceModder state for it.
