@@ -1,8 +1,8 @@
-use std::{fs::{File, OpenOptions}, io::{BufReader, Cursor, Read, Seek, Write}, path::{Path, PathBuf}, process::Command, time::Instant};
+use std::{fs::{File, OpenOptions}, io::{BufReader, Cursor, Read, Seek, Write}, path::{Path, PathBuf}, process::Command};
 
 use anyhow::{Context, Result, anyhow};
-use log::{error, info, warn};
-use crate::{axml::{AxmlReader, AxmlWriter}, copy_stream_progress, data_fix::fix_colour_schemes, external_res::{self, Diff, VersionDiffs}, requests::{AppInfo, ModLoader}, zip::{self, ZIP_CRC}, ModTag, APK_ID, APP_OBB_PATH, DATAKEEPER_PATH, DATA_BACKUP_PATH, PLAYER_DATA_PATH};
+use log::{info, warn};
+use crate::{axml::{AxmlReader, AxmlWriter}, data_fix::fix_colour_schemes, download_file_with_attempts, external_res::{self, Diff, VersionDiffs}, requests::{AppInfo, ModLoader}, zip::{self, ZIP_CRC}, ModTag, APK_ID, APP_OBB_PATH, DATAKEEPER_PATH, DATA_BACKUP_PATH, PLAYER_DATA_PATH};
 use crate::manifest::{ManifestMod, ResourceIds};
 use crate::zip::{signing, FileCompression, ZipFile};
 
@@ -14,7 +14,6 @@ const MOD_TAG_PATH: &str = "modded.json";
 
 const LIB_MAIN_PATH: &str = "lib/arm64-v8a/libmain.so";
 const LIB_UNITY_PATH: &str = "lib/arm64-v8a/libunity.so";
-const DIFF_DOWNLOAD_ATTEMPTS: u32 = 3;
 
 // Mods the currently installed version of the given app and reinstalls it, without doing any downgrading.
 // If `manifest_only` is true, patching will only attempt to update permissions/features 
@@ -234,62 +233,20 @@ fn download_diffs(to_path: impl AsRef<Path>, version_diffs: &VersionDiffs) -> Re
 
 // Attempts to download the given diff DIFF_DOWNLOAD_ATTEMPTS times, returning an error if the final attempt fails.
 fn download_diff_retry(diff: &Diff, to_dir: impl AsRef<Path>) -> Result<()> {
-    let mut attempt = 1;
-    loop {
-        match download_diff(diff, &to_dir) {
-            Ok(_) => return Ok(()),
-            Err(err) => if attempt == DIFF_DOWNLOAD_ATTEMPTS {
-                break Err(err);
-            }   else    {
-                error!("Failed to download {}: {err}\nTrying again...", diff.diff_name);
-            }
-        }
+    let url = external_res::get_diff_url(diff);
+    let output_path = to_dir.as_ref().join(&diff.diff_name);
 
-        attempt += 1;
-    }
-}
-
-// Downloads a diff to the given directory, using the file name given in the `Diff` struct.
-fn download_diff(diff: &Diff, to_dir: impl AsRef<Path>) -> Result<()> {
-    let mut output = OpenOptions::new()
-        .create(true)
-        .truncate(true)
-        .write(true)
-        .open(to_dir.as_ref().join(&diff.diff_name))?;
-
-    let (mut resp, length) = external_res::get_diff_reader(diff)?;
-
-    if let Some(length) = length {
-        let mut last_progress_update = Instant::now();
-        copy_stream_progress(&mut resp, &mut output, &mut |bytes_copied| {
-            let now = Instant::now();
-            if now.duration_since(last_progress_update).as_secs_f32() > 2.0 {
-                last_progress_update = now;
-                info!("Progress: {:.2}%", (bytes_copied as f32 / length as f32) * 100.0);
-            }
-        })?;
-
-    }   else {
-        warn!("Diff repository returned no Content-Length, so cannot show download progress");
-        std::io::copy(&mut resp, &mut output)?;
-    }
-    Ok(())
+    download_file_with_attempts(&output_path, &url).context("Failed to download diff file")
 }
 
 fn save_libunity(temp_path: impl AsRef<Path>, version: &str) -> Result<Option<PathBuf>> {
-    let mut libunity_stream = match external_res::get_libunity_stream(APK_ID, version)? {
-        Some(stream) => stream,
+    let url = match external_res::get_libunity_url(APK_ID, version)? {
+        Some(url) => url,
         None => return Ok(None) // No libunity for this version
     };
 
     let libunity_path = temp_path.as_ref().join("libunity.so");
-    let mut libunity_handle = OpenOptions::new()
-        .truncate(true)
-        .write(true)
-        .create(true)
-        .open(&libunity_path)?;
-
-    std::io::copy(&mut libunity_stream, &mut libunity_handle)?;
+    download_file_with_attempts(&libunity_path, &url).context("Failed to download unstripped libunity.so")?;
 
     Ok(Some(libunity_path))
 }

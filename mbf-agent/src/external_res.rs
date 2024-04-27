@@ -3,7 +3,6 @@ use semver::Version;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Display};
 use anyhow::{Context, Result};
-use std::io::Read;
 
 #[derive(Deserialize)]
 #[derive(Serialize)]
@@ -72,7 +71,7 @@ pub fn fetch_core_mods() -> Result<CoreModIndex, JsonPullError> {
 const UNITY_INDEX_URL: &str = "https://raw.githubusercontent.com/Lauriethefish/QuestUnstrippedUnity/main/index.json";
 const UNITY_VER_FORMAT: &str = "https://raw.githubusercontent.com/Lauriethefish/QuestUnstrippedUnity/main/versions/{0}.so";
 
-pub fn get_libunity_stream(apk_id: &str, version: &str) -> Result<Option<impl Read>> {
+pub fn get_libunity_url(apk_id: &str, version: &str) -> Result<Option<String>> {
     let resp = ureq::get(UNITY_INDEX_URL)
         .call()
         .context("Failed to GET libunity index")?;
@@ -85,14 +84,7 @@ pub fn get_libunity_stream(apk_id: &str, version: &str) -> Result<Option<impl Re
         None => return Ok(None)
     };
     match app_index.get(version) {
-        Some(unity_version) => {
-            let version_uri = UNITY_VER_FORMAT.replace("{0}", &unity_version);
-
-            Ok(Some(ureq::get(&version_uri)
-                .call()
-                .context("Failed to GET libunity version")?
-                .into_reader()))
-        },
+        Some(unity_version) => Ok(Some(UNITY_VER_FORMAT.replace("{0}", &unity_version))),
         None => Ok(None)
     }
 }
@@ -133,17 +125,7 @@ pub fn get_diff_index() -> Result<DiffIndex, JsonPullError> {
     fetch_json(&format!("{DIFF_INDEX_STEM}/index.json"))
 }
 
-pub fn get_diff_reader(diff: &Diff) -> Result<(impl Read, Option<usize>)> {
-    // We will want to implement some kind of progress system, since I imagine that diffs will get fairly large.
-    let resp = ureq::get(&format!("{DIFF_INDEX_STEM}/{}", diff.diff_name))
-        .call()
-        .context("Failed to GET diff file")?;
-
-    let content_len = match resp.header("Content-Length") {
-        Some(length) => length.parse::<usize>().ok(),
-        None => None
-    };
-
-    Ok((resp.into_reader(), content_len))
+pub fn get_diff_url(diff: &Diff) -> String {
+    format!("{DIFF_INDEX_STEM}/{}", diff.diff_name)
 }
 

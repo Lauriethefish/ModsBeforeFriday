@@ -11,10 +11,10 @@ mod data_fix;
 use crate::requests::Request;
 use anyhow::{Context, Result};
 use const_format::formatcp;
-use log::{error, Level};
+use log::{error, info, warn, Level};
 use requests::Response;
 use serde::{Deserialize, Serialize};
-use std::{fs::OpenOptions, io::{BufRead, BufReader, Read, Write}, panic, path::Path, process::Command};
+use std::{fs::OpenOptions, io::{BufRead, BufReader, Read, Write}, panic, path::Path, process::Command, time::{Duration, Instant}};
 
 // Directories accessed by the agent, in one place so that they can be easily changed.
 pub const APK_ID: &str = "com.beatgames.beatsaber";
@@ -35,6 +35,13 @@ pub const SONGS_PATH: &str = formatcp!("/sdcard/ModData/{APK_ID}/Mods/SongCore/C
 pub const DOWNLOADS_PATH: &str = "/data/local/tmp/mbf-downloads";
 pub const TEMP_PATH: &str = "/data/local/tmp/mbf-tmp";
 
+// The number of attempts for all downloads before considering them failed and therefore failing the relevant operation.
+pub const DOWNLOAD_ATTEMPTS: u32 = 3;
+// If no data is read for this period of time during a file download, the download will be failed.
+pub const REQUEST_TIMEOUT_READ_SECS: u64 = 20;
+// The number of seconds between download progress updates.
+pub const PROGRESS_UPDATE_INTERVAL: f32 = 2.0;
+
 
 pub fn get_apk_path() -> Result<Option<String>> {
     let pm_output = Command::new("pm")
@@ -51,11 +58,35 @@ pub fn get_apk_path() -> Result<Option<String>> {
     }
 }
 
-fn download_file(to: impl AsRef<Path>, url: &str) -> Result<()> {
-    let mut resp_body = ureq::get(url)
+fn download_file_with_attempts(to: impl AsRef<Path>, url: &str) -> Result<()> {
+    let mut attempt = 0;
+    loop {
+        attempt += 1;
+        match download_file_one_attempt(&to, url) {
+            Ok(_) => return Ok(()),
+            Err(err) => if attempt == 3 {
+                return Err(err).context("Failed to download file after maximum attempts")
+            }   else    {
+                warn!("Failed to download file {url}: {err}. Trying again...")
+            }
+        }
+    }
+}
+
+fn download_file_one_attempt(to: impl AsRef<Path>, url: &str) -> Result<()> {
+    let agent = ureq::AgentBuilder::new()
+        .timeout_read(Duration::from_secs(REQUEST_TIMEOUT_READ_SECS))
+        .build();
+
+    let resp = agent.get(url)
         .call()
-        .context("Failed to request file")?
-        .into_reader();
+        .context("Failed to request file")?;
+
+    let content_len = match resp.header("Content-Length") {
+        Some(length) => length.parse::<usize>().ok(),
+        None => None
+    };
+    let mut resp_body = resp.into_reader();
 
     let mut writer = OpenOptions::new()
         .write(true)
@@ -63,7 +94,26 @@ fn download_file(to: impl AsRef<Path>, url: &str) -> Result<()> {
         .create(true)
         .open(to).context("Failed to create destination file")?;
 
-    std::io::copy(&mut resp_body, &mut writer)?;
+    match content_len {
+        Some(length) => {
+            // Update the frontend with some indication of progress of the download.
+            // This will do nothing for small downloads, since they should take less than 5 seconds to complete.
+            let mut last_progress_update = Instant::now();
+            copy_stream_progress(&mut resp_body, &mut writer, &mut |bytes_copied| {
+                let now = Instant::now();
+                if now.duration_since(last_progress_update).as_secs_f32() > PROGRESS_UPDATE_INTERVAL {
+                    last_progress_update = now;
+                    info!("Progress: {:.2}%", (bytes_copied as f32 / length as f32) * 100.0);
+                }
+            })?;
+        },
+        None => {
+            warn!("No Content-Length header, so cannot report download progress");
+            std::io::copy(&mut resp_body, &mut writer)?;
+        }
+    }
+   
+
     Ok(())
 }
 

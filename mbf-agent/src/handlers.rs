@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
-use crate::{data_fix, download_file, DATAKEEPER_PATH, DOWNLOADS_PATH, PLAYER_DATA_BAK_PATH, PLAYER_DATA_PATH, SONGS_PATH, TEMP_PATH};
+use crate::{data_fix, download_file_with_attempts, DATAKEEPER_PATH, DOWNLOADS_PATH, PLAYER_DATA_BAK_PATH, PLAYER_DATA_PATH, SONGS_PATH, TEMP_PATH};
 use crate::{axml::AxmlReader, patching, zip::ZipFile};
 use crate::external_res::{get_diff_index, JsonPullError};
 use crate::manifest::{ManifestInfo, ManifestMod};
@@ -166,7 +166,7 @@ fn handle_import_mod_url(from_url: String) -> Result<Response> {
     let download_path = Path::new(DOWNLOADS_PATH).join("import_from_url.qmod");
 
     info!("Downloading {}", from_url);
-    download_file(&download_path, &from_url)?;
+    download_file_with_attempts(&download_path, &from_url)?;
 
     // Load the installed mods.
     let mut mod_manager = ModManager::new();
@@ -432,7 +432,7 @@ fn install_core_mods(mod_manager: &mut ModManager, app_info: AppInfo) -> Result<
         let save_path = mod_manager.mods_path().as_ref()
             .join(format!("{}-v{}-CORE.qmod", core_mod.id, core_mod.version));
 
-        download_file(&save_path, &core_mod.download_url).context("Failed to download core mod")?;
+        download_file_with_attempts(&save_path, &core_mod.download_url).context("Failed to download core mod")?;
         mod_manager.try_load_new_mod(save_path)?;
         
     }

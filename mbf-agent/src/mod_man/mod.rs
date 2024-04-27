@@ -7,7 +7,7 @@ pub use manifest::*;
 use anyhow::{Context, Result, anyhow};
 use semver::Version;
 
-use crate::{download_file, zip::ZipFile, EARLY_MODS_DIR, LATE_MODS_DIR, LIBS_DIR, QMODS_DIR};
+use crate::{download_file_with_attempts, zip::ZipFile, EARLY_MODS_DIR, LATE_MODS_DIR, LIBS_DIR, QMODS_DIR};
 
 pub struct Mod {
     manifest: ModInfo,
@@ -283,7 +283,7 @@ impl ModManager {
         };
 
         info!("Downloading dependency from {}", link);
-        download_file(&save_path, &link).context("Failed to download dependency")?;
+        download_file_with_attempts(&save_path, &link).context("Failed to download dependency")?;
 
 
         // TODO: check ID matches
