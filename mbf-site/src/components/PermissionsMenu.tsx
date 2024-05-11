@@ -36,6 +36,11 @@ const displayedOptions: ManifestOptionInfo[] = [
         name: "Body tracking",
         permissions: ["com.oculus.permission.BODY_TRACKING"],
         features: ["com.oculus.software.body_tracking"]
+    },
+    {
+        name: "Bluetooth",
+        permissions: ["android.permission.BLUETOOTH", "android.permission.BLUETOOTH_CONNECT"],
+        features: []
     }
 ]
 
