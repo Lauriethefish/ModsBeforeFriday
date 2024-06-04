@@ -68,8 +68,8 @@ pub fn fetch_core_mods() -> Result<CoreModIndex, JsonPullError> {
     fetch_json(CORE_MODS_URL)
 }
 
-const UNITY_INDEX_URL: &str = "https://raw.githubusercontent.com/Lauriethefish/QuestUnstrippedUnity/main/index.json";
-const UNITY_VER_FORMAT: &str = "https://raw.githubusercontent.com/Lauriethefish/QuestUnstrippedUnity/main/versions/{0}.so";
+const UNITY_INDEX_URL: &str = "https://raw.githubusercontent.com/QuestPackageManager/QuestUnstrippedUnity/main/index.json";
+const UNITY_VER_FORMAT: &str = "https://raw.githubusercontent.com/QuestPackageManager/QuestUnstrippedUnity/main/versions/{0}.so";
 
 pub fn get_libunity_url(apk_id: &str, version: &str) -> Result<Option<String>> {
     let resp = ureq::get(UNITY_INDEX_URL)
