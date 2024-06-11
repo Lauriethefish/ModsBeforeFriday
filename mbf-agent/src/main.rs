@@ -126,7 +126,7 @@ fn copy_stream_progress<T: FnMut(usize) -> ()>(from: &mut impl Read,
     let mut total_read = 0;
     loop {
         let bytes_read = from.read(&mut buffer)?;
-        to.write(&buffer[0..bytes_read])?;
+        to.write_all(&buffer[0..bytes_read])?;
 
         if bytes_read == 0  {
             break Ok(());
