@@ -62,7 +62,7 @@ export async function overwriteAgent(adb: Adb, eventSink: LogEventSink) {
     logInfo(eventSink, "Removing existing agent");
     await adb.subprocess.spawnAndWait("rm " + AgentPath)
     logInfo(eventSink, "Downloading agent, this might take a minute if it's not cached")
-    await saveAgent(sync);
+    await saveAgent(sync, eventSink);
     logInfo(eventSink, "Writing new agent");
     await adb.subprocess.spawnAndWait("chmod +x " + AgentPath);
 
@@ -73,8 +73,8 @@ export async function overwriteAgent(adb: Adb, eventSink: LogEventSink) {
   }
 }
 
-async function saveAgent(sync: AdbSync) {
-  const agent: Uint8Array = await downloadAgent();
+async function saveAgent(sync: AdbSync, eventSink: LogEventSink) {
+  const agent: Uint8Array = await downloadAgent(eventSink);
 
   // TODO: properly use readable streams
   const file: ConsumableReadableStream<Uint8Array> = readableStreamBodge(agent);
@@ -87,13 +87,35 @@ async function saveAgent(sync: AdbSync) {
   await sync.write(options);
 }
   
-async function downloadAgent(): Promise<Uint8Array> {
-    const resp = await fetch("mbf-agent");
-    if(resp.body === null) {
-        throw new Error("Agent response had no body")
-    }
+async function downloadAgent(eventSink: LogEventSink): Promise<Uint8Array> {
+  const MAX_ATTEMPTS: number = 3;
+  const TIMEOUT: number = 60000; // In milliseconds
 
-    return new Uint8Array(await resp.arrayBuffer());
+  let ok = false;
+  let attempt = 1;
+  do {
+    // Add a modest request timeout
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), TIMEOUT);
+
+    try {
+      const resp = await fetch("mbf-agent", { signal: controller.signal });
+      if(resp.body === null) {
+        console.error("No body in agent response");
+      } else if(resp.ok) {
+        return new Uint8Array(await resp.arrayBuffer());
+      } else  {
+        console.error("Failed to GET agent: status code " + resp.status)
+      }
+    } catch(e) {
+      console.error("Failed to GET agent", e);
+    }
+    
+    attempt = attempt + 1;
+    logInfo(eventSink, `Failed to download agent, trying again... (attempt ${attempt}/${MAX_ATTEMPTS})`)
+  } while(!ok && attempt <= MAX_ATTEMPTS);
+
+  throw new Error("Failed to fetch agent after multiple attempts.\nDid you lose internet connection just after you loaded the site?\n\nIf not, then please report this issue, including a screenshot of the browser console window!");
 }
 
 function logFromAgent(log: LogMsg) {
