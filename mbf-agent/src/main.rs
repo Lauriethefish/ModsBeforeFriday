@@ -11,10 +11,11 @@ mod data_fix;
 use crate::requests::Request;
 use anyhow::{Context, Result};
 use const_format::formatcp;
+use external_res::get_agent;
 use log::{error, info, warn, Level};
 use requests::Response;
 use serde::{Deserialize, Serialize};
-use std::{fs::OpenOptions, io::{BufRead, BufReader, Read, Write}, panic, path::Path, process::Command, time::{Duration, Instant}};
+use std::{fs::OpenOptions, io::{BufRead, BufReader, Read, Write}, panic, path::Path, process::Command, time::Instant};
 
 // Directories accessed by the agent, in one place so that they can be easily changed.
 pub const APK_ID: &str = "com.beatgames.beatsaber";
@@ -37,8 +38,6 @@ pub const TEMP_PATH: &str = "/data/local/tmp/mbf-tmp";
 
 // The number of attempts for all downloads before considering them failed and therefore failing the relevant operation.
 pub const DOWNLOAD_ATTEMPTS: u32 = 3;
-// If no data is read for this period of time during a file download, the download will be failed.
-pub const REQUEST_TIMEOUT_READ_SECS: u64 = 20;
 // The number of seconds between download progress updates.
 pub const PROGRESS_UPDATE_INTERVAL: f32 = 2.0;
 
@@ -74,11 +73,7 @@ fn download_file_with_attempts(to: impl AsRef<Path>, url: &str) -> Result<()> {
 }
 
 fn download_file_one_attempt(to: impl AsRef<Path>, url: &str) -> Result<()> {
-    let agent = ureq::AgentBuilder::new()
-        .timeout_read(Duration::from_secs(REQUEST_TIMEOUT_READ_SECS))
-        .build();
-
-    let resp = agent.get(url)
+    let resp = get_agent().get(url)
         .call()
         .context("Failed to request file")?;
 
@@ -126,7 +121,7 @@ fn copy_stream_progress<T: FnMut(usize) -> ()>(from: &mut impl Read,
     let mut total_read = 0;
     loop {
         let bytes_read = from.read(&mut buffer)?;
-        to.write(&buffer[0..bytes_read])?;
+        to.write_all(&buffer[0..bytes_read])?;
 
         if bytes_read == 0  {
             break Ok(());

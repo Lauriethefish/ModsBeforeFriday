@@ -1,8 +1,9 @@
 //! Collection of types used to read the BMBF resources repository to fetch core mod information.
 use semver::Version;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{collections::HashMap, fmt::Display};
+use std::{collections::HashMap, fmt::Display, sync, time::Duration};
 use anyhow::{Context, Result};
+
 
 #[derive(Deserialize)]
 #[derive(Serialize)]
@@ -45,8 +46,24 @@ impl std::error::Error for JsonPullError { }
 
 const CORE_MODS_URL: &str = "https://raw.githubusercontent.com/QuestPackageManager/bs-coremods/main/core_mods.json";
 
+// If no data is read for this period of time during a file download, the download will be failed.
+pub const REQUEST_TIMEOUT_READ_SECS: u64 = 20;
+
+static AGENT: sync::OnceLock<ureq::Agent> = sync::OnceLock::new();
+
+pub fn get_agent() -> &'static ureq::Agent {
+    AGENT.get_or_init(|| {
+        ureq::AgentBuilder::new()
+            .timeout_read(Duration::from_secs(REQUEST_TIMEOUT_READ_SECS))
+            .https_only(true)
+            .try_proxy_from_env(true)
+            .user_agent(format!("mbf-agent/{}", env!("CARGO_PKG_VERSION")).as_str())
+            .build()
+    })
+}
+
 pub fn fetch_json<T: DeserializeOwned>(from: &str) -> Result<T, JsonPullError> {
-    let response = match ureq::get(from)
+    let response = match get_agent().get(from)
         .call()
         .context("Failed to GET resource") {
             Ok(resp) => resp,
@@ -72,7 +89,7 @@ const UNITY_INDEX_URL: &str = "https://raw.githubusercontent.com/Lauriethefish/Q
 const UNITY_VER_FORMAT: &str = "https://raw.githubusercontent.com/Lauriethefish/QuestUnstrippedUnity/main/versions/{0}.so";
 
 pub fn get_libunity_url(apk_id: &str, version: &str) -> Result<Option<String>> {
-    let resp = ureq::get(UNITY_INDEX_URL)
+    let resp = get_agent().get(UNITY_INDEX_URL)
         .call()
         .context("Failed to GET libunity index")?;
 
