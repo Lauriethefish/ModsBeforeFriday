@@ -15,7 +15,7 @@ use external_res::get_agent;
 use log::{error, info, warn, Level};
 use requests::Response;
 use serde::{Deserialize, Serialize};
-use std::{fs::OpenOptions, io::{BufRead, BufReader, Read, Write}, panic, path::Path, process::Command, time::{Duration, Instant}};
+use std::{fs::OpenOptions, io::{BufRead, BufReader, Read, Write}, panic, path::Path, process::Command, time::Instant};
 
 // Directories accessed by the agent, in one place so that they can be easily changed.
 pub const APK_ID: &str = "com.beatgames.beatsaber";
