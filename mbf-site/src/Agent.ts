@@ -123,7 +123,7 @@ async function downloadAgent(eventSink: LogEventSink): Promise<Uint8Array> {
           allChunks.set(chunk, pos);
           pos += chunk.length;
         }
-        return new Uint8Array(allChunks);
+        return allChunks;
       } else  {
         console.error("Failed to GET agent: status code " + resp.status)
       }
