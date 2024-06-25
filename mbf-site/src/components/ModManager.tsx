@@ -211,7 +211,7 @@ function AddModsMenu(props: ModMenuProps) {
         setMods(installed_mods);
 
         const imported_mod = installed_mods.find(mod => mod.id === imported_id)!;
-        const versionMismatch = gameVersion !== null && gameVersion !== imported_mod.game_version;
+        const versionMismatch = imported_mod.game_version !== null &&gameVersion !== imported_mod.game_version;
         if(versionMismatch) {
             // Don't install a mod by default if its version mismatches: we want the user to understand the consequences
             setError("The mod `" + imported_id + "` was not enabled automatically as it is not designed for game version v" + trimGameVersion(gameVersion) + ".");
