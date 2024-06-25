@@ -43,7 +43,7 @@ impl Display for JsonPullError {
 
 impl std::error::Error for JsonPullError { }
 
-const CORE_MODS_URL: &str = "https://git.bmbf.dev/unicorns/resources/-/raw/master/com.beatgames.beatsaber/core-mods.json";
+const CORE_MODS_URL: &str = "https://raw.githubusercontent.com/QuestPackageManager/bs-coremods/main/core_mods.json";
 
 pub fn fetch_json<T: DeserializeOwned>(from: &str) -> Result<T, JsonPullError> {
     let response = match ureq::get(from)
