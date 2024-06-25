@@ -100,10 +100,30 @@ async function downloadAgent(eventSink: LogEventSink): Promise<Uint8Array> {
 
     try {
       const resp = await fetch("mbf-agent", { signal: controller.signal });
+      const reader = resp.body.getReader();
+      const agentSize = +resp.headers.get('Content-Length');
+      let recvLen = 0;
+      let chunks = [];
+      while (true) {
+        const {done, value} = await reader.read();
+
+        if (done) break;
+
+        chunks.push(value);
+        recvLen += value.length;
+        logInfo(eventSink, `Received ${recvLen} of ${agentSize}`);
+      }
+      
       if(resp.body === null) {
         console.error("No body in agent response");
       } else if(resp.ok) {
-        return new Uint8Array(await resp.arrayBuffer());
+        let allChunks = new Uint8Array(recvLen);
+        let pos = 0;
+        for (let chunk of chunks) {
+          allChunks.set(chunk, pos);
+          pos += chunk.length;
+        }
+        return new Uint8Array(allChunks);
       } else  {
         console.error("Failed to GET agent: status code " + resp.status)
       }
