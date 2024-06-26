@@ -3,9 +3,9 @@ $APKS_PATH = "./apk_data"
 
 # Put your OBB file/BS APK here
 if ( $Latest.Length -ne 0 ) {
-    Write-Output "Using latest: 1.36.1"
-	$OBB_NAME = "main.1194.com.beatgames.beatsaber.obb"
-    $BS_PATH = "$APKS_PATH/bs1361.apk"
+    Write-Output "Using latest: 1.37.0"
+	$OBB_NAME = "main.1238.com.beatgames.beatsaber.obb"
+    $BS_PATH = "$APKS_PATH/bs137.apk"
 }   else    {
     $OBB_NAME = "main.1130.com.beatgames.beatsaber.obb"
     $BS_PATH = "$APKS_PATH/bs135.apk"
