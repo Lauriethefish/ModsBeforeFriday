@@ -22,7 +22,7 @@ const BLOCK_ANIMATION_AVERAGE_LIFETIME = 5000;
 const BLOCK_ANIMATION_LIFETIME_RANGE = 1000;
 
 //	Amount of blocks per pixel. If the amount of blocks on screen differs too much blocks will be added/removed.
-const BLOCK_DENSITY = 0.00006;
+const BLOCK_DENSITY = 0.00002;
 
 export class FallingBlockParticle {
 	type:number = 0;
