@@ -223,12 +223,18 @@ async function sendRequest(adb: Adb, request: Request, eventSink: LogEventSink =
   }
 }
 
+let CORE_MOD_OVERRIDE_URL: string | null = null;
+export function setCoreModOverrideUrl(core_mod_override_url: string | null) {
+  CORE_MOD_OVERRIDE_URL = core_mod_override_url;
+}
+
 // Gets the status of mods from the quest, i.e. whether the app is patched, and what mods are currently installed.
 export async function loadModStatus(device: Adb, eventSink: LogEventSink = null): Promise<ModStatus> {
   await prepareAgent(device, eventSink);
 
   return await sendRequest(device, {
-      type: 'GetModStatus'
+      type: 'GetModStatus',
+      override_core_mod_url: CORE_MOD_OVERRIDE_URL
   }, eventSink) as ModStatus;
 }
 
@@ -309,6 +315,7 @@ export async function patchApp(device: Adb,
       downgrade_to: downgradeToVersion,
       manifest_mod: manifestMod,
       allow_no_core_mods: allow_no_core_mods,
+      override_core_mod_url: CORE_MOD_OVERRIDE_URL,
       remodding
   }, eventSink);
 
@@ -336,7 +343,8 @@ export async function quickFix(device: Adb,
   beforeFix: ModStatus,
   eventSink: LogEventSink = null): Promise<ModStatus> {
   let response = await sendRequest(device, {
-      type: 'QuickFix'
+      type: 'QuickFix',
+      override_core_mod_url: CORE_MOD_OVERRIDE_URL
   }, eventSink);
 
   // Update the mod status to reflect the fixed installation

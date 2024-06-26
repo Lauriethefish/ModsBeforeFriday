@@ -1,14 +1,16 @@
 import { ManifestMod, Mod } from "./Models";
 
 export interface GetModStatus {
-    type: 'GetModStatus'
+    type: 'GetModStatus',
+    override_core_mod_url: string | null
 }
 
 export interface Patch {
     type: 'Patch',
     manifest_mod: ManifestMod,
     downgrade_to: string | null,
-    allow_no_core_mods: boolean
+    allow_no_core_mods: boolean,
+    override_core_mod_url: string | null,
     remodding: boolean
 }
 
@@ -22,7 +24,8 @@ export interface SetModsEnabled {
 }
 
 export interface QuickFix {
-    type: 'QuickFix'
+    type: 'QuickFix',
+    override_core_mod_url: string | null
 }
 
 export interface RemoveMod {

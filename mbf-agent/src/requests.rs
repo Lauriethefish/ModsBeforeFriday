@@ -23,7 +23,11 @@ pub enum Request {
     /// - The known installed mods and whether all their necessary files exist.
     /// - The core mods that need to be installed.
     /// - Whether the modloader is in the correct place
-    GetModStatus,
+    GetModStatus {
+        // If not null, this specifies a core mod JSON to use instead of the default core mods source.
+        // This is useful for developers testing a core mod update.
+        override_core_mod_url: Option<String>
+    },
     /// Installs or uninstalls any number of mods.
     /// This will also attempt to download and install dependencies, upgrade dependencies and will uninstall any
     /// depending mods of mods that have been disabled.
@@ -73,7 +77,10 @@ pub enum Request {
         // or libmainloader (easier) so that these can be easily updated.
         remodding: bool,
         // If this is true, patching will not be failed if core mods cannot be found for the version.
-        allow_no_core_mods: bool
+        allow_no_core_mods: bool,
+        // If not null, this specifies a core mod JSON to use instead of the default core mods source.
+        // This is useful for developers testing a core mod update.
+        override_core_mod_url: Option<String>
     },
 
     // Attempts to fix a blackscreen issue by removing PlayerData.dat from `/sdcard/...../files/`.
@@ -86,7 +93,11 @@ pub enum Request {
     /// Reinstalls any core mods that are misssing/out of date and overwrites the modloader in case it is corrupt.
     /// Should fix most issues with any installation.
     /// Returns a `Mods` response containing the newly installed mods.
-    QuickFix,
+    QuickFix {
+        // If not null, this specifies a core mod JSON to use instead of the default core mods source.
+        // This is useful for developers testing a core mod update.
+        override_core_mod_url: Option<String>
+    },
 }
 
 #[derive(Serialize)]

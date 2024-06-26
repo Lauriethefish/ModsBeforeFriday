@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import './css/App.css';
 import { AdbDaemonWebUsbConnection, AdbDaemonWebUsbDeviceManager } from '@yume-chan/adb-daemon-webusb';
@@ -10,6 +10,7 @@ import { ErrorModal } from './components/Modal';
 import { Bounce, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { CornerSourceLink, SmallSourceLink } from './components/SourceLink';
+import { setCoreModOverrideUrl } from './Agent';
 
 type NoDeviceCause = "NoDeviceSelected" | "DeviceInUse";
 
@@ -151,11 +152,53 @@ function Title() {
   </>
 }
 
+function ChooseCoreModUrl({ setSpecifiedCoreMods } : { setSpecifiedCoreMods: () => void}) {
+  const inputFieldRef = useRef<HTMLInputElement | null>(null);
+
+  return <div className='container mainContainer'>
+    <h1>Manually override core mod JSON</h1>
+    <p>Please specify a complete URL to the raw contents of your core mod JSON</p>
+    <input type="text" ref={inputFieldRef}/>
+    <br/><br/>
+    <button onClick={() => {
+      if(inputFieldRef.current !== null) {
+        const inputField = inputFieldRef.current;
+        console.warn("Overriding core mods URL to " + inputField.value)
+        setCoreModOverrideUrl(inputField.value);
+        const searchParams = new URLSearchParams(window.location.search);
+        searchParams.set("setcores", inputField.value);
+        window.history.replaceState({}, "ModsBeforeThursday", "?" + searchParams.toString());
+
+        setSpecifiedCoreMods();
+      }
+    }}>
+      Confirm URL
+    </button>
+  </div>
+}
+
 function AppContents() {
+  const [ hasSetCoreUrl, setSetCoreUrl ] = useState(false);
+
+  const overrideQueryParam: string | null = new URLSearchParams(window.location.search).get("setcores");
+  let mustEnterUrl = false;
+  if(overrideQueryParam !== "prompt" && overrideQueryParam !== null) {
+    if(!hasSetCoreUrl) {
+      console.warn("Setting core mod URL to " + overrideQueryParam);
+      setCoreModOverrideUrl(overrideQueryParam);
+      setSetCoreUrl(true);
+    }
+  } else if(overrideQueryParam !== null) {
+    console.log("Prompting user to specify core mod URL");
+    mustEnterUrl = true;
+  }
+
   if (navigator.usb === undefined) {
-    return UnsupportedMessage();
-  } else {
-    return ChooseDevice();
+    return <UnsupportedMessage />
+  } else if (hasSetCoreUrl || !mustEnterUrl) {
+    return <ChooseDevice />
+  } else  {
+    return <ChooseCoreModUrl setSpecifiedCoreMods={() => setSetCoreUrl(true)}/>
   }
 }
 

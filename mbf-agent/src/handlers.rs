@@ -14,13 +14,13 @@ use log::{error, info, warn};
 
 pub fn handle_request(request: Request) -> Result<Response> {
     match request {
-        Request::GetModStatus => handle_get_mod_status(),
-        Request::Patch { downgrade_to , remodding, manifest_mod, allow_no_core_mods} => 
-            handle_patch(downgrade_to, remodding, manifest_mod, allow_no_core_mods),
+        Request::GetModStatus { override_core_mod_url } => handle_get_mod_status(override_core_mod_url),
+        Request::Patch { downgrade_to , remodding, manifest_mod, allow_no_core_mods, override_core_mod_url} => 
+            handle_patch(downgrade_to, remodding, manifest_mod, allow_no_core_mods, override_core_mod_url),
         Request::SetModsEnabled {
             statuses
         } => run_mod_action(statuses),
-        Request::QuickFix => handle_quick_fix(),
+        Request::QuickFix { override_core_mod_url } => handle_quick_fix(override_core_mod_url),
         Request::Import { from_path } => handle_import(from_path),
         Request::RemoveMod { id } => handle_remove_mod(id),
         Request::ImportModUrl { from_url } => handle_import_mod_url(from_url),
@@ -61,7 +61,7 @@ fn run_mod_action(statuses: HashMap<String, bool>) -> Result<Response> {
     })
 }
 
-fn handle_get_mod_status() -> Result<Response> {
+fn handle_get_mod_status(override_core_mod_url: Option<String>) -> Result<Response> {
     info!("Loading installed mods");
 
     let mut mod_manager = ModManager::new();
@@ -70,7 +70,7 @@ fn handle_get_mod_status() -> Result<Response> {
     info!("Searching for Beat Saber app");
     let app_info = get_app_info()?;
     let core_mods = match &app_info {
-        Some(app_info) => get_core_mods_info(&app_info.version, &mod_manager)?,
+        Some(app_info) => get_core_mods_info(&app_info.version, &mod_manager, override_core_mod_url)?,
         None => {
             warn!("Beat Saber is not installed!");
             None
@@ -91,10 +91,10 @@ fn get_mod_models(mod_manager: ModManager) -> Vec<ModModel> {
         .collect()
 }
 
-fn get_core_mods_info(apk_version: &str, mod_manager: &ModManager) -> Result<Option<CoreModsInfo>> {
+fn get_core_mods_info(apk_version: &str, mod_manager: &ModManager, override_core_mod_url: Option<String>) -> Result<Option<CoreModsInfo>> {
     // Fetch the core mods from the resources repo
     info!("Fetching core mod index");
-    let core_mods = match crate::external_res::fetch_core_mods() {
+    let core_mods = match crate::external_res::fetch_core_mods(override_core_mod_url) {
         Ok(mods) => mods,
         Err(JsonPullError::FetchError(_)) => return Ok(None),
         Err(JsonPullError::ParseError(err)) => return Err(err)
@@ -311,7 +311,7 @@ fn handle_remove_mod(id: String) -> Result<Response> {
     })
 }
 
-fn handle_quick_fix() -> Result<Response> {
+fn handle_quick_fix(override_core_mod_url: Option<String>) -> Result<Response> {
     let app_info = get_app_info()?
         .ok_or(anyhow!("Cannot quick fix when app is not installed"))?;
 
@@ -319,7 +319,7 @@ fn handle_quick_fix() -> Result<Response> {
     mod_manager.load_mods()?;
 
     // Reinstall missing core mods and overwrite the modloader with the one contained within the executable.
-    install_core_mods(&mut mod_manager, app_info)?;
+    install_core_mods(&mut mod_manager, app_info, override_core_mod_url)?;
     patching::install_modloader()?;
     Ok(Response::Mods {
         installed_mods: get_mod_models(mod_manager)
@@ -355,7 +355,11 @@ fn handle_fix_player_data() -> Result<Response> {
     })
 }
 
-fn handle_patch(downgrade_to: Option<String>, repatch: bool, manifest_mod: ManifestMod, allow_no_core_mods: bool) -> Result<Response> {
+fn handle_patch(downgrade_to: Option<String>,
+    repatch: bool,
+    manifest_mod: ManifestMod,
+    allow_no_core_mods: bool,
+    override_core_mod_url: Option<String>) -> Result<Response> {
     let app_info = get_app_info()?
         .ok_or(anyhow!("Cannot patch when app not installed"))?;
 
@@ -394,7 +398,7 @@ fn handle_patch(downgrade_to: Option<String>, repatch: bool, manifest_mod: Manif
         mod_manager.load_mods()?; // Should load no mods.
     
         match install_core_mods(&mut mod_manager, get_app_info()?
-            .ok_or(anyhow!("Beat Saber should be installed after patching"))?) {
+            .ok_or(anyhow!("Beat Saber should be installed after patching"))?, override_core_mod_url) {
                 Ok(_) => info!("Successfully installed all core mods"),
                 Err(err) => if allow_no_core_mods {
                     warn!("Failed to install core mods: {err}")
@@ -407,9 +411,9 @@ fn handle_patch(downgrade_to: Option<String>, repatch: bool, manifest_mod: Manif
     Ok(Response::Mods { installed_mods: get_mod_models(mod_manager) })
 }
 
-fn install_core_mods(mod_manager: &mut ModManager, app_info: AppInfo) -> Result<()> {
+fn install_core_mods(mod_manager: &mut ModManager, app_info: AppInfo, override_core_mod_url: Option<String>) -> Result<()> {
     info!("Preparing core mods");
-    let core_mod_index = crate::external_res::fetch_core_mods()?;
+    let core_mod_index = crate::external_res::fetch_core_mods(override_core_mod_url)?;
 
     let core_mods = core_mod_index.get(&app_info.version)
         .ok_or(anyhow!("No core mods existed for {}", app_info.version))?;

@@ -1,4 +1,5 @@
 //! Collection of types used to read the BMBF resources repository to fetch core mod information.
+use log::info;
 use semver::Version;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Display, sync, time::Duration};
@@ -81,8 +82,14 @@ pub fn fetch_json<T: DeserializeOwned>(from: &str) -> Result<T, JsonPullError> {
     }
 }
 
-pub fn fetch_core_mods() -> Result<CoreModIndex, JsonPullError> {
-    fetch_json(CORE_MODS_URL)
+pub fn fetch_core_mods(override_core_mod_url: Option<String>) -> Result<CoreModIndex, JsonPullError> {
+    match override_core_mod_url {
+        Some(url) => {
+            info!("Using overridden core mod URL");
+            fetch_json(&url)
+        },
+        None => fetch_json(CORE_MODS_URL)
+    }
 }
 
 const UNITY_INDEX_URL: &str = "https://raw.githubusercontent.com/Lauriethefish/QuestUnstrippedUnity/main/index.json";
