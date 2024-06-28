@@ -169,7 +169,7 @@ impl ModManager {
                         self.install_mod(&dep.id)?;
                     }
                 },
-                None => {
+                None => if dep.required {
                     info!("Dependency {} was not found: installing now", dep.id);
                     self.install_dependency(&dep)?;
                 }

@@ -93,6 +93,12 @@ pub struct ModDependency {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "downloadIfMissing")]
     pub mod_link: Option<String>,
+    #[serde(default = "true_default")]
+    pub required: bool,
+}
+
+fn true_default() -> bool {
+    true
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
