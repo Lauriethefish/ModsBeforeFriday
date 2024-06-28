@@ -219,8 +219,6 @@ function PatchingMenu(props: PatchingMenuProps) {
             
             <h2 className='warning'>READ CAREFULLY</h2>
             <p>Mods and custom songs are not supported by Beat Games. You may experience bugs and crashes that you wouldn't in a vanilla game.</p>
-            <b>In addition, by modding the game you will lose access to both vanilla leaderboards and vanilla multiplayer.</b> (Modded leaderboards/servers are available.)
-            <br/>
             <div>
                 <button className="discreetButton" id="permissionsButton" onClick={() => setSelectingPerms(true)}>Permissions</button>
                 <button className="largeCenteredButton" onClick={async () => {
