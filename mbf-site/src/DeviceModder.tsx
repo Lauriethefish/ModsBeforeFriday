@@ -8,7 +8,7 @@ import { ErrorModal, Modal, SyncingModal } from './components/Modal';
 import { ModManager } from './components/ModManager';
 import { ManifestMod, trimGameVersion } from './Models';
 import { PermissionsMenu } from './components/PermissionsMenu';
-import { Collapsible } from './components/Collapsible';
+import { SelectableList } from './components/SelectableList';
 
 interface DeviceModderProps {
     device: Adb,
@@ -69,37 +69,14 @@ export function DeviceModder(props: DeviceModderProps) {
                 modStatus={modStatus}
                 onCompleted={status => setModStatus(status)}
                 device={device}
-                downgradingTo={downgradeVersion}
+                initialDowngradingTo={downgradeVersion}
             />
         }
 
     }   else if(modStatus.app_info.loader_installed !== null)   {
         let loader = modStatus.app_info.loader_installed;
         if(loader === 'Scotland2') {
-            return <>
-                <div className='container mainContainer'>
-                    <h1>App is modded</h1>
-                    <p>Your Beat Saber install is modded, and its version is compatible with mods.</p>
-
-                    {isDeveloperUrl ? <>
-                        <p className="warning">Core mod functionality is disabled.</p>
-                    </> : <>
-                        <InstallStatus
-                                modStatus={modStatus}
-                                device={device}
-                                onFixed={status => setModStatus(status)}/>
-                            <h4>Not sure what to do next?</h4>
-                        <NextSteps />
-                    </>}
-                </div>
-
-                <ModManager modStatus={modStatus}
-                    setMods={mods => setModStatus({ ...modStatus, installed_mods: mods })}
-                    device={device}
-                    gameVersion={modStatus.app_info.version}
-                    quit={quit}
-                />
-            </>
+            return <ValidModLoaderMenu device={device} modStatus={modStatus} setModStatus={setModStatus} quit={() => quit(null)}/>
         }   else    {
             return <IncompatibleLoader device={device} loader={loader} quit={() => quit(null)} />
         }
@@ -108,8 +85,38 @@ export function DeviceModder(props: DeviceModderProps) {
             device={device}
             modStatus={modStatus}
             onCompleted={modStatus => setModStatus(modStatus)}
-            downgradingTo={null} />
+            initialDowngradingTo={null} />
     }
+}
+
+function ValidModLoaderMenu({ device, modStatus, setModStatus, quit }: { device: Adb,
+    modStatus: ModStatus,
+    setModStatus: (status: ModStatus) => void
+    quit: () => void}) {
+    return <>
+        <div className='container mainContainer'>
+            <h1>App is modded</h1>
+            <p>Your Beat Saber install is modded, and its version is compatible with mods.</p>
+
+            {isDeveloperUrl ? <>
+                <p className="warning">Core mod functionality is disabled.</p>
+            </> : <>
+                <InstallStatus
+                        modStatus={modStatus}
+                        device={device}
+                        onFixed={status => setModStatus(status)}/>
+                <h4>Not sure what to do next?</h4>
+                <NextSteps />
+            </>}
+        </div>
+
+        <ModManager modStatus={modStatus}
+            setMods={mods => setModStatus({ ...modStatus, installed_mods: mods })}
+            device={device}
+            gameVersion={modStatus.app_info!.version}
+            quit={quit}
+        />
+    </>
 }
 
 interface InstallStatusProps {
@@ -161,7 +168,7 @@ interface PatchingMenuProps {
     modStatus: ModStatus
     device: Adb,
     onCompleted: (newStatus: ModStatus) => void,
-    downgradingTo: string | null
+    initialDowngradingTo: string | null
 }
 
 function PatchingMenu(props: PatchingMenuProps) {
@@ -169,23 +176,53 @@ function PatchingMenu(props: PatchingMenuProps) {
     const [logEvents, addLogEvent] = useLog();
     const [patchingError, setPatchingError] = useState(null as string | null);
     const [selectingPerms, setSelectingPerms] = useState(false);
+    const [versionSelectOpen, setVersionSelectOpen] = useState(false);
+    const [versionOverridden, setVersionOverridden] = useState(false);
+
     const [manifestMod, setManifestMod] = useState({
         add_permissions: [],
         add_features: []
     } as ManifestMod);
 
-    const { onCompleted, modStatus, device, downgradingTo } = props;
+    const { onCompleted, modStatus, device, initialDowngradingTo } = props;
+    const [downgradingTo, setDowngradingTo] = useState(initialDowngradingTo);
+    const downgradeChoices = modStatus.core_mods!.downgrade_versions
+        .filter(version => modStatus.core_mods!.supported_versions.includes(version)
+            && version != initialDowngradingTo);
+
     if(!isPatching) {
         return <div className='container mainContainer'>
-            {downgradingTo !== null && <DowngradeMessage toVersion={downgradingTo}/>}
-            {downgradingTo === null && <VersionSupportedMessage version={modStatus.app_info!.version} />}
+            {downgradingTo !== null && <DowngradeMessage
+                toVersion={downgradingTo}
+                wasUserSelected={versionOverridden}
+                requestedVersionChange={() => setVersionSelectOpen(true)}
+                canChooseAnotherVersion={downgradeChoices.length > 0}
+                requestedResetToDefault={() => {
+                setDowngradingTo(initialDowngradingTo);
+                setVersionOverridden(false);
+            }} />}
+
+            {downgradingTo === null && <VersionSupportedMessage
+                version={modStatus.app_info!.version}
+                requestedVersionChange={() => setVersionSelectOpen(true)}
+                canChooseAnotherVersion={downgradeChoices.length > 0}/>}
+            <PatchingAdvancedOptions
+                isVisible={versionSelectOpen && downgradeChoices.length > 0}
+                downgradeVersions={downgradeChoices}
+                onConfirm={version => {
+                    if(version !== null) {
+                        setDowngradingTo(version);
+                        setVersionOverridden(true);
+                    }
+                    setVersionSelectOpen(false);
+                }} />
             
             <h2 className='warning'>READ CAREFULLY</h2>
             <p>Mods and custom songs are not supported by Beat Games. You may experience bugs and crashes that you wouldn't in a vanilla game.</p>
             <b>In addition, by modding the game you will lose access to both vanilla leaderboards and vanilla multiplayer.</b> (Modded leaderboards/servers are available.)
             <br/>
             <div>
-                <button className="discreetButton" id="permissionsButton" onClick={() => setSelectingPerms(true)}>Patch Options</button>
+                <button className="discreetButton" id="permissionsButton" onClick={() => setSelectingPerms(true)}>Permissions</button>
                 <button className="largeCenteredButton" onClick={async () => {
                     setIsPatching(true);
                     try {
@@ -223,25 +260,54 @@ function PatchingMenu(props: PatchingMenuProps) {
     }
 }
 
-function VersionSupportedMessage({ version }: { version: string }) {
+function PatchingAdvancedOptions({ downgradeVersions, onConfirm, isVisible }:
+    {
+        downgradeVersions: string[],
+        isVisible: boolean,
+        onConfirm: (version: string | null) => void
+    }) {
+
+    const [selected, setSelected] = useState(null as string | null);
+
+    return <Modal isVisible={isVisible}>
+        <h2>Choose a different game version</h2>
+        <p>Using this menu, you can make MBF downgrade to a version other than the latest moddable version.</p>
+        <p>This is not recommended, and you should only do it if there are specific mods you wish to use that aren't available on the latest version.</p>
+        <p><b>Please note that MBF is not capable of modding Beat Saber 1.28 or lower.</b></p>
+        <p>Click a version then confirm the downgrade:</p>
+        <SelectableList options={downgradeVersions} choiceSelected={choice => setSelected(choice)} />
+        <br/>
+        <button onClick={() => {
+            setSelected(null);
+            onConfirm(selected);
+        }}>{selected === null ? <>Use latest moddable</> : <>Confirm downgrade</>}</button>
+    </Modal>
+}
+
+function VersionSupportedMessage({ version, requestedVersionChange, canChooseAnotherVersion }: { version: string, requestedVersionChange: () => void, canChooseAnotherVersion: boolean }) {
     return <>
         <h1>Install Custom Songs</h1>
         {isDeveloperUrl ? 
             <p className="warning">Mod development mode engaged: bypassing version check.
             This will not help you unless you are a mod developer!</p> : <>
-            <p>Your app has version {trimGameVersion(version)}, which is supported by mods!</p>
+            <p>Your app has version {trimGameVersion(version)}, which is supported by mods! {canChooseAnotherVersion && <a style={{"cursor": "pointer"}}onClick={requestedVersionChange}>(choose another version)</a>}</p>
             <p>To get your game ready for custom songs, ModsBeforeFriday will next patch your Beat Saber app and install some essential mods.
             Once this is done, you will be able to manage your custom songs <b>inside the game.</b></p>
         </>}
     </>
 }
 
-function DowngradeMessage({ toVersion }: { toVersion: string }) {
+function DowngradeMessage({ toVersion, wasUserSelected, requestedVersionChange, requestedResetToDefault, canChooseAnotherVersion }: { toVersion: string, wasUserSelected: boolean,
+    requestedVersionChange: () => void,
+    requestedResetToDefault: () => void,
+    canChooseAnotherVersion: boolean }) {
     return <>
         <h1>Downgrade and set up mods</h1>
-        <p>MBF has detected that your version of Beat Saber doesn't support mods!</p>
-
-        <p>Fortunately for you, your version can be downgraded automatically to the latest moddable version: {trimGameVersion(toVersion)}</p>
+        {wasUserSelected ? (<><p>You have decided to downgrade to a version older than the latest moddable version. <b>Only do this if you know why you want to!</b> <a style={{"cursor": "pointer"}} onClick={requestedResetToDefault}>(reverse decision)</a></p></>)
+        : <>
+            <p>MBF has detected that your version of Beat Saber doesn't support mods!</p>
+            <p>Fortunately for you, your version can be downgraded automatically to the latest moddable version: {trimGameVersion(toVersion)} {canChooseAnotherVersion && <a style={{"cursor": "pointer"}} onClick={requestedVersionChange}>(choose another version)</a>}</p>
+        </>}
         <p><span className='warning'><b>NOTE:</b></span> By downgrading, you will lose access to any DLC or other content that is not present in version {trimGameVersion(toVersion)}. If you decide to stop using mods and reinstall vanilla Beat Saber, however, then you will get this content back.</p>
     </>
 }

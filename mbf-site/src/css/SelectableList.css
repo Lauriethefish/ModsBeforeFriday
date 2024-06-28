@@ -1,0 +1,15 @@
+.selectedListItem {
+    background-color: rgb(98, 0, 255);
+}
+
+.listItem {
+    padding: 5px;
+    cursor: pointer;
+    border-color: rgb(223, 215, 215);
+    border-radius: 5px;
+    margin: 0px;
+}
+
+.selectableList {
+    padding: 0;
+}
