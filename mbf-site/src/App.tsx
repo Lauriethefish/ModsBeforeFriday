@@ -26,8 +26,12 @@ async function connect(
   try {
     connection = await quest.connect();
   } catch(err) {
-    // Some other ADB daemon is hogging the connection, so we can't get to the Quest.
-    return "DeviceInUse";
+    if(String(err).includes("Unable to claim interface")) {
+      // Some other ADB daemon is hogging the connection, so we can't get to the Quest.
+      return "DeviceInUse";
+    } else  {
+      throw err;
+    }
   }
   const keyStore: AdbWebCredentialStore = new AdbWebCredentialStore("ModsBeforeFriday");
 
