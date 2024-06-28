@@ -2,6 +2,11 @@
 
 [ModsBeforeFriday](https://lauriethefish.github.io/ModsBeforeFriday/) is a modding tool for Beat Saber on Quest that works entirely within the browser, using WebUSB to interact with the quest. The aim is to make installing mods as easy as possible, with no need to download special tools or hunt around for core mods.
 
+## Query Parameters
+MBF has some query parameters which can be passed with the URL. These are useful for mod developers when testing core mods before they are officially released.
+- `?dev=true`: This will override the normal version check, and always prompt the user to patch the currently installed Beat Saber game. NOTE: If you are not a mod developer, this **will not help you.** All it does is allows the modloader to be installed, it does not magically make the new version support mods and using this will only prevent you from downgrading Beat Saber. This is not "get mods only".
+- `?setcores=prompt`: This will prompt the user to enter an alternative core mods URL to use to test that the core mod JSON is ready for release. This URL will then be stored in the query parameter for future page refreshes.
+
 ## Project Structure
 
 `./mbf-agent` contains the agent, which is an executable written in Rust that is executed by the frontend via ADB. This agent does pretty much all the work, including installing mods and patching the game.
