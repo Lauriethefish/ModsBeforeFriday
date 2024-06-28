@@ -174,8 +174,8 @@ function InstalledModsMenu(props: ModMenuProps) {
 
 function UploadButton({ onUploaded }: { onUploaded: (file: File) => void}) {
     const inputFile = useRef<HTMLInputElement | null>(null);
-    return <button id="uploadButton" onClick={() => inputFile.current?.click()}>
-        Upload Mods or Songs
+    return <button id="uploadButton" onClick={() => inputFile.current?.click()} title="Upload any .QMOD file, any song as a .ZIP, any Qosmetics files or any other file accepted by a particular mod.">
+        Upload Files
         <img src={UploadIcon}/>
         <input type="file"
             id="file"
