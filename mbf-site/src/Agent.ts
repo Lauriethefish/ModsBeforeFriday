@@ -85,7 +85,7 @@ async function saveAgent(sync: AdbSync, eventSink: LogEventSink) {
 async function downloadAgent(eventSink: LogEventSink): Promise<Uint8Array> {
   const MAX_ATTEMPTS: number = 3;
   const TIMEOUT: number = 60000; // In milliseconds
-  const PROGRESS_UPDATE_INTERVAL = 1.0; // Time between download progress updates, in seconds
+  const PROGRESS_UPDATE_INTERVAL = 1000; // Time between download progress updates, in milliseconds
 
   let ok = false;
   let attempt = 1;
