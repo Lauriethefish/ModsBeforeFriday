@@ -63,7 +63,9 @@ function ChooseDevice() {
     if(chosenDevice.banner.model === "Quest") { // "Quest" not "Quest 2/3"
       return <div className='container mainContainer'>
         <h1>Quest 1 Not Supported</h1>
-        <p>ModsBeforeFriday has detected that you're using a Quest 1, which is no longer supported for modding Beat Saber.</p>
+        <p>ModsBeforeFriday has detected that you're using a Quest 1, which is not supported by MBF. (and never will be)</p>
+        <p>This is because Quest 1 uses different builds of the Beat Saber game and so mods are stuck forever on version 1.28.0 of the game.</p>
+        <p>Follow <a href="https://bsmg.wiki/quest/modding-quest1.html">this link</a> for instructions on how to set up mods on Quest 1.</p>
       </div>
     } else if(devicePreV51) {
       return <div className="container mainContainer">
