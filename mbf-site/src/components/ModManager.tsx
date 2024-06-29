@@ -224,6 +224,7 @@ function AddModsMenu(props: ModMenuProps) {
 
     const { isDragging, isLoading } = useFileDropper({
         onFilesDropped: async files => {
+            setWorking(true);
             for (const file of files) {
                 try {
                     const importResult = await importFile(device, file, addLogEvent);
@@ -239,8 +240,10 @@ function AddModsMenu(props: ModMenuProps) {
                     toast.error("Failed to import file: " + e);
                 }
             }
+            setWorking(false);
         },
         onUrlDropped: async url => {
+            setWorking(true);
             if (url.startsWith("file:///")) {
                 toast.error("Cannot process dropped file from this source, drag from the file picker instead. (Drag from OperaGX file downloads popup does not work)");
                 return;
@@ -251,6 +254,7 @@ function AddModsMenu(props: ModMenuProps) {
             }   catch(e)   {
                 toast.error(`Failed to import file: ${e}`);
             }
+            setWorking(false);
         }
     })
 
