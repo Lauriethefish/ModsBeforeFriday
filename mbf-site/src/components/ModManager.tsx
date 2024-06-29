@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { useLog } from "./LogWindow";
 import { Mod, trimGameVersion } from "../Models";
-import { ErrorModal, SyncingModal } from "./Modal";
+import { ErrorModal, Modal, SyncingModal } from "./Modal";
 import { Adb } from '@yume-chan/adb';
 import { ModCard } from "./ModCard";
 import UploadIcon from '../icons/upload.svg';
@@ -259,6 +259,13 @@ function AddModsMenu(props: ModMenuProps) {
     })
 
     return <div className="verticalCenter">
+        <Modal isVisible={isDragging}>
+            <div className="horizontalCenter">
+                <img src={UploadIcon}/>
+                <h1>Drag 'n' drop files or links!</h1>
+            </div>
+        </Modal>
+
         <UploadButton onUploaded={async file => {
             console.log("Importing " + file.name);
             try {
