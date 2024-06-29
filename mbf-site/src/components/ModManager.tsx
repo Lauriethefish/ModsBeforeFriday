@@ -12,6 +12,7 @@ import { toast } from "react-toastify";
 import { ModRepoBrowser } from "./ModRepoBrowser";
 import { ImportedMod, ModStatus } from "../Messages";
 import { OptionsMenu } from "./OptionsMenu";
+import useFileDropper from "../hooks/useFileDropper";
 
 interface ModManagerProps {
     gameVersion: string,
@@ -220,6 +221,39 @@ function AddModsMenu(props: ModMenuProps) {
             toast("Successfully downloaded and installed " + imported_id + " v" + imported_mod.version)
         }
     }
+
+    const { isDragging, isLoading } = useFileDropper({
+        onFilesDropped: async files => {
+            for (const file of files) {
+                try {
+                    const importResult = await importFile(device, file, addLogEvent);
+                    if(importResult.type === 'ImportedFileCopy') {
+                        console.log("Successfully copied " + file.name + " to " + importResult.copied_to + " due to request from " + importResult.mod_id);
+                        toast("Successfully copied " + file.name + " to the path specified by " + importResult.mod_id);
+                    }   else if(importResult.type === 'ImportedSong') {
+                        toast("Successfully imported song " + file.name);
+                    } else {
+                        await onModImported(importResult);
+                    }
+                }   catch(e)   {
+                    toast.error("Failed to import file: " + e);
+                }
+            }
+        },
+        onUrlDropped: async url => {
+            if (url.startsWith("file:///")) {
+                toast.error("Cannot process dropped file from this source, drag from the file picker instead. (Drag from OperaGX file downloads popup does not work)");
+                return;
+            }
+            try {
+                const importResult = await importModUrl(device, url, addLogEvent)
+                await onModImported(importResult);
+                toast(`Successfully imported mod ${importResult.imported_id}`);
+            }   catch(e)   {
+                toast.error(`Failed to import file: ${e}`);
+            }
+        }
+    })
 
     return <div className="verticalCenter">
         <UploadButton onUploaded={async file => {
