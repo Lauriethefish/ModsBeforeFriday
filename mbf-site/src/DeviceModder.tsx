@@ -1,14 +1,16 @@
 import { Adb } from '@yume-chan/adb';
-import { loadModStatus, patchApp, quickFix } from "./Agent";
+import { importFile, importModUrl, loadModStatus, patchApp, quickFix, setModStatuses } from "./Agent";
 import { ReactNode, useEffect, useState } from 'react';
-import { ModLoader, ModStatus } from './Messages';
+import { ImportedMod, ModLoader, ModStatus } from './Messages';
 import './css/DeviceModder.css';
 import { LogWindow, useLog } from './components/LogWindow';
 import { ErrorModal, Modal, SyncingModal } from './components/Modal';
 import { ModManager } from './components/ModManager';
-import { ManifestMod, trimGameVersion } from './Models';
+import { ManifestMod, Mod, trimGameVersion } from './Models';
 import { PermissionsMenu } from './components/PermissionsMenu';
 import { SelectableList } from './components/SelectableList';
+import { toast } from 'react-toastify';
+import useFileDropper from './hooks/useFileDropper';
 
 interface DeviceModderProps {
     device: Adb,
@@ -70,37 +72,95 @@ export function DeviceModder(props: DeviceModderProps) {
             .catch(err => quit(err));
     }, [device, quit]);
 
+    const gameVersion = modStatus?.app_info?.version;
+
+    function setMods(mods:Mod[]) {
+        if (modStatus === null) return;
+        setModStatus({ ...modStatus, installed_mods: mods })
+    };
+
+    async function onModImported(result: ImportedMod) {
+        if (!modStatus || !gameVersion) return;
+        
+        const { installed_mods, imported_id } = result;
+        setMods(installed_mods);
+
+        const imported_mod = installed_mods.find(mod => mod.id === imported_id)!;
+        const versionMismatch = gameVersion !== null && gameVersion !== imported_mod.game_version;
+        if(versionMismatch) {
+            // Don't install a mod by default if its version mismatches: we want the user to understand the consequences
+            toast.error("The mod `" + imported_id + "` was not enabled automatically as it is not designed for game version v" + trimGameVersion(gameVersion) + ".");
+        }   else    {
+            setMods(await setModStatuses(device, { [imported_id]: true }, addLogEvent));
+            toast("Successfully downloaded and installed " + imported_id + " v" + imported_mod.version)
+        }
+    }
+
+    const { isDragging, isLoading } = useFileDropper({
+        onFilesDropped: async files => {
+            for (const file of files) {
+                try {
+                    const importResult = await importFile(device, file, addLogEvent);
+                    if(importResult.type === 'ImportedFileCopy') {
+                        console.log("Successfully copied " + file.name + " to " + importResult.copied_to + " due to request from " + importResult.mod_id);
+                        toast("Successfully copied " + file.name + " to the path specified by " + importResult.mod_id);
+                    }   else if(importResult.type === 'ImportedSong') {
+                        toast("Successfully imported song " + file.name);
+                    } else {
+                        await onModImported(importResult);
+                    }
+                }   catch(e)   {
+                    toast.error("Failed to import file: " + e);
+                }
+            }
+        },
+        onUrlDropped: async url => {
+            if (url.startsWith("file:///")) {
+                toast.error("Cannot process dropped file from this source, drag from the file picker instead. (Drag from OperaGX file downloads popup does not work)");
+                return;
+            }
+            try {
+                const importResult = await importModUrl(device, url, addLogEvent)
+                await onModImported(importResult);
+                toast(`Successfully imported mod ${importResult.imported_id}`);
+            }   catch(e)   {
+                toast.error(`Failed to import file: ${e}`);
+            }
+        }
+    })
+
     // Fun "ocean" of IF statements, hopefully covering every possible state of an installation!
-    if(modStatus === null) {
+    if (modStatus === null) {
         return <div className='container mainContainer fadeIn'>
             <h2>Checking Beat Saber installation</h2>
             <p>This might take a minute or so the first few times.</p>
             <LogWindow events={logEvents} />
         </div>
-    }   else if(modStatus.app_info === null) {
+    } else if (modStatus.app_info === null) {
         return <div className='container mainContainer'>
             <h1>Beat Saber is not installed</h1>
             <p>Please install Beat Saber from the store and then refresh the page.</p>
         </div>
-    }   else if (modStatus.core_mods === null) {
+    } else if (modStatus.core_mods === null) {
         return <div className='container mainContainer'>
             <h1>No internet</h1>
             <p>It seems as though <b>your Quest</b> has no internet connection.</p>
-            <p>To mod Beat Saber, MBF needs to download files such as a mod loader and several essential mods. 
+            <p>To mod Beat Saber, MBF needs to download files such as a mod loader and several essential mods.
                 <br />This occurs on your Quest's connection. Please make sure that WiFi is enabled, then refresh the page.</p>
         </div>
-    }   else if(!(modStatus.core_mods.supported_versions.includes(modStatus.app_info.version)) && !isDeveloperUrl) {
+    } else if (!(modStatus.core_mods.supported_versions.includes(modStatus.app_info.version)) && !isDeveloperUrl) {
         // Check if we can downgrade to a supported version
         const downgradeVersions = GetSortedDowngradableVersions(modStatus);
         console.log("Available versions to downgrade: " + downgradeVersions);
         if(downgradeVersions === undefined || downgradeVersions.length === 0) {
+
             return <NotSupported version={modStatus.app_info.version} device={device} quit={() => quit(undefined)} />
-        }   else if(modStatus.app_info.loader_installed !== null) {
+        } else if (modStatus.app_info.loader_installed !== null) {
             // App is already patched, and we COULD in theory downgrade this version normally, but since it has been modified, the diffs will not work.
             // Therefore, they need to reinstall the latest version.
-            return <IncompatibleAlreadyModded installedVersion={modStatus.app_info.version} device={device} quit={() => quit(undefined)}/>
-        }   else    {
-            return <PatchingMenu 
+            return <IncompatibleAlreadyModded installedVersion={modStatus.app_info.version} device={device} quit={() => quit(undefined)} />
+        } else {
+            return <PatchingMenu
                 modStatus={modStatus}
                 onCompleted={status => setModStatus(status)}
                 device={device}
@@ -108,14 +168,14 @@ export function DeviceModder(props: DeviceModderProps) {
             />
         }
 
-    }   else if(modStatus.app_info.loader_installed !== null)   {
+    } else if (modStatus.app_info.loader_installed !== null) {
         let loader = modStatus.app_info.loader_installed;
         if(loader === 'Scotland2') {
             return <ValidModLoaderMenu device={device} modStatus={modStatus} setModStatus={setModStatus} quit={() => quit(null)}/>
         }   else    {
             return <IncompatibleLoader device={device} loader={loader} quit={() => quit(null)} />
         }
-    }   else   {
+    } else {
         return <PatchingMenu
             device={device}
             modStatus={modStatus}
@@ -167,25 +227,26 @@ function InstallStatus(props: InstallStatusProps) {
     const [error, setError] = useState(null as string | null);
     const [fixing, setFixing] = useState(false);
 
-    if(modStatus.modloader_present && modStatus.core_mods?.all_core_mods_installed) {
+
+    if (modStatus.modloader_present && modStatus.core_mods?.all_core_mods_installed) {
         return <p>Everything should be ready to go! &#9989;</p>
-    }   else {
+    } else {
         return <div>
             <h3 className="warning">Problems found with your install:</h3>
             <p>These must be fixed before custom songs will work!</p>
             <ul>
-                {!modStatus.modloader_present && 
+                {!modStatus.modloader_present &&
                     <li>Modloader not found &#10060;</li>}
-                {!modStatus.core_mods?.all_core_mods_installed && 
+                {!modStatus.core_mods?.all_core_mods_installed &&
                     <li>Core mods missing or out of date &#10060;</li>}
             </ul>
             <button onClick={async () => {
                 try {
                     setFixing(true);
                     onFixed(await quickFix(device, modStatus, addLogEvent));
-                }   catch(e) {
+                } catch (e) {
                     setError(String(e));
-                }   finally {
+                } finally {
                     setFixing(false);
                 }
             }}>Fix issues</button>
@@ -293,7 +354,7 @@ function PatchingMenu(props: PatchingMenuProps) {
                     setIsPatching(true);
                     try {
                         onCompleted(await patchApp(device, modStatus, downgradingTo, manifestMod, false, isDeveloperUrl, addLogEvent));
-                    } catch(e) {
+                    } catch (e) {
                         setPatchingError(String(e));
                         setIsPatching(false);
                     }
@@ -304,24 +365,24 @@ function PatchingMenu(props: PatchingMenuProps) {
                 isVisible={patchingError != null}
                 title={"Failed to install mods"}
                 description={'An error occured while patching ' + patchingError}
-                onClose={() => setPatchingError(null)}/>
+                onClose={() => setPatchingError(null)} />
 
             <Modal isVisible={selectingPerms}>
                 <h2>Change Permissions</h2>
                 <p>Certain mods require particular Android permissions to be set on the Beat Saber app in order to work correctly.</p>
                 <p>(You can change these permissions later, so don't worry about enabling them all now unless you know which ones you need.)</p>
                 <PermissionsMenu manifestMod={manifestMod}
-                    setManifestMod={manifestMod => setManifestMod(manifestMod)}/>
+                    setManifestMod={manifestMod => setManifestMod(manifestMod)} />
                 <button className="largeCenteredButton" onClick={() => setSelectingPerms(false)}>Confirm permissions</button>
             </Modal>
-                
+
         </div>
-    }   else    {
+    } else {
         return <div className='container mainContainer'>
             <h1>App is being patched</h1>
             <p>This should only take a few minutes, but might take up to 10 on a very slow internet connection.</p>
             <p className='warning'>You must not disconnect your device during this process.</p>
-            <LogWindow events={logEvents}/>
+            <LogWindow events={logEvents} />
         </div>
     }
 }
@@ -357,7 +418,7 @@ function ClickableLink({ onClick, children }: { onClick: () => void, children: R
 function VersionSupportedMessage({ version, requestedVersionChange, canChooseAnotherVersion }: { version: string, requestedVersionChange: () => void, canChooseAnotherVersion: boolean }) {
     return <>
         <h1>Install Custom Songs</h1>
-        {isDeveloperUrl ? 
+        {isDeveloperUrl ?
             <p className="warning">Mod development mode engaged: bypassing version check.
             This will not help you unless you are a mod developer!</p> : <>
             <p>Your app has version {trimGameVersion(version)}, which is supported by mods! {canChooseAnotherVersion && <ClickableLink onClick={requestedVersionChange}>(choose another version)</ClickableLink>}</p>
@@ -423,19 +484,21 @@ function IncompatibleLoader(props: IncompatibleLoaderProps) {
     </div>
 }
 
-function IncompatibleAlreadyModded({ device, quit, installedVersion }: { device: Adb,
-    quit: () => void, installedVersion: string }) {
-        return <div className='container mainContainer'>
-            <h1>Incompatible Version Patched</h1>
+function IncompatibleAlreadyModded({ device, quit, installedVersion }: {
+    device: Adb,
+    quit: () => void, installedVersion: string
+}) {
+    return <div className='container mainContainer'>
+        <h1>Incompatible Version Patched</h1>
 
-            <p>Your Beat Saber app has a modloader installed, but the game version ({trimGameVersion(installedVersion)}) has no support for mods!</p>
-            <p>To fix this, uninstall Beat Saber and reinstall the latest version. MBF can then downgrade this automatically to the latest moddable version.</p>
+        <p>Your Beat Saber app has a modloader installed, but the game version ({trimGameVersion(installedVersion)}) has no support for mods!</p>
+        <p>To fix this, uninstall Beat Saber and reinstall the latest version. MBF can then downgrade this automatically to the latest moddable version.</p>
 
-            <button onClick={async () => {
-                await uninstallBeatSaber(device);
-                quit();
-            }}>Uninstall Beat Saber</button>
-        </div>
+        <button onClick={async () => {
+            await uninstallBeatSaber(device);
+            quit();
+        }}>Uninstall Beat Saber</button>
+    </div>
 }
 
 function NextSteps() {
