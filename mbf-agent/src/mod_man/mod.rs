@@ -1,6 +1,7 @@
 mod manifest;
 use std::{cell::RefCell, collections::{HashMap, HashSet}, fs::File, path::{Path, PathBuf}, rc::Rc};
 
+use jsonschema::JSONSchema;
 use log::{error, info, warn};
 pub use manifest::*;
 
@@ -8,6 +9,9 @@ use anyhow::{Context, Result, anyhow};
 use semver::Version;
 
 use crate::{download_file_with_attempts, zip::ZipFile, EARLY_MODS_DIR, LATE_MODS_DIR, LIBS_DIR, QMODS_DIR};
+
+const QMOD_SCHEMA: &str = include_str!("qmod_schema.json");
+const MAX_SCHEMA_VERSION: Version = Version::new(1, 1, 0);
 
 pub struct Mod {
     manifest: ModInfo,
@@ -29,12 +33,16 @@ impl Mod {
 
 pub struct ModManager {
     mods: HashMap<String, Rc<RefCell<Mod>>>,
+    schema: JSONSchema
 }
 
 impl ModManager {
     pub fn new() -> Self {    
         Self {
-            mods: HashMap::new()
+            mods: HashMap::new(),
+            schema: JSONSchema::options()
+                .compile(&serde_json::from_str::<serde_json::Value>(QMOD_SCHEMA).expect("QMOD schema was not valid JSON"))
+                .expect("QMOD schema was not a valid JSON schema")
         }
     }
 
@@ -87,7 +95,7 @@ impl ModManager {
                 continue;
             }
 
-            match Self::load_mod_from(mod_path.clone()) {
+            match self.load_mod_from(mod_path.clone()) {
                 Ok(loaded_mod) =>  if !self.mods.contains_key(&loaded_mod.manifest.id) {
                     self.mods.insert(loaded_mod.manifest.id.clone(), Rc::new(RefCell::new(loaded_mod)));
                 }   else    {
@@ -108,19 +116,49 @@ impl ModManager {
         Ok(())
     }
 
-    fn load_mod_from(from: PathBuf) -> Result<Mod> {
+    fn load_mod_from(&self, from: PathBuf) -> Result<Mod> {
         let mod_file = std::fs::File::open(&from).context("Failed to open mod archive")?;
         let mut zip = ZipFile::open(mod_file).context("Mod was invalid ZIP archive")?;
 
         let json_data = zip.read_file("mod.json").context("Mod had no mod.json manifest")?;
-
-        let manifest = serde_json::from_slice(&json_data)?;
         Ok(Mod {
-            manifest: manifest,
+            manifest: self.load_manifest_from_slice(&json_data).context("Failed to parse manifest")?,
             installed: false, // Must call update_mods_status
             zip,
             loaded_from: from
         })
+    }
+
+    fn load_manifest_from_slice(&self, manifest_slice: &[u8]) -> Result<ModInfo> {
+        let manifest_value = serde_json::from_slice::<serde_json::Value>(manifest_slice)?;
+        // Check that the QMOD isn't a newer schema version than we support
+        // NB: Validating against the schema will catch this, but we would like to provide a nicer error message
+        match manifest_value.get("_QPVersion") {
+            Some(serde_json::Value::String(schema_ver)) => {
+                let sem_version = semver::Version::parse(&schema_ver)
+                    .context("Failed to parse specified QMOD schema version")?;
+
+                if sem_version > MAX_SCHEMA_VERSION {
+                    return Err(anyhow!("QMOD specified schema version {sem_version} which was newer than the maximum supported version {MAX_SCHEMA_VERSION}. Is MBF out of date, or did the mod developer make a mistake?"));
+                }
+            },
+            _ => return Err(anyhow!("Could not load mod as its manifest did not specify a QMOD schema version"))
+        }
+
+        // Now validate against the schema
+        if let Err(errors) = self.schema.validate(&manifest_value) {
+            let mut log_builder = String::new();
+
+            for error in errors {
+                log_builder.push_str(&format!("Validation error: {}\n", error));
+                log_builder.push_str(&format!("Instance path: {}\n", error.instance_path));
+            }
+
+            return Err(anyhow!("QMOD schema validation failed: \n{log_builder}"))
+        }
+
+        Ok(serde_json::from_value(manifest_value)
+            .expect("Failed to parse as QMOD manifest, despite being valid according to schema. This is a bug"))
     }
 
     /// Checks whether or not each loaded mod is installed.
@@ -302,7 +340,7 @@ impl ModManager {
     }
 
     pub fn try_load_new_mod(&mut self, from: PathBuf) -> Result<String> {
-        let loaded_mod = Self::load_mod_from(from.clone())?;
+        let loaded_mod = self.load_mod_from(from.clone())?;
 
         // Check that upgrading the mod to the new version is actually safe
         let id = loaded_mod.manifest.id.clone();
