@@ -2,6 +2,7 @@ import { AdbSync, AdbSyncWriteOptions, Adb, encodeUtf8 } from '@yume-chan/adb';
 import { ConsumableReadableStream, Consumable, DecodeUtf8Stream, ConcatStringStream } from '@yume-chan/stream-extra';
 import { Request, Response, LogMsg, ModStatus, Mods, ImportedMod, ImportResult, FixedPlayerData } from "./Messages";
 import { ManifestMod, Mod } from './Models';
+import { AGENT_LENGTH, AGENT_SHA1 } from './agent_manifest';
 
 const AgentPath: string = "/data/local/tmp/mbf-agent";
 
@@ -32,20 +33,14 @@ function logInfo(sink: LogEventSink, msg: string) {
 export async function prepareAgent(adb: Adb, eventSink: LogEventSink) {
   logInfo(eventSink, "Preparing agent: used to communicate with your Quest.");
 
-  const resp = await fetch("mbf-agent.sha1");
   let existingUpToDate = false;
-  if(resp.ok) {
-    let latestSha1 = (await resp.text()).trim().toUpperCase();
-    console.log("Latest agent SHA1 " + latestSha1);
+  console.log("Latest agent SHA1 " + AGENT_SHA1);
 
-    const exsitingSha1 = (await adb.subprocess.spawnAndWait(`sha1sum ${AgentPath} | cut -f 1 -d " "`)).stdout
-      .trim()
-      .toUpperCase();
-    console.log("Existing agent SHA1: " + exsitingSha1);
-    existingUpToDate = latestSha1 == exsitingSha1.trim().toUpperCase();
-  } else  {
-    console.warn("Failed to check SHA1 of agent: it will be redownloaded every time");
-  }
+  const exsitingSha1 = (await adb.subprocess.spawnAndWait(`sha1sum ${AgentPath} | cut -f 1 -d " "`)).stdout
+    .trim()
+    .toUpperCase();
+  console.log("Existing agent SHA1: " + exsitingSha1);
+  existingUpToDate = AGENT_SHA1 == exsitingSha1.trim().toUpperCase();
 
   if(existingUpToDate) {
     logInfo(eventSink, "Agent is up to date");
@@ -90,6 +85,7 @@ async function saveAgent(sync: AdbSync, eventSink: LogEventSink) {
 async function downloadAgent(eventSink: LogEventSink): Promise<Uint8Array> {
   const MAX_ATTEMPTS: number = 3;
   const TIMEOUT: number = 60000; // In milliseconds
+  const PROGRESS_UPDATE_INTERVAL = 1.0; // Time between download progress updates, in seconds
 
   let ok = false;
   let attempt = 1;
@@ -100,10 +96,31 @@ async function downloadAgent(eventSink: LogEventSink): Promise<Uint8Array> {
 
     try {
       const resp = await fetch("mbf-agent", { signal: controller.signal });
+      
       if(resp.body === null) {
         console.error("No body in agent response");
       } else if(resp.ok) {
-        return new Uint8Array(await resp.arrayBuffer());
+        const reader = resp.body.getReader();
+        let lastReadTime = new Date().getTime();
+        let allChunks = new Uint8Array(AGENT_LENGTH);
+
+        let recvLen = 0;
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          allChunks.set(value, recvLen);
+          recvLen += value.length;
+
+          const timeNow = new Date().getTime();
+          if(timeNow - lastReadTime > PROGRESS_UPDATE_INTERVAL) {
+            lastReadTime = timeNow;
+            const percentComplete = (recvLen / AGENT_LENGTH) * 100;
+
+            logInfo(eventSink, `Download ${Math.round(percentComplete * 10) / 10}% complete`);
+          }
+        }
+
+        return allChunks;
       } else  {
         console.error("Failed to GET agent: status code " + resp.status)
       }
