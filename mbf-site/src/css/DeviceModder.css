@@ -6,6 +6,11 @@
     margin-top: 10px;
 }
 
+.clickableLink {
+    cursor: pointer;
+    text-decoration: underline;
+}
+
 h2.warning {
     margin-top: 15px;
 }

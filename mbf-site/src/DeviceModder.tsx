@@ -1,6 +1,6 @@
 import { Adb } from '@yume-chan/adb';
 import { loadModStatus, patchApp, quickFix } from "./Agent";
-import { useEffect, useState } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { ModLoader, ModStatus } from './Messages';
 import './css/DeviceModder.css';
 import { LogWindow, useLog } from './components/LogWindow';
@@ -131,7 +131,7 @@ function ValidModLoaderMenu({ device, modStatus, setModStatus, quit }: { device:
     return <>
         <div className='container mainContainer'>
             <h1>App is modded</h1>
-            <p>Your Beat Saber install is modded, and its version is compatible with mods.</p>
+            <UpdateInfo modStatus={modStatus} device={device} quit={quit}/>
 
             {isDeveloperUrl ? <>
                 <p className="warning">Core mod functionality is disabled.</p>
@@ -197,6 +197,40 @@ function InstallStatus(props: InstallStatusProps) {
                 onClose={() => setError(null)} />
         </div>
     }
+}
+
+function UpdateInfo({ modStatus, device, quit }: { modStatus: ModStatus, device: Adb, quit: () => void }) {
+    const sortedModdableVersions = modStatus.core_mods?.supported_versions.sort(CompareBeatSaberVersions)!;
+    const newerUpdateExists = modStatus.app_info?.version !== sortedModdableVersions[0];
+
+    const [updateWindowOpen, setUpdateWindowOpen] = useState(false);
+
+    return <>
+        <p>Your Beat Saber install is modded, and its version is compatible with mods.</p>
+        {newerUpdateExists && <p>&#10071; &#65039;&#10071; &#65039; However, an updated moddable version is available! <ClickableLink onClick={() => setUpdateWindowOpen(true)}>Click here to update</ClickableLink></p>}
+
+        <Modal isVisible={updateWindowOpen}>
+            <h2>Update Beat Saber</h2>
+            <p>To update to the latest moddable version, simply:</p>
+            <ol>
+                <li>Uninstall Beat Saber with the button below.</li>
+                <li>Reinstall Beat Saber in your headset.</li>
+                <li>Open back up MBF to mod the version you just installed.</li>
+            </ol>
+            <button onClick={() => {
+                uninstallBeatSaber(device);
+                quit();
+            }}>Uninstall Beat Saber</button>
+            <button onClick={() => setUpdateWindowOpen(false)} className="discreetButton">Cancel</button>
+            <br/><br/>
+            <h3>What about my maps/mods/scores/qosmetics?</h3>
+            <ul>
+                <li><em>Maps and scores will remain safe</em> as they are held in a separate folder to the game files, so will not be deleted when you uninstall.</li>
+                <li>Qosmetics will not be deleted, however you can only use them if the qosmetics mods are available for the new version. You can always move back to your current version later if you miss them.</li>
+                <li><em>All currently installed mods will be removed.</em> (the new core mods for the updated version will be installed automatically) You can reinstall them once you have updated (if they are available for the newer version)</li>
+            </ul>
+        </Modal>
+    </>
 }
 
 interface PatchingMenuProps {
@@ -316,13 +350,17 @@ function PatchingAdvancedOptions({ downgradeVersions, onConfirm, isVisible }:
     </Modal>
 }
 
+function ClickableLink({ onClick, children }: { onClick: () => void, children: ReactNode }) {
+    return <a className="clickableLink" onClick={onClick}>{children}</a>
+}
+
 function VersionSupportedMessage({ version, requestedVersionChange, canChooseAnotherVersion }: { version: string, requestedVersionChange: () => void, canChooseAnotherVersion: boolean }) {
     return <>
         <h1>Install Custom Songs</h1>
         {isDeveloperUrl ? 
             <p className="warning">Mod development mode engaged: bypassing version check.
             This will not help you unless you are a mod developer!</p> : <>
-            <p>Your app has version {trimGameVersion(version)}, which is supported by mods! {canChooseAnotherVersion && <a style={{"cursor": "pointer"}}onClick={requestedVersionChange}>(choose another version)</a>}</p>
+            <p>Your app has version {trimGameVersion(version)}, which is supported by mods! {canChooseAnotherVersion && <ClickableLink onClick={requestedVersionChange}>(choose another version)</ClickableLink>}</p>
             <p>To get your game ready for custom songs, ModsBeforeFriday will next patch your Beat Saber app and install some essential mods.
             Once this is done, you will be able to manage your custom songs <b>inside the game.</b></p>
         </>}
@@ -335,10 +373,10 @@ function DowngradeMessage({ toVersion, wasUserSelected, requestedVersionChange, 
     canChooseAnotherVersion: boolean }) {
     return <>
         <h1>Downgrade and set up mods</h1>
-        {wasUserSelected ? (<><p>You have decided to downgrade to a version older than the latest moddable version. <b>Only do this if you know why you want to!</b> <a style={{"cursor": "pointer"}} onClick={requestedResetToDefault}>(reverse decision)</a></p></>)
+        {wasUserSelected ? (<><p>You have decided to downgrade to a version older than the latest moddable version. <b>Only do this if you know why you want to!</b> <ClickableLink onClick={requestedResetToDefault}>(reverse decision)</ClickableLink></p></>)
         : <>
             <p>MBF has detected that your version of Beat Saber doesn't support mods!</p>
-            <p>Fortunately for you, your version can be downgraded automatically to the latest moddable version: {trimGameVersion(toVersion)} {canChooseAnotherVersion && <a style={{"cursor": "pointer"}} onClick={requestedVersionChange}>(choose another version)</a>}</p>
+            <p>Fortunately for you, your version can be downgraded automatically to the latest moddable version: {trimGameVersion(toVersion)} {canChooseAnotherVersion && <ClickableLink onClick={requestedVersionChange}>(choose another version)</ClickableLink>}</p>
         </>}
         <p><span className='warning'><b>NOTE:</b></span> By downgrading, you will lose access to any DLC or other content that is not present in version {trimGameVersion(toVersion)}. If you decide to stop using mods and reinstall vanilla Beat Saber, however, then you will get this content back.</p>
     </>
