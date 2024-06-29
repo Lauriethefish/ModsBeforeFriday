@@ -14,6 +14,8 @@ import { setCoreModOverrideUrl } from './Agent';
 
 type NoDeviceCause = "NoDeviceSelected" | "DeviceInUse";
 
+const MIN_SUPPORTED_ANDROID_VERSION: number = 11;
+
 async function connect(
   setAuthing: () => void): Promise<Adb | NoDeviceCause> {
   const device_manager = new AdbDaemonWebUsbDeviceManager(navigator.usb);
@@ -45,10 +47,16 @@ async function connect(
   return new Adb(transport);
 }
 
+export async function getAndroidVersion(device: Adb) {
+  const result = await device.subprocess.spawnAndWait("getprop ro.build.version.release");
+  return Number(result.stdout.trim());
+}
+
 function ChooseDevice() {
   const [authing, setAuthing] = useState(false);
   const [chosenDevice, setChosenDevice] = useState(null as Adb | null);
   const [connectError, setConnectError] = useState(null as string | null);
+  const [devicePreV51, setdevicePreV51] = useState(false);
   const [deviceInUse, setDeviceInUse] = useState(false);
 
   if(chosenDevice !== null) {
@@ -57,7 +65,13 @@ function ChooseDevice() {
         <h1>Quest 1 Not Supported</h1>
         <p>ModsBeforeFriday has detected that you're using a Quest 1, which is no longer supported for modding Beat Saber.</p>
       </div>
-    } else {
+    } else if(devicePreV51) {
+      return <div className="container mainContainer">
+        <h1>Pre-v51 OS Detected</h1>
+        <p>ModsBeforeFriday has detected that you have an outdated version of the Quest operating system installed which is no longer supported by mods.</p>
+        <p>Please ensure your operating system is up to date and then refresh the page.</p>
+      </div>
+    } else  {
       return <>
         <DeviceModder device={chosenDevice} quit={(err) => {
           if(err != null) {
@@ -104,9 +118,13 @@ function ChooseDevice() {
               return;
             }
             
-            setAuthing(false);
             if(device !== null) {
+              const androidVersion = await getAndroidVersion(device);
+              console.log("Device android version: " + androidVersion);
+              setdevicePreV51(androidVersion < MIN_SUPPORTED_ANDROID_VERSION);
+              setAuthing(false);
               setChosenDevice(device);
+
               await device.transport.disconnected;
               setChosenDevice(null);
             }
