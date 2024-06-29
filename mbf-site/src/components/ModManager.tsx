@@ -248,7 +248,6 @@ function AddModsMenu(props: ModMenuProps) {
             try {
                 const importResult = await importModUrl(device, url, addLogEvent)
                 await onModImported(importResult);
-                toast(`Successfully imported mod ${importResult.imported_id}`);
             }   catch(e)   {
                 toast.error(`Failed to import file: ${e}`);
             }
