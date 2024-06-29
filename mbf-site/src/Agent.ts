@@ -209,7 +209,7 @@ async function sendRequest(adb: Adb, request: Request, eventSink: LogEventSink =
       throw new Error("Received error response from agent");
     } else if(response.type === 'LogMsg') {
       const log = response as LogMsg;
-      throw new Error("Received error from backend: `" + log.message + "`");
+      throw new Error("`" + log.message + "`");
     } else  {
       return response;
     }
