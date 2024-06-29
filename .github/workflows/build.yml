@@ -40,12 +40,9 @@ jobs:
           linker = "${{ env.CC_aarch64-linux-android }}"' > /home/runner/.cargo/config.toml
       - name: Output cargo config
         run: cat /home/runner/.cargo/config.toml
-      - name: Build agent
-        run: cargo build --manifest-path=mbf-agent/Cargo.toml --target aarch64-linux-android --release
-      - name: Copy agent
-        run: cp ./mbf-agent/target/aarch64-linux-android/release/mbf-agent ./mbf-site/public/mbf-agent
-      - name: Generate agent checksum
-        run: sha1sum ./mbf-site/public/mbf-agent | cut -f 1 -d " " > ./mbf-site/public/mbf-agent.sha1
+      - name: Run agent build script
+        run: ./mbf-agent/build.ps1
+        shell: pwsh
       - name: yarn install
         run: yarn --cwd ./mbf-site install
       - name: yarn build
