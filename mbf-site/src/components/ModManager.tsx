@@ -87,7 +87,7 @@ function Title(props: TitleProps) {
             onClick={() => setMenu('current')}>
             <h1>Your Mods</h1>
         </div>
-        <span className={`tab-header ${menu === 'options' ? "selected":""}`}
+        <span className={`tab-header settingsCog ${menu === 'options' ? "selected":""}`}
             onClick={() => setMenu('options')}>
             <img src={ToolsIcon} />
         </span>

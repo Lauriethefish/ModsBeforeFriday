@@ -42,6 +42,10 @@
     padding: 10px;
 }
 
+.settingsCog {
+    display: flex;
+}
+
 .tab-header.selected {
     background-color: rgb(17, 39, 243);
 }
