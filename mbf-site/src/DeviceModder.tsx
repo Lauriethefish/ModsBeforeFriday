@@ -22,6 +22,43 @@ export async function uninstallBeatSaber(device: Adb) {
 
 const isDeveloperUrl: boolean = new URLSearchParams(window.location.search).get("dev") === "true";
 
+// Gets the available versions that have diffs to downgrade, and have core mod support
+// Sorts them with the newest versions first.
+export function GetSortedDowngradableVersions(modStatus: ModStatus): string[] | undefined {
+    return modStatus.core_mods?.downgrade_versions
+        .filter(version => modStatus.core_mods?.supported_versions.includes(version))
+        .sort(CompareBeatSaberVersions)
+}
+
+export function CompareBeatSaberVersions(a: string, b: string): number {
+    // Split each version into its segments, period separated,
+    // e.g. 1.13.2 goes to 1, 13 and 2.
+    // We make sure to remove the _ suffix
+    const aSegments = a.split("_")[0].split(".");
+    const bSegments = b.split("_")[0].split(".");
+
+    // Iterate through the segments, from major to minor, until neither version has any more segments.
+    for(let segment = 0; segment < Math.max(aSegments.length, bSegments.length); segment++) {
+        // Default each segment to 0 if version A/B has terminated before this segment.
+        let aSegment = 0;
+        let bSegment = 0;
+        if(segment < aSegments.length) {
+            aSegment = Number(aSegments[segment]);
+        }
+        if(segment < bSegments.length) {
+            bSegment = Number(bSegments[segment]);
+        }
+
+        if(aSegment > bSegment) {
+            return -1;
+        }   else if(aSegment < bSegment) {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
 export function DeviceModder(props: DeviceModderProps) {
     const [modStatus, setModStatus] = useState(null as ModStatus | null);
     const { device, quit } = props;
@@ -54,11 +91,9 @@ export function DeviceModder(props: DeviceModderProps) {
         </div>
     }   else if(!(modStatus.core_mods.supported_versions.includes(modStatus.app_info.version)) && !isDeveloperUrl) {
         // Check if we can downgrade to a supported version
-        const downgradeVersion = modStatus.core_mods
-            .downgrade_versions
-            .find(version => modStatus.core_mods!.supported_versions.includes(version));
-
-        if(downgradeVersion === undefined) {
+        const downgradeVersions = GetSortedDowngradableVersions(modStatus);
+        console.log("Available versions to downgrade: " + downgradeVersions);
+        if(downgradeVersions === undefined || downgradeVersions.length === 0) {
             return <NotSupported version={modStatus.app_info.version} device={device} quit={() => quit(undefined)} />
         }   else if(modStatus.app_info.loader_installed !== null) {
             // App is already patched, and we COULD in theory downgrade this version normally, but since it has been modified, the diffs will not work.
@@ -69,7 +104,7 @@ export function DeviceModder(props: DeviceModderProps) {
                 modStatus={modStatus}
                 onCompleted={status => setModStatus(status)}
                 device={device}
-                initialDowngradingTo={downgradeVersion}
+                initialDowngradingTo={downgradeVersions[0]}
             />
         }
 
@@ -186,9 +221,8 @@ function PatchingMenu(props: PatchingMenuProps) {
 
     const { onCompleted, modStatus, device, initialDowngradingTo } = props;
     const [downgradingTo, setDowngradingTo] = useState(initialDowngradingTo);
-    const downgradeChoices = modStatus.core_mods!.downgrade_versions
-        .filter(version => modStatus.core_mods!.supported_versions.includes(version)
-            && version != initialDowngradingTo);
+    const downgradeChoices = GetSortedDowngradableVersions(modStatus)!
+        .filter(version => version != initialDowngradingTo);
 
     if(!isPatching) {
         return <div className='container mainContainer'>
