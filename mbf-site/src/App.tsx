@@ -170,6 +170,7 @@ function Title() {
       <span className="initial">F</span>
       <span className="title">riday</span>
       <span className="initial">!</span>
+      <p className="williamGay">william gay</p>
     </h1>
     <SmallSourceLink />
     <p>The easiest way to install custom songs for Beat Saber on Quest!</p>

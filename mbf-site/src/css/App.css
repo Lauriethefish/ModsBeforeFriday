@@ -59,3 +59,15 @@ h1:hover > .title {
 .allowDebug {
     width: 100%
 }
+
+.williamGay {
+    position: fixed;
+    bottom: 0;
+    right: 0;
+    font-size: 15px;
+    color: transparent;
+}
+
+h1:hover > .williamGay {
+    color: blue;
+}
