@@ -20,7 +20,7 @@ pub fn handle_request(request: Request) -> Result<Response> {
         Request::SetModsEnabled {
             statuses
         } => run_mod_action(statuses),
-        Request::QuickFix { override_core_mod_url } => handle_quick_fix(override_core_mod_url),
+        Request::QuickFix { override_core_mod_url, wipe_existing_mods } => handle_quick_fix(override_core_mod_url, wipe_existing_mods),
         Request::Import { from_path } => handle_import(from_path),
         Request::RemoveMod { id } => handle_remove_mod(id),
         Request::ImportModUrl { from_url } => handle_import_mod_url(from_url),
@@ -311,12 +311,16 @@ fn handle_remove_mod(id: String) -> Result<Response> {
     })
 }
 
-fn handle_quick_fix(override_core_mod_url: Option<String>) -> Result<Response> {
+fn handle_quick_fix(override_core_mod_url: Option<String>, wipe_existing_mods: bool) -> Result<Response> {
     let app_info = get_app_info()?
         .ok_or(anyhow!("Cannot quick fix when app is not installed"))?;
 
     let mut mod_manager = ModManager::new();
-    mod_manager.load_mods()?;
+    if wipe_existing_mods {
+        info!("Wiping all existing mods");
+        mod_manager.wipe_all_mods().context("Failed to wipe existing mods")?;
+    }
+    mod_manager.load_mods()?; // Should load no mods.
 
     // Reinstall missing core mods and overwrite the modloader with the one contained within the executable.
     install_core_mods(&mut mod_manager, app_info, override_core_mod_url)?;

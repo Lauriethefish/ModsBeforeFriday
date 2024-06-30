@@ -25,7 +25,8 @@ export interface SetModsEnabled {
 
 export interface QuickFix {
     type: 'QuickFix',
-    override_core_mod_url: string | null
+    override_core_mod_url: string | null,
+    wipe_existing_mods: boolean
 }
 
 export interface RemoveMod {

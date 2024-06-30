@@ -19,6 +19,7 @@ interface ModManagerProps {
     gameVersion: string,
     setMods: (mods: Mod[]) => void,
     modStatus: ModStatus,
+    setModStatus: (status: ModStatus) => void,
     device: Adb,
     quit: (err: unknown) => void
 }
@@ -26,7 +27,7 @@ interface ModManagerProps {
 type SelectedMenu = 'add' | 'current' | 'options';
 
 export function ModManager(props: ModManagerProps) {
-    const { modStatus, setMods, device, gameVersion, quit } = props;
+    const { modStatus, setModStatus, setMods, device, gameVersion, quit } = props;
     const mods = modStatus.installed_mods;
 
     const [isWorking, setWorking] = useState(false);
@@ -66,6 +67,7 @@ export function ModManager(props: ModManagerProps) {
             device={device}
             quit={quit}
             modStatus={modStatus}
+            setModStatus={setModStatus}
          />}
         
         <ErrorModal isVisible={modError != null}

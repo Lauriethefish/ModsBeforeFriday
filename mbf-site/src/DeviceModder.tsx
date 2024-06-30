@@ -150,6 +150,7 @@ function ValidModLoaderMenu({ device, modStatus, setModStatus, quit }: { device:
 
         <ModManager modStatus={modStatus}
             setMods={mods => setModStatus({ ...modStatus, installed_mods: mods })}
+            setModStatus={status => setModStatus(status)}
             device={device}
             gameVersion={modStatus.app_info!.version}
             quit={quit}
@@ -186,7 +187,7 @@ function InstallStatus(props: InstallStatusProps) {
             <button onClick={async () => {
                 try {
                     setFixing(true);
-                    onFixed(await quickFix(device, modStatus, addLogEvent));
+                    onFixed(await quickFix(device, modStatus, false, addLogEvent));
                 } catch (e) {
                     setError(String(e));
                 } finally {

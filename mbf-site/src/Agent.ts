@@ -369,10 +369,12 @@ export async function patchApp(device: Adb,
 // Should fix many common issues with an install.
 export async function quickFix(device: Adb,
   beforeFix: ModStatus,
+  wipe_existing_mods: boolean,
   eventSink: LogEventSink = null): Promise<ModStatus> {
   let response = await sendRequest(device, {
       type: 'QuickFix',
-      override_core_mod_url: CORE_MOD_OVERRIDE_URL
+      override_core_mod_url: CORE_MOD_OVERRIDE_URL,
+      wipe_existing_mods
   }, eventSink);
 
   // Update the mod status to reflect the fixed installation

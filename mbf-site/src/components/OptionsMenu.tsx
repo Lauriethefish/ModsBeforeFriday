@@ -1,7 +1,7 @@
 import { Adb, decodeUtf8 } from '@yume-chan/adb';
 import { uninstallBeatSaber } from '../DeviceModder';
 import { useEffect, useState } from 'react';
-import { fixPlayerData, patchApp } from '../Agent';
+import { fixPlayerData, patchApp, quickFix } from '../Agent';
 import { toast } from 'react-toastify';
 import { ErrorModal, Modal, SyncingModal } from './Modal';
 import { PermissionsMenu } from './PermissionsMenu';
@@ -11,13 +11,14 @@ import { Collapsible } from './Collapsible';
 import { LogWindow, useLog } from './LogWindow';
 import { ModStatus } from '../Messages';
 
-export function OptionsMenu({ device, quit, modStatus }: {
+export function OptionsMenu({ device, quit, modStatus, setModStatus }: {
     device: Adb,
+    setModStatus: (status: ModStatus) => void,
     quit: (err: unknown | null) => void
     modStatus: ModStatus}) {
     return <div className="container mainContainer" id="toolsContainer">
         <Collapsible title="Mod tools" defaultOpen>
-            <ModTools device={device} quit={() => quit(null)} />
+            <ModTools device={device} modStatus={modStatus} setModStatus={setModStatus} quit={() => quit(null)} />
         </Collapsible>
         <Collapsible title="ADB log" defaultOpen>
             <AdbLogger device={device}/>
@@ -29,21 +30,40 @@ export function OptionsMenu({ device, quit, modStatus }: {
 }
 
 // Basic tools to do with managing the install, including a fix for a previously introduced bug.
-function ModTools({ device, quit }: {
+function ModTools({ device, quit, modStatus, setModStatus }: {
     device: Adb,
-    quit: () => void}) {
+    quit: () => void,
+    modStatus: ModStatus,
+    setModStatus: (status: ModStatus) => void}) {
     const [err, setErr] = useState(null as string | null);
+    const [isWorking, setWorking] = useState(false);
+    const [logEvents, addLogEvent] = useLog();
+
     return <div id="modTools">
         <button onClick={async () => {
             try {
                 await device.subprocess.spawnAndWait("am force-stop com.beatgames.beatsaber");
-                toast("Successfully killed Beat Saber");
+                toast.success("Successfully killed Beat Saber");
             }   catch(e) {
                 setErr("Failed to kill Beat Saber process " + e);
             }
-        }}>Kill Beat Saber</button>
+        }}>Kill Beat Saber</button> Immediately closes the game.
 
         <br />
+        <button onClick={async () => {
+            try {
+                setWorking(true);
+                setModStatus(await quickFix(device, modStatus, true, addLogEvent));
+                toast.success("All non-core mods removed!");
+            }   catch(e) {
+                setErr("Failed to uninstall all mods " + e);
+            }   finally {
+                setWorking(false);
+            }
+
+        }}>Reinstall only core mods</button> Deletes all installed mods, then installs only the core mods.
+        <br/>
+
         <button onClick={async () => {
             try {
                 await uninstallBeatSaber(device);
@@ -51,20 +71,21 @@ function ModTools({ device, quit }: {
             }   catch(e)   {
                 setErr("Failed to uninstall Beat Saber " + e)
             }
-        }}>Uninstall Beat Saber</button>
+        }}>Uninstall Beat Saber</button> Uninstalls the game: this will remove all mods and quit MBF.
         <br/>
 
         <button onClick={async () => {
             try {
                 if(await fixPlayerData(device)) {
-                    toast("Successfully fixed player data issues");
+                    toast.success("Successfully fixed player data issues");
                 }   else    {
-                    toast("No player data file found to fix");
+                    toast.error("No player data file found to fix");
                 }
             }   catch(e) {
                 setErr("Failed to fix player data " + e);
             }
-        }}>Fix Player Data</button>
+        }}>Fix Player Data</button> Fixes an issue with player data permissions.
+        <br/>
 
         <ErrorModal
             title="Operation failed"
@@ -72,6 +93,8 @@ function ModTools({ device, quit }: {
             isVisible={err !== null}
             onClose={() => setErr(null)}
         />
+
+        <SyncingModal title="Reinstalling only core mods" logEvents={logEvents} isVisible={isWorking}/>
     </div>
 }
 

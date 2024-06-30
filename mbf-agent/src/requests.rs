@@ -96,7 +96,9 @@ pub enum Request {
     QuickFix {
         // If not null, this specifies a core mod JSON to use instead of the default core mods source.
         // This is useful for developers testing a core mod update.
-        override_core_mod_url: Option<String>
+        override_core_mod_url: Option<String>,
+        // If true, this request will delete ALL mods before reinstalling only the core mods.
+        wipe_existing_mods: bool
     },
 }
 
