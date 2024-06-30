@@ -47,7 +47,8 @@ function ModTools({ device, quit, modStatus, setModStatus }: {
             }   catch(e) {
                 setErr("Failed to kill Beat Saber process " + e);
             }
-        }}>Kill Beat Saber</button> Immediately closes the game.
+        }}>Kill Beat Saber</button>
+        Immediately closes the game.
 
         <br />
         <button onClick={async () => {
@@ -61,7 +62,8 @@ function ModTools({ device, quit, modStatus, setModStatus }: {
                 setWorking(false);
             }
 
-        }}>Reinstall only core mods</button> Deletes all installed mods, then installs only the core mods.
+        }}>Reinstall only core mods</button>
+        Deletes all installed mods, then installs only the core mods.
         <br/>
 
         <button onClick={async () => {
@@ -71,7 +73,8 @@ function ModTools({ device, quit, modStatus, setModStatus }: {
             }   catch(e)   {
                 setErr("Failed to uninstall Beat Saber " + e)
             }
-        }}>Uninstall Beat Saber</button> Uninstalls the game: this will remove all mods and quit MBF.
+        }}>Uninstall Beat Saber</button>
+        Uninstalls the game: this will remove all mods and quit MBF.
         <br/>
 
         <button onClick={async () => {
@@ -84,7 +87,9 @@ function ModTools({ device, quit, modStatus, setModStatus }: {
             }   catch(e) {
                 setErr("Failed to fix player data " + e);
             }
-        }}>Fix Player Data</button> Fixes an issue with player data permissions.
+        }}>Fix Player Data</button>
+        Fixes an issue with player data permissions.
+        
         <br/>
 
         <ErrorModal

@@ -16,3 +16,8 @@
 #modTools {
     padding-top: 10px;
 }
+
+#modTools > button {
+    margin-right: 10px;
+    margin-bottom: 5px;
+}
