@@ -6,9 +6,7 @@ interface Props {
 }
 
 export default function useFileDropper(props: Props) {
-
     const [isDragging, setIsDragging] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
     const dragCounter = useRef(0);
 
     useEffect(() => {
@@ -47,7 +45,6 @@ export default function useFileDropper(props: Props) {
         async function ondrop(e: any) {
             e.preventDefault();
             try {
-                setIsLoading(true);
                 setIsDragging(false);
                 dragCounter.current = 0;
                 if (props.onFilesDropped) {
@@ -64,8 +61,6 @@ export default function useFileDropper(props: Props) {
                 }
             } catch (e) {
                 console.error(e);
-            } finally {
-                setIsLoading(false);
             }
         }
 
@@ -83,7 +78,6 @@ export default function useFileDropper(props: Props) {
 
     return {
         isDragging,
-        isLoading,
     }
 }
 

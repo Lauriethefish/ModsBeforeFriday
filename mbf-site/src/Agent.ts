@@ -19,7 +19,9 @@ function readableStreamBodge(array: Uint8Array): ConsumableReadableStream<Uint8A
   });
 }
 
-function logInfo(sink: LogEventSink, msg: string) {
+export type LogEventSink = ((event: LogMsg) => void) | null;
+
+export function logInfo(sink: LogEventSink, msg: string) {
   console.log(msg);
   if(sink !== null) {
     sink({
@@ -29,7 +31,6 @@ function logInfo(sink: LogEventSink, msg: string) {
     })
   }
 }
-
 export async function prepareAgent(adb: Adb, eventSink: LogEventSink) {
   logInfo(eventSink, "Preparing agent: used to communicate with your Quest.");
 
@@ -154,8 +155,6 @@ function logFromAgent(log: LogMsg) {
   }
 }
 
-export type LogEventSink = ((event: LogMsg) => void) | null;
-
 async function sendRequest(adb: Adb, request: Request, eventSink: LogEventSink = null): Promise<Response> {
   let command_buffer = encodeUtf8(JSON.stringify(request) + "\n");
 
@@ -170,6 +169,7 @@ async function sendRequest(adb: Adb, request: Request, eventSink: LogEventSink =
 
   let exited = false;
   agentProcess.exit.then(() => exited = true);
+  adb.disconnected.then(() => exited = true);
 
   const reader = agentProcess.stdout
     // TODO: Not totally sure if this will handle non-ASCII correctly.
@@ -271,6 +271,17 @@ export async function setModStatuses(device: Adb,
 export async function importFile(device: Adb,
     file: File,
     eventSink: LogEventSink = null): Promise<ImportResult> {
+
+    if(file.name.endsWith(".slow")) {
+      const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+      await delay(5000);
+      console.log("Imported " + file.name);
+      return {
+        type: 'ImportedFileCopy',
+        copied_to: "jazz",
+        mod_id: "slow-mod"
+      };
+    }
   const sync = await device.sync();
   const tempPath = "/data/local/tmp/mbf-uploads/" + file.name;
   try {

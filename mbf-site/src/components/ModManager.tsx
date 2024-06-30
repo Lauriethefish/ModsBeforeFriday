@@ -7,12 +7,13 @@ import { ModCard } from "./ModCard";
 import UploadIcon from '../icons/upload.svg';
 import ToolsIcon from '../icons/tools-icon.svg';
 import '../css/ModManager.css';
-import { LogEventSink, importFile, importModUrl, removeMod, setModStatuses } from "../Agent";
+import { importFile, importModUrl, removeMod, setModStatuses } from "../Agent";
 import { toast } from "react-toastify";
 import { ModRepoBrowser } from "./ModRepoBrowser";
 import { ImportedMod, ModStatus } from "../Messages";
 import { OptionsMenu } from "./OptionsMenu";
 import useFileDropper from "../hooks/useFileDropper";
+import { LogEventSink, logInfo } from "../Agent";
 
 interface ModManagerProps {
     gameVersion: string,
@@ -194,6 +195,24 @@ function UploadButton({ onUploaded }: { onUploaded: (file: File) => void}) {
 }
 
 
+type ImportType = "Url" | "File";
+interface QueuedImport {
+    type: ImportType
+}
+
+interface QueuedFileImport extends QueuedImport {
+    file: File,
+    type: "File"
+}
+
+interface QueuedUrlImport extends QueuedImport {
+    url: string,
+    type: "Url"
+}
+
+const importQueue: QueuedImport[] = [];
+let isProcessingQueue: boolean = false;
+
 function AddModsMenu(props: ModMenuProps) {
     const {
         mods,
@@ -222,39 +241,77 @@ function AddModsMenu(props: ModMenuProps) {
         }
     }
 
-    const { isDragging, isLoading } = useFileDropper({
-        onFilesDropped: async files => {
-            setWorking(true);
-            for (const file of files) {
-                try {
-                    const importResult = await importFile(device, file, addLogEvent);
-                    if(importResult.type === 'ImportedFileCopy') {
-                        console.log("Successfully copied " + file.name + " to " + importResult.copied_to + " due to request from " + importResult.mod_id);
-                        toast("Successfully copied " + file.name + " to the path specified by " + importResult.mod_id);
-                    }   else if(importResult.type === 'ImportedSong') {
-                        toast("Successfully imported song " + file.name);
-                    } else {
-                        await onModImported(importResult);
-                    }
-                }   catch(e)   {
-                    toast.error("Failed to import file: " + e);
-                }
+    async function handleFileImport(file: File) {
+        try {
+            const importResult = await importFile(device, file, addLogEvent);
+            if(importResult.type === 'ImportedFileCopy') {
+                logInfo(addLogEvent, "Successfully copied " + file.name + " to " + importResult.copied_to + " due to request from " + importResult.mod_id);
+                toast("Successfully copied " + file.name + " to the path specified by " + importResult.mod_id);
+            }   else if(importResult.type === 'ImportedSong') {
+                toast("Successfully imported song " + file.name);
+            }   else    {
+                await onModImported(importResult);
             }
-            setWorking(false);
+        }   catch(e)   {
+            toast.error("Failed to import file: " + e);
+        }
+    }
+
+    async function handleUrlImport(url: string) {
+        if (url.startsWith("file:///")) {
+            toast.error("Cannot process dropped file from this source, drag from the file picker instead. (Drag from OperaGX file downloads popup does not work)");
+            return;
+        }
+        try {
+            const importResult = await importModUrl(device, url, addLogEvent)
+            await onModImported(importResult);
+        }   catch(e)   {
+            toast.error(`Failed to import file: ${e}`);
+        }
+    }
+
+    async function enqueueImports(imports: QueuedImport[]) {
+        // Add the new imports to the queue
+        importQueue.push(...imports);
+        // If somebody else is processing the queue already, stop and let them finish processing the whole queue.
+        if(isProcessingQueue) {
+            return;
+        }
+        
+        // Otherwise, we must stop being lazy and process the queue ourselves.
+        console.log("Now processing import queue");
+        isProcessingQueue = true;
+
+        let disconnected = false;
+        device.disconnected.then(() => disconnected = true);
+        setWorking(true);
+        while(importQueue.length > 0 && !disconnected) {
+            // Process the next import, depending on if it is a URL or file
+            const newImport = importQueue.pop()!;
+            if(newImport.type == "File") {
+                const file = (newImport as QueuedFileImport).file;
+                await handleFileImport(file);
+            }   else    {
+                const url = (newImport as QueuedUrlImport).url;
+                await handleUrlImport(url);
+            }
+        }
+        setWorking(false);
+        isProcessingQueue = false;
+    }
+
+    const { isDragging } = useFileDropper({
+        onFilesDropped: async files => {
+            enqueueImports(files.map(file => {
+                return { type: "File", file: file };
+            }))
         },
         onUrlDropped: async url => {
-            setWorking(true);
-            if (url.startsWith("file:///")) {
-                toast.error("Cannot process dropped file from this source, drag from the file picker instead. (Drag from OperaGX file downloads popup does not work)");
-                return;
-            }
-            try {
-                const importResult = await importModUrl(device, url, addLogEvent)
-                await onModImported(importResult);
-            }   catch(e)   {
-                toast.error(`Failed to import file: ${e}`);
-            }
-            setWorking(false);
+            const urlImport: QueuedUrlImport = {
+                type: "Url",
+                url: url
+            };
+            enqueueImports([urlImport])
         }
     })
 
@@ -266,25 +323,7 @@ function AddModsMenu(props: ModMenuProps) {
             </div>
         </Modal>
 
-        <UploadButton onUploaded={async file => {
-            console.log("Importing " + file.name);
-            try {
-                setWorking(true);
-                const importResult = await importFile(device, file, addLogEvent);
-                if(importResult.type === 'ImportedFileCopy') {
-                    console.log("Successfully copied " + file.name + " to " + importResult.copied_to + " due to request from " + importResult.mod_id);
-                    toast("Successfully copied " + file.name + " to the path specified by " + importResult.mod_id);
-                }   else if(importResult.type === 'ImportedSong') {
-                    toast("Successfully imported song " + file.name);
-                }   else    {
-                    await onModImported(importResult);
-                }
-            }   catch(e)   {
-                setError("Failed to import file: " + e);
-            }   finally {
-                setWorking(false);
-            }
-        }} />
+        <UploadButton onUploaded={async file => await enqueueImports([{ type: "File", file: file } as QueuedFileImport])} />
 
         <ModRepoBrowser existingMods={mods} gameVersion={gameVersion} onDownload={async url => {
             setWorking(true);
