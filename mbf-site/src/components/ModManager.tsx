@@ -238,7 +238,7 @@ function AddModsMenu(props: ModMenuProps) {
             setError("The mod `" + imported_id + "` was not enabled automatically as it is not designed for game version v" + trimGameVersion(gameVersion) + ".");
         }   else    {
             setMods(await setModStatuses(device, { [imported_id]: true }, addLogEvent));
-            toast("Successfully downloaded and installed " + imported_id + " v" + imported_mod.version)
+            toast.success("Successfully downloaded and installed " + imported_id + " v" + imported_mod.version)
         }
     }
 
@@ -247,9 +247,9 @@ function AddModsMenu(props: ModMenuProps) {
             const importResult = await importFile(device, file, addLogEvent);
             if(importResult.type === 'ImportedFileCopy') {
                 logInfo(addLogEvent, "Successfully copied " + file.name + " to " + importResult.copied_to + " due to request from " + importResult.mod_id);
-                toast("Successfully copied " + file.name + " to the path specified by " + importResult.mod_id);
+                toast.success("Successfully copied " + file.name + " to the path specified by " + importResult.mod_id);
             }   else if(importResult.type === 'ImportedSong') {
-                toast("Successfully imported song " + file.name);
+                toast.success("Successfully imported song " + file.name);
             }   else    {
                 await onModImported(importResult);
             }
