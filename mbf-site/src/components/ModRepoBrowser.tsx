@@ -40,18 +40,13 @@ export function ModRepoBrowser(props: ModRepoBrowserProps) {
     else if(gameVersion in modRepo) {
         return <>
             <div className="mod-list fadeIn">
-                {latestVersions(modRepo[gameVersion]).map(mod => {
-                    const existingInstall = props.existingMods
-                    .find(existing => existing.id === mod.id);
-
-                    if(existingInstall === undefined || existingInstall?.version !== mod.version) {
-                        return <ModRepoCard
-                            mod={mod}
-                            key={mod.id}
-                            update={existingInstall !== undefined}
-                            onInstall={() => onDownload(mod.download)} />
-                    }
-                })}
+                {prepareModRepoForDisplay(latestVersions(modRepo[gameVersion]), props.existingMods).map(displayInfo => 
+                    <ModRepoCard
+                            mod={displayInfo.mod}
+                            key={displayInfo.mod.id}
+                            update={displayInfo.needUpdate}
+                            onInstall={() => onDownload(displayInfo.mod.download)} />
+                )}
             </div>
         </>
     }   else    {
@@ -60,6 +55,46 @@ export function ModRepoBrowser(props: ModRepoBrowserProps) {
             <p>No mods are available for v{props.gameVersion} of the game!</p>
         </>
     }
+}
+
+interface ModDisplayInfo {
+    mod: ModRepoMod,
+    alreadyInstalled: boolean
+    needUpdate: boolean
+}
+
+function prepareModRepoForDisplay(mods: ModRepoMod[],
+    existingMods: Mod[]): ModDisplayInfo[] {
+    
+    return mods.map(mod => {
+        // Match mods up with the existing loaded mods.
+        const existingInstall = existingMods.find(existing => existing.id === mod.id);
+
+        return {
+            alreadyInstalled: existingInstall !== undefined,
+            needUpdate: existingInstall !== undefined && existingInstall.version !== mod.version,
+            mod: mod
+        };
+    }).filter(mod => mod.needUpdate || !mod.alreadyInstalled) // Skip any mods that are already installed and up to date
+    .sort((a, b) => {
+        // Show mods that need an update first in the list
+        if(!a.needUpdate && b.needUpdate) {
+            return 1;
+        }
+
+        if(!b.needUpdate && a.needUpdate) {
+            return -1;
+        }
+
+        // Sort the rest of the mods alphabetically
+        if(a.mod.name > b.mod.name) {
+            return 1;
+        }   else if(a.mod.name < b.mod.name) {
+            return -1;
+        }   else    {
+            return 0;
+        }
+    });
 }
 
 // Makes the `mods` array unique by the mod `id`, extracting only the latest version of each mod.
