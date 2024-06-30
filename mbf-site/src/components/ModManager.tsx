@@ -181,7 +181,7 @@ function UploadButton({ onUploaded }: { onUploaded: (files: File[]) => void}) {
         <img src={UploadIcon}/>
         <input type="file"
             id="file"
-            multiple="true"
+            multiple={true}
             ref={inputFile}
             style={{display: 'none'}}
             onChange={ev => {
