@@ -174,19 +174,20 @@ function InstalledModsMenu(props: ModMenuProps) {
     </>
 }
 
-function UploadButton({ onUploaded }: { onUploaded: (file: File) => void}) {
+function UploadButton({ onUploaded }: { onUploaded: (files: File[]) => void}) {
     const inputFile = useRef<HTMLInputElement | null>(null);
     return <button id="uploadButton" onClick={() => inputFile.current?.click()} title="Upload any .QMOD file, any song as a .ZIP, any Qosmetics files or any other file accepted by a particular mod.">
         Upload Files
         <img src={UploadIcon}/>
         <input type="file"
             id="file"
+            multiple="true"
             ref={inputFile}
             style={{display: 'none'}}
             onChange={ev => {
                 const files = ev.target.files;
                 if(files !== null) {
-                    onUploaded(files[0]);
+                    onUploaded(Array.from(files));
                 }
                 ev.target.value = "";
             }}
@@ -323,7 +324,9 @@ function AddModsMenu(props: ModMenuProps) {
             </div>
         </Modal>
 
-        <UploadButton onUploaded={async file => await enqueueImports([{ type: "File", file: file } as QueuedFileImport])} />
+        <UploadButton onUploaded={async files => await enqueueImports(files.map(file => {
+                return { type: "File", file: file };
+            }))} />
 
         <ModRepoBrowser existingMods={mods} gameVersion={gameVersion} onDownload={async url => {
             setWorking(true);
