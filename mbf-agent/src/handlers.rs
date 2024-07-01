@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
@@ -21,7 +22,7 @@ pub fn handle_request(request: Request) -> Result<Response> {
             statuses
         } => run_mod_action(statuses),
         Request::QuickFix { override_core_mod_url, wipe_existing_mods } => handle_quick_fix(override_core_mod_url, wipe_existing_mods),
-        Request::Import { from_path } => handle_import(from_path),
+        Request::Import { from_path } => handle_import(from_path, None),
         Request::RemoveMod { id } => handle_remove_mod(id),
         Request::ImportModUrl { from_url } => handle_import_mod_url(from_url),
         Request::FixPlayerData => handle_fix_player_data()
@@ -163,36 +164,36 @@ fn get_app_info() -> Result<Option<AppInfo>> {
 
 fn handle_import_mod_url(from_url: String) -> Result<Response> {
     std::fs::create_dir_all(DOWNLOADS_PATH)?;
-    let download_path = Path::new(DOWNLOADS_PATH).join("import_from_url.qmod");
+    let download_path = Path::new(DOWNLOADS_PATH).join("import_from_url");
 
     info!("Downloading {}", from_url);
-    download_file_with_attempts(&download_path, &from_url)?;
-
-    // Load the installed mods.
-    let mut mod_manager = ModManager::new();
-    mod_manager.load_mods()?;
+    let filename: Option<String> = download_file_with_attempts(&download_path, &from_url)?;
     
     // Attempt to import the downloaded file as a qmod, removing the temporary file if this fails.
-    match handle_import_qmod(mod_manager, download_path.clone()) {
-        Ok(resp) => Ok(resp),
-        Err(err) => {
-            std::fs::remove_file(download_path)?;
-            Err(err)
-        }
-    }
+    handle_import(&download_path, filename)
 }
 
-fn handle_import(from_path: String) -> Result<Response> {
+fn handle_import(from_path: impl AsRef<Path> + Debug, override_filename: Option<String>) -> Result<Response> {
     // Load the installed mods.
     let mut mod_manager = ModManager::new();
     mod_manager.load_mods()?;
 
-    info!("Attempting to import from {from_path}");
-    let path: PathBuf = from_path.into();
+    let path = from_path.as_ref().to_owned();
+    if let Some(filename) = &override_filename {
+        info!("Attempting to import from {filename}");
+    }   else {
+        info!("Attempting to import from {:?}", path);
+    }
 
-    let file_ext = match path.extension() {
-        Some(ext) => ext.to_string_lossy().to_lowercase().to_string(),
-        None => return Err(anyhow!("File had no extension"))
+    let file_ext = match override_filename {
+        Some(filename) => match filename.split_once('.') {
+            Some((_name, ext)) => ext.to_lowercase(),
+            None => return Err(anyhow!("File had no extension"))
+        },
+        None => match path.extension() {
+            Some(ext) => ext.to_string_lossy().to_lowercase(),
+            None => return Err(anyhow!("File had no extension"))
+        }
     };
 
     let import_result = if file_ext == "qmod" {

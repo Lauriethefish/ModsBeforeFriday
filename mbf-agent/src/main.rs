@@ -57,12 +57,14 @@ pub fn get_apk_path() -> Result<Option<String>> {
     }
 }
 
-fn download_file_with_attempts(to: impl AsRef<Path>, url: &str) -> Result<()> {
+// Attempts to download a file with multiple attempts (3 currently)
+// Returns the file name if given in the response, otherwise Ok(None)
+fn download_file_with_attempts(to: impl AsRef<Path>, url: &str) -> Result<Option<String>> {
     let mut attempt = 0;
     loop {
         attempt += 1;
         match download_file_one_attempt(&to, url) {
-            Ok(_) => return Ok(()),
+            Ok(filename) => return Ok(filename),
             Err(err) => if attempt == 3 {
                 return Err(err).context("Failed to download file after maximum attempts")
             }   else    {
@@ -72,7 +74,7 @@ fn download_file_with_attempts(to: impl AsRef<Path>, url: &str) -> Result<()> {
     }
 }
 
-fn download_file_one_attempt(to: impl AsRef<Path>, url: &str) -> Result<()> {
+fn download_file_one_attempt(to: impl AsRef<Path>, url: &str) -> Result<Option<String>> {
     let resp = get_agent().get(url)
         .call()
         .context("Failed to request file")?;
@@ -81,6 +83,23 @@ fn download_file_one_attempt(to: impl AsRef<Path>, url: &str) -> Result<()> {
         Some(length) => length.parse::<usize>().ok(),
         None => None
     };
+
+    // Extract the file name from the response.
+    let filename = match resp.header("Content-Disposition") {
+        // Locate the filename within the header
+        Some(cont_dis) => match cont_dis.find("filename=") {
+            Some(index) => Some(cont_dis[(index + 9)..]
+                .split(';') // Remove any subsequent data after the filename
+                .next()
+                .unwrap() // Guaranteed not to panic as there is always at least 1 segment of string
+                .trim() // Yeet any whitespace to be safe
+                .to_string()),
+            None => None
+        },
+        None => None
+    };
+
+
     let mut resp_body = resp.into_reader();
 
     let mut writer = OpenOptions::new()
@@ -108,8 +127,7 @@ fn download_file_one_attempt(to: impl AsRef<Path>, url: &str) -> Result<()> {
         }
     }
    
-
-    Ok(())
+    Ok(filename)
 }
 
 fn copy_stream_progress<T: FnMut(usize) -> ()>(from: &mut impl Read,

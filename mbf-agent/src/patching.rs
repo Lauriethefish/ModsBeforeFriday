@@ -236,7 +236,8 @@ fn download_diff_retry(diff: &Diff, to_dir: impl AsRef<Path>) -> Result<()> {
     let url = external_res::get_diff_url(diff);
     let output_path = to_dir.as_ref().join(&diff.diff_name);
 
-    download_file_with_attempts(&output_path, &url).context("Failed to download diff file")
+    download_file_with_attempts(&output_path, &url).context("Failed to download diff file")?;
+    Ok(())
 }
 
 fn save_libunity(temp_path: impl AsRef<Path>, version: &str) -> Result<Option<PathBuf>> {
