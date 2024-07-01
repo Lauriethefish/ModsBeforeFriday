@@ -1,6 +1,6 @@
 import { AdbSync, AdbSyncWriteOptions, Adb, encodeUtf8 } from '@yume-chan/adb';
 import { ConsumableReadableStream, Consumable, DecodeUtf8Stream, ConcatStringStream } from '@yume-chan/stream-extra';
-import { Request, Response, LogMsg, ModStatus, Mods, ImportedMod, ImportResult, FixedPlayerData } from "./Messages";
+import { Request, Response, LogMsg, ModStatus, Mods, ImportedMod, ImportResultType, FixedPlayerData, ImportResult } from "./Messages";
 import { ManifestMod, Mod } from './Models';
 import { AGENT_LENGTH, AGENT_SHA1 } from './agent_manifest';
 
@@ -271,17 +271,6 @@ export async function setModStatuses(device: Adb,
 export async function importFile(device: Adb,
     file: File,
     eventSink: LogEventSink = null): Promise<ImportResult> {
-
-    if(file.name.endsWith(".slow")) {
-      const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
-      await delay(5000);
-      console.log("Imported " + file.name);
-      return {
-        type: 'ImportedFileCopy',
-        copied_to: "jazz",
-        mod_id: "slow-mod"
-      };
-    }
   const sync = await device.sync();
   const tempPath = "/data/local/tmp/mbf-uploads/" + file.name;
   try {
@@ -306,15 +295,15 @@ export async function importFile(device: Adb,
   }
 }
 
-export async function importModUrl(device: Adb,
+export async function importUrl(device: Adb,
 url: string,
 eventSink: LogEventSink = null) {
   const response = await sendRequest(device, {
-    'type': 'ImportModUrl',
+    type: 'ImportUrl',
     from_url: url
   }, eventSink);
 
-  return response as ImportedMod;
+  return response as ImportResult;
 }
 
 export async function removeMod(device: Adb,

@@ -39,8 +39,8 @@ export interface Import {
     from_path: string
 }
 
-export interface ImportModUrl {
-    type: 'ImportModUrl',
+export interface ImportUrl {
+    type: 'ImportUrl',
     from_url: string
 }
 
@@ -50,7 +50,7 @@ export type Request = GetModStatus |
     QuickFix | 
     RemoveMod | 
     Import | 
-    ImportModUrl | 
+    ImportUrl | 
     FixPlayerData;
 
 export interface Mods {
@@ -79,7 +79,13 @@ export interface FixedPlayerData {
     existed: boolean
 }
 
-export type ImportResult = ImportedMod | ImportedFileCopy | ImportedSong;
+export interface ImportResult {
+    result: ImportResultType,
+    used_filename: string,
+    type: 'ImportResult'
+}
+
+export type ImportResultType = ImportedMod | ImportedFileCopy | ImportedSong;
 
 export interface ModStatus {
     type: 'ModStatus',

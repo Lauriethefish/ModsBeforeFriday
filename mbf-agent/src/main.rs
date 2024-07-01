@@ -85,20 +85,7 @@ fn download_file_one_attempt(to: impl AsRef<Path>, url: &str) -> Result<Option<S
     };
 
     // Extract the file name from the response.
-    let filename = match resp.header("Content-Disposition") {
-        // Locate the filename within the header
-        Some(cont_dis) => match cont_dis.find("filename=") {
-            Some(index) => Some(cont_dis[(index + 9)..]
-                .split(';') // Remove any subsequent data after the filename
-                .next()
-                .unwrap() // Guaranteed not to panic as there is always at least 1 segment of string
-                .trim() // Yeet any whitespace to be safe
-                .to_string()),
-            None => None
-        },
-        None => None
-    };
-
+    let filename = get_filename_from_headers(&resp);
 
     let mut resp_body = resp.into_reader();
 
@@ -128,6 +115,31 @@ fn download_file_one_attempt(to: impl AsRef<Path>, url: &str) -> Result<Option<S
     }
    
     Ok(filename)
+}
+
+fn get_filename_from_headers(resp: &ureq::Response) -> Option<String> {
+    match resp.header("Content-Disposition") {
+        // Locate the filename within the header
+        Some(cont_dis) => match cont_dis.find("filename=") {
+            Some(index) => { 
+                let with_quotes = cont_dis[(index + 9)..]
+                    .split(";") // Remove any subsequent data after the filename
+                    .next()
+                    .unwrap() // Guaranteed not to panic as there is always at least 1 segment of string
+                    .trim();
+                // Remove quotes *if there are any* (seems to be inconsistent)
+                let start_idx = if with_quotes.chars().next() == Some('"') 
+                    { 1 } else { 0 };
+                let end_idx = if with_quotes.chars().rev().next() == Some('"') 
+                    { with_quotes.len() - 1 } else { with_quotes.len() };
+
+                // Remove the opening and closing quotes
+                Some(with_quotes[start_idx..end_idx].to_string())
+            },
+            None => None
+        },
+        None => None
+    }
 }
 
 fn copy_stream_progress<T: FnMut(usize) -> ()>(from: &mut impl Read,

@@ -53,7 +53,7 @@ pub enum Request {
     },
     /// Downloads the file from the given URL and then attempts to import it as a mod (only).
     /// Returns an ImportedMod message.
-    ImportModUrl {
+    ImportUrl {
         from_url: String,
     },
 
@@ -146,6 +146,26 @@ pub enum Response {
     Mods {
         installed_mods: Vec<ModModel>
     },
+    ImportResult {
+        result: ImportResultType, // The result of importing the file.
+        used_filename: String // The filename that was actually used to determine how to import the mod.
+    },
+    // Sent to relay progress information during the modding process.
+    // This will NOT be the final message sent.
+    LogMsg {
+        message: String,
+        level: LogLevel
+    },
+    FixedPlayerData {
+        // True if a PlayerData.dat existed to fix, false if the request did nothing.
+        existed: bool
+    }
+}
+
+/// What type of file a file was imported as, and details about the resulting file.
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum ImportResultType {
     ImportedMod {
         installed_mods: Vec<ModModel>,
         imported_id: String  
@@ -157,16 +177,6 @@ pub enum Response {
         mod_id: String
     },
     ImportedSong,
-    // Sent to relay progress information during the modding process.
-    // This will NOT be the final message sent.
-    LogMsg {
-        message: String,
-        level: LogLevel
-    },
-    FixedPlayerData {
-        // True if a PlayerData.dat existed to fix, false if the request did nothing.
-        existed: bool
-    }
 }
 
 /// The trimmed version of the ModInfo type that is sent to the web client.

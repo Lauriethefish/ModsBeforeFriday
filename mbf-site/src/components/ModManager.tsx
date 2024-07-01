@@ -7,10 +7,10 @@ import { ModCard } from "./ModCard";
 import UploadIcon from '../icons/upload.svg';
 import ToolsIcon from '../icons/tools-icon.svg';
 import '../css/ModManager.css';
-import { importFile, importModUrl, removeMod, setModStatuses } from "../Agent";
+import { importFile, importUrl, removeMod, setModStatuses } from "../Agent";
 import { toast } from "react-toastify";
 import { ModRepoBrowser } from "./ModRepoBrowser";
-import { ImportedMod, ModStatus } from "../Messages";
+import { ImportResult, ImportResultType, ImportedMod, ModStatus } from "../Messages";
 import { OptionsMenu } from "./OptionsMenu";
 import useFileDropper from "../hooks/useFileDropper";
 import { LogEventSink, logInfo } from "../Agent";
@@ -244,17 +244,24 @@ function AddModsMenu(props: ModMenuProps) {
         }
     }
 
+    // Processes an ImportResult
+    async function onImportResult(importResult: ImportResult) {
+        const filename = importResult.used_filename;
+        const typedResult = importResult.result;
+        if(typedResult.type === 'ImportedFileCopy') {
+            logInfo(addLogEvent, "Successfully copied " + filename + " to " + typedResult.copied_to + " due to request from " + typedResult.mod_id);
+            toast.success("Successfully copied " + filename + " to the path specified by " + typedResult.mod_id);
+        }   else if(typedResult.type === 'ImportedSong') {
+            toast.success("Successfully imported song " + filename);
+        }   else    {
+            await onModImported(typedResult);
+        }
+    }
+
     async function handleFileImport(file: File) {
         try {
             const importResult = await importFile(device, file, addLogEvent);
-            if(importResult.type === 'ImportedFileCopy') {
-                logInfo(addLogEvent, "Successfully copied " + file.name + " to " + importResult.copied_to + " due to request from " + importResult.mod_id);
-                toast.success("Successfully copied " + file.name + " to the path specified by " + importResult.mod_id);
-            }   else if(importResult.type === 'ImportedSong') {
-                toast.success("Successfully imported song " + file.name);
-            }   else    {
-                await onModImported(importResult);
-            }
+            await onImportResult(importResult);
         }   catch(e)   {
             toast.error("Failed to import file: " + e);
         }
@@ -266,8 +273,8 @@ function AddModsMenu(props: ModMenuProps) {
             return;
         }
         try {
-            const importResult = await importModUrl(device, url, addLogEvent)
-            await onModImported(importResult);
+            const importResult = await importUrl(device, url, addLogEvent)
+            await onImportResult(importResult);
         }   catch(e)   {
             toast.error(`Failed to import file: ${e}`);
         }
@@ -333,7 +340,7 @@ function AddModsMenu(props: ModMenuProps) {
         <ModRepoBrowser existingMods={mods} gameVersion={gameVersion} onDownload={async url => {
             setWorking(true);
             try {
-                await onModImported(await importModUrl(device, url, addLogEvent));
+                await onImportResult(await importUrl(device, url, addLogEvent));
             }   catch(e) { 
                 setError("Failed to install mod " + e);
             }   finally {

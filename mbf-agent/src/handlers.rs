@@ -8,7 +8,7 @@ use crate::{axml::AxmlReader, patching, zip::ZipFile};
 use crate::external_res::{get_diff_index, JsonPullError};
 use crate::manifest::{ManifestInfo, ManifestMod};
 use crate::mod_man::ModManager;
-use crate::requests::{AppInfo, CoreModsInfo, ModModel, Request, Response};
+use crate::requests::{AppInfo, CoreModsInfo, ImportResultType, ModModel, Request, Response};
 use anyhow::{anyhow, Context, Result};
 use log::{error, info, warn};
 
@@ -24,7 +24,7 @@ pub fn handle_request(request: Request) -> Result<Response> {
         Request::QuickFix { override_core_mod_url, wipe_existing_mods } => handle_quick_fix(override_core_mod_url, wipe_existing_mods),
         Request::Import { from_path } => handle_import(from_path, None),
         Request::RemoveMod { id } => handle_remove_mod(id),
-        Request::ImportModUrl { from_url } => handle_import_mod_url(from_url),
+        Request::ImportUrl { from_url } => handle_import_mod_url(from_url),
         Request::FixPlayerData => handle_fix_player_data()
     }
 }
@@ -178,23 +178,23 @@ fn handle_import(from_path: impl AsRef<Path> + Debug, override_filename: Option<
     let mut mod_manager = ModManager::new();
     mod_manager.load_mods()?;
 
-    let path = from_path.as_ref().to_owned();
-    if let Some(filename) = &override_filename {
-        info!("Attempting to import from {filename}");
-    }   else {
-        info!("Attempting to import from {:?}", path);
-    }
-
-    let file_ext = match override_filename {
-        Some(filename) => match filename.split_once('.') {
-            Some((_name, ext)) => ext.to_lowercase(),
-            None => return Err(anyhow!("File had no extension"))
-        },
-        None => match path.extension() {
-            Some(ext) => ext.to_string_lossy().to_lowercase(),
-            None => return Err(anyhow!("File had no extension"))
-        }
+    let filename = match override_filename {
+        Some(filename) => filename,
+        None => from_path.as_ref().file_name().ok_or(anyhow!("No filename in {from_path:?}"))?
+            .to_string_lossy()
+            .to_string()
     };
+
+
+    let path = from_path.as_ref().to_owned();
+    info!("Attempting to import from {filename}");
+
+    let file_ext = filename
+        .split('.')
+        .rev()
+        .next()
+        .ok_or(anyhow!("No file extension in filename {filename}"))?
+        .to_string();
 
     let import_result = if file_ext == "qmod" {
         handle_import_qmod(mod_manager, path.clone())
@@ -206,7 +206,10 @@ fn handle_import(from_path: impl AsRef<Path> + Debug, override_filename: Option<
     
     // Make sure to remove the temporary file in the case that importing the file failed.
     match import_result {
-        Ok(resp) => Ok(resp),
+        Ok(result) => Ok(Response::ImportResult {
+            result,
+            used_filename: filename
+        }),
         Err(err) => {
             match std::fs::remove_file(path) {
                 Ok(_) => {},
@@ -220,7 +223,7 @@ fn handle_import(from_path: impl AsRef<Path> + Debug, override_filename: Option<
 
 // Attempts to import the given path as a QMOD
 // The file will be deleted if this results in a success.
-fn handle_import_qmod(mut mod_manager: ModManager, from_path: PathBuf) -> Result<Response> {
+fn handle_import_qmod(mut mod_manager: ModManager, from_path: PathBuf) -> Result<ImportResultType> {
     info!("Loading {from_path:?} as a QMOD");
     let id = mod_manager.try_load_new_mod(from_path.clone())?;
 
@@ -236,7 +239,7 @@ fn handle_import_qmod(mut mod_manager: ModManager, from_path: PathBuf) -> Result
     std::fs::copy(&from_path, new_path)?;
     std::fs::remove_file(from_path)?;
 
-    Ok(Response::ImportedMod {
+    Ok(ImportResultType::ImportedMod {
         imported_id: id,
         installed_mods
     })
@@ -244,7 +247,7 @@ fn handle_import_qmod(mut mod_manager: ModManager, from_path: PathBuf) -> Result
 
 // Attempts to copy the given file as a mod file copy.
 // If returning Ok, the file will have been deleted.
-fn attempt_file_copy(from_path: PathBuf, file_ext: String, mod_manager: ModManager) -> Result<Response> {
+fn attempt_file_copy(from_path: PathBuf, file_ext: String, mod_manager: ModManager) -> Result<ImportResultType> {
     for m in mod_manager.get_mods() {
         let mod_ref = (**m).borrow();
         match mod_ref.manifest()
@@ -262,7 +265,7 @@ fn attempt_file_copy(from_path: PathBuf, file_ext: String, mod_manager: ModManag
                 std::fs::copy(&from_path, &dest_path).context("Failed to copy file")?;
                 std::fs::remove_file(&from_path)?;
 
-                return Ok(Response::ImportedFileCopy {
+                return Ok(ImportResultType::ImportedFileCopy {
                     copied_to: dest_path.to_string_lossy().to_string(),
                     mod_id: mod_ref.manifest().id.to_string()
                 })
@@ -274,7 +277,7 @@ fn attempt_file_copy(from_path: PathBuf, file_ext: String, mod_manager: ModManag
     Err(anyhow!("File extension `.{}` was not recognised by any mod", file_ext))
 }
 
-fn attempt_song_import(from_path: PathBuf) -> Result<Response> {
+fn attempt_song_import(from_path: PathBuf) -> Result<ImportResultType> {
     let song_handle = std::fs::File::open(&from_path)?;
     let mut zip = ZipFile::open(song_handle).context("Song was invalid ZIP file")?;
 
@@ -296,7 +299,7 @@ fn attempt_song_import(from_path: PathBuf) -> Result<Response> {
 
         drop(zip);
         std::fs::remove_file(from_path)?;
-        Ok(Response::ImportedSong)
+        Ok(ImportResultType::ImportedSong)
     }   else {
         Err(anyhow!("ZIP file was not a song; Unclear know how to import it"))
     }
