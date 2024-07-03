@@ -394,6 +394,7 @@ fn patch_manifest(zip: &mut ZipFile<File>, additional_properties: ManifestMod) -
 
     let manifest = additional_properties
         .debuggable(true)
+        .hardware_accelerated(true)
         .with_permission("android.permission.MANAGE_EXTERNAL_STORAGE");
 
     let res_ids = ResourceIds::load()?;

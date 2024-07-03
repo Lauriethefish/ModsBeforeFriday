@@ -63,7 +63,9 @@ pub struct ManifestMod {
     add_permissions: Vec<Rc<str>>,
     add_features: Vec<Rc<str>>,
     #[serde(default = "bool::default")]
-    debuggable: bool
+    debuggable: bool,
+    #[serde(default = "bool::default")]
+    hardware_accelerated: bool
 }
 
 impl ManifestMod {
@@ -72,7 +74,8 @@ impl ManifestMod {
         Self {
             add_permissions: Vec::new(),
             add_features: Vec::new(),
-            debuggable: false
+            debuggable: false,
+            hardware_accelerated: false,
         }
     }
 
@@ -94,24 +97,29 @@ impl ManifestMod {
         self
     }
 
-    // Set the "debuggable" attribute on the given attribute list for the <application ...> element to "true".
+    pub fn hardware_accelerated(mut self, hardware_accelerated: bool) -> Self {
+        self.hardware_accelerated = hardware_accelerated;
+        self
+    }
+
+    // Set the given attribute on the given attribute list for the <application ...> element to "true".
     // Returns true if any value was actually changed, false otherwise.
-    fn apply_debuggable(attributes: &mut Vec<Attribute>, res_ids: &ResourceIds) -> bool {
-        // Set the debuggable attribute
-        if let Some(existing_debuggable) = attributes
+    // Will add the `android:` namespace prefix to the attribute.
+    fn set_attribute_to_true(attributes: &mut Vec<Attribute>, res_ids: &ResourceIds, attr_name: &str) -> bool {
+        if let Some(existing_attr) = attributes
             .iter_mut()
-            .find(|attr| &*attr.name == "debuggable") {
-            // Set the value of the debuggable attribute if it exists
-            if existing_debuggable.value != AttributeValue::Boolean(true) {
-                existing_debuggable.value = AttributeValue::Boolean(true);
+            .find(|attr| &*attr.name == attr_name) {
+            // Set the value of the current instance of an attribute if it exists
+            if existing_attr.value != AttributeValue::Boolean(true) {
+                existing_attr.value = AttributeValue::Boolean(true);
                 true
             }   else {
                 false
             }
         }   else    {
-            // Add the debuggable attribute if one doesn't already exist.
+            // Add the attribute if one doesn't already exist.
             attributes.push(
-                android_attribute("debuggable", AttributeValue::Boolean(true), res_ids)
+                android_attribute(attr_name, AttributeValue::Boolean(true), res_ids)
             );
             true
         }
@@ -144,9 +152,16 @@ impl ManifestMod {
         while let Some(mut ev) = reader.read_next_event().context("Failed to read original manifest")? {
             let is_end_of_manifest = match &mut ev { // Determine if the current event is the final tag: </manifest>
                 Event::StartElement { attributes, name, .. } => {
-                    if &**name == "application" && self.debuggable {
-                        info!("Setting debuggable to `{}`", self.debuggable);
-                        modified |= Self::apply_debuggable(attributes, res_ids);
+                    if &**name == "application" {
+                        if self.debuggable {
+                            info!("Making debuggable");
+                            modified |= Self::set_attribute_to_true(attributes, res_ids, "debuggable");
+                        }
+                        if self.hardware_accelerated {
+                            info!("Making hardware accelerated");
+                            modified |= Self::set_attribute_to_true(attributes, res_ids, "hardwareAccelerated");
+                        }
+                        
                     }   else if &**name == "meta-data" && Self::get_name_attribute(attributes) // Locate existing modded metadata tag
                         .is_ok_and(|name| &*name == METADATA_TAG) {
                         skipping_subsequent = true; // Skip adding permissions/feats to the manifest that were added last time we patched.
