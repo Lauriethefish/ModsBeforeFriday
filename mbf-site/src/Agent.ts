@@ -92,22 +92,29 @@ async function downloadAgent(eventSink: LogEventSink): Promise<Uint8Array> {
   let attempt = 1;
   do {
     // Add a modest request timeout
+    logInfo(eventSink, "Creating abort controller and setting timeout");
     const controller = new AbortController();
     setTimeout(() => controller.abort(), TIMEOUT);
 
     try {
+      logInfo(eventSink, "Initial fetch request");
       const resp = await fetch("mbf-agent", { signal: controller.signal });
-      
+      logInfo(eventSink, "Now reading response");
+
       if(resp.body === null) {
         console.error("No body in agent response");
       } else if(resp.ok) {
+        logInfo(eventSink, "Getting response body reader");
         const reader = resp.body.getReader();
         let lastReadTime = new Date().getTime();
+        logInfo(eventSink, "Allocating output byte array");
         let allChunks = new Uint8Array(AGENT_LENGTH);
 
+        logInfo(eventSink, "Now reading body");
         let recvLen = 0;
         while (true) {
           const { done, value } = await reader.read();
+          console.log("Read next chunk " + recvLen);
           if (done) break;
           allChunks.set(value, recvLen);
           recvLen += value.length;
