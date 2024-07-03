@@ -218,7 +218,9 @@ function AppContents() {
     mustEnterUrl = true;
   }
 
-  if (navigator.usb === undefined) {
+  if (usingOculusBrowser()) {
+    return <OculusBrowserMessage />
+  } else  if (navigator.usb === undefined) {
     return <UnsupportedMessage />
   } else if (hasSetCoreUrl || !mustEnterUrl) {
     return <ChooseDevice />
@@ -238,6 +240,10 @@ function App() {
       transition={Bounce}
       hideProgressBar={true} />
   </div>
+}
+
+function usingOculusBrowser(): boolean {
+  return navigator.userAgent.includes("OculusBrowser");
 }
 
 function isViewingOnWindows(): boolean {
@@ -266,16 +272,23 @@ function isViewingOnIos() {
   || (navigator.userAgent.includes("Mac") && "ontouchend" in document)
 }
 
+function OculusBrowserMessage() {
+  return <div className="container mainContainer">
+    <h1>Quest Browser Detected</h1>
+    <p>MBF has detected that you're trying to use the built-in Quest browser.</p>
+    <p>Unfortunately, <b>you cannot use MBF on the device you are attempting to mod.</b></p>
+    <DevicesSupportingModding />
+
+    <p>(MBF can be used on a Quest if you install a chromium browser, however this can only be used to mod <b>another Quest headset</b>, connected via USB.)</p>
+  </div>
+}
+
 function UnsupportedMessage() {
   return <div className='container mainContainer'>
     {isViewingOnIos() ? <>
       <h1>iOS is not supported</h1>
       <p>MBF has detected that you're trying to use it from an iOS device. Unfortunately, Apple does not allow WebUSB, which MBF needs to be able to interact with the Quest.</p>
-      <p>To mod your game, you will need one of: </p>
-      <ul>
-        <li>A PC or Mac (preferred)</li>
-        <li>An Android phone (still totally works)</li>
-      </ul>
+      <DevicesSupportingModding />
 
       <p>.... and one of the following supported browsers:</p>
     </> : <>
@@ -286,6 +299,16 @@ function UnsupportedMessage() {
     <h2>Supported Browsers</h2>
     <SupportedBrowsers />
   </div>
+}
+
+function DevicesSupportingModding() {
+  return <>
+    <p>To mod your game, you will need one of: </p>
+    <ul>
+      <li>A PC or Mac (preferred)</li>
+      <li>An Android phone (still totally works)</li>
+    </ul>
+  </>
 }
 
 function SupportedBrowsers() {
