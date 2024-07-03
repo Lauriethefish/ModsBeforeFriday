@@ -85,59 +85,61 @@ async function saveAgent(sync: AdbSync, eventSink: LogEventSink) {
   
 async function downloadAgent(eventSink: LogEventSink): Promise<Uint8Array> {
   const MAX_ATTEMPTS: number = 3;
-  const TIMEOUT: number = 60000; // In milliseconds
   const PROGRESS_UPDATE_INTERVAL = 1000; // Time between download progress updates, in milliseconds
 
   let ok = false;
   let attempt = 1;
   do {
-    // Add a modest request timeout
-    logInfo(eventSink, "Creating abort controller and setting timeout");
-    const controller = new AbortController();
-    setTimeout(() => controller.abort(), TIMEOUT);
-
     try {
-      logInfo(eventSink, "Initial fetch request");
-      const resp = await fetch("mbf-agent", { signal: controller.signal });
-      logInfo(eventSink, "Now reading response");
+      // Use XMLHttpRequest adapted to work with promises/async to fetch the agent
+      // Previously this used the fetch API, and there was some suggestion that various issues regarding the download
+      // "hanging" before data was received were caused by fetch.
+      // So, to see if it fixes the problem, we have changed to XMLHttpRequest.
+      const xhr = new XMLHttpRequest();
+      await new Promise((resolve, reject) => {
+        xhr.open('GET', "mbf-agent", true);
+        xhr.responseType = "arraybuffer";
 
-      if(resp.body === null) {
-        console.error("No body in agent response");
-      } else if(resp.ok) {
-        logInfo(eventSink, "Getting response body reader");
-        const reader = resp.body.getReader();
+        xhr.onload = function() {
+          if(xhr.status >= 200 && xhr.status < 300) {
+            resolve(xhr.response);
+          } else  {
+            reject(xhr.status)
+          }
+        };
+        xhr.onerror = function() {
+          reject(xhr.status)
+        }
+
         let lastReadTime = new Date().getTime();
-        logInfo(eventSink, "Allocating output byte array");
-        let allChunks = new Uint8Array(AGENT_LENGTH);
+        xhr.onprogress = function(event) {
+          if(!event.lengthComputable) {
+            return;
+          }
 
-        logInfo(eventSink, "Now reading body");
-        let recvLen = 0;
-        while (true) {
-          const { done, value } = await reader.read();
-          console.log("Read next chunk " + recvLen);
-          if (done) break;
-          allChunks.set(value, recvLen);
-          recvLen += value.length;
-
+          // Do not spam with progress updates: only every second or so
           const timeNow = new Date().getTime();
           if(timeNow - lastReadTime > PROGRESS_UPDATE_INTERVAL) {
+            // Calculate the percentage of the download that has completed
+            const percentComplete = (event.loaded / event.total) * 100.0;
             lastReadTime = timeNow;
-            const percentComplete = (recvLen / AGENT_LENGTH) * 100;
-
             logInfo(eventSink, `Download ${Math.round(percentComplete * 10) / 10}% complete`);
           }
         }
 
-        return allChunks;
-      } else  {
-        console.error("Failed to GET agent: status code " + resp.status)
-      }
+        xhr.send();
+      })
+
+      logInfo(eventSink, "Download complete!");
+      return new Uint8Array(xhr.response);
     } catch(e) {
-      console.error("Failed to GET agent", e);
+      logInfo(eventSink, "Failed to fetch agent, status " + e);
     }
-    
-    attempt = attempt + 1;
-    logInfo(eventSink, `Failed to download agent, trying again... (attempt ${attempt}/${MAX_ATTEMPTS})`)
+
+    attempt++;
+    if(attempt <= MAX_ATTEMPTS) {
+      logInfo(eventSink, `Failed to download agent, trying again... (attempt ${attempt}/${MAX_ATTEMPTS})`);
+    }
   } while(!ok && attempt <= MAX_ATTEMPTS);
 
   throw new Error("Failed to fetch agent after multiple attempts.\nDid you lose internet connection just after you loaded the site?\n\nIf not, then please report this issue, including a screenshot of the browser console window!");
