@@ -59,7 +59,7 @@ pub struct ModInfo {
 impl Default for ModInfo {
     fn default() -> Self {
         Self {
-            schema_version: Version::new(1, 1, 0),
+            schema_version: Version::new(1, 2, 0),
             name: Default::default(),
             id: Default::default(),
             author: Default::default(),
