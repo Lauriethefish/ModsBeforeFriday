@@ -1,15 +1,15 @@
 import { Adb, decodeUtf8 } from '@yume-chan/adb';
 import { uninstallBeatSaber } from '../DeviceModder';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { fixPlayerData, patchApp, quickFix } from '../Agent';
 import { toast } from 'react-toastify';
 import { ErrorModal, Modal, SyncingModal } from './Modal';
 import { PermissionsMenu } from './PermissionsMenu';
-import { ManifestMod } from '../Models';
 import '../css/OptionsMenu.css'
 import { Collapsible } from './Collapsible';
-import { LogWindow, useLog } from './LogWindow';
+import { useLog } from './LogWindow';
 import { ModStatus } from '../Messages';
+import { AndroidManifest } from '../AndroidManifest';
 
 export function OptionsMenu({ device, quit, modStatus, setModStatus }: {
     device: Adb,
@@ -23,7 +23,7 @@ export function OptionsMenu({ device, quit, modStatus, setModStatus }: {
         <Collapsible title="ADB log" defaultOpen>
             <AdbLogger device={device}/>
         </Collapsible>
-        <Collapsible title="Set new permissions">
+        <Collapsible title="Change permissions">
             <RepatchMenu device={device} quit={quit} modStatus={modStatus}/>
         </Collapsible>
     </div>
@@ -107,10 +107,11 @@ function RepatchMenu({ device, modStatus, quit }: {
     device: Adb,
     modStatus: ModStatus,
     quit: (err: unknown) => void}) {
-    const [manifestMod, setManifestMod] = useState({
-        add_features: [],
-        add_permissions: []
-    } as ManifestMod);
+
+    let manifest = useRef(new AndroidManifest(modStatus.app_info!.manifest_xml));
+    useEffect(() => {
+        manifest.current.applyPatchingManifestMod();
+    }, []);
 
     const [logs, addLogEvent] = useLog();
     const [isPatching, setPatching] = useState(false);
@@ -118,7 +119,7 @@ function RepatchMenu({ device, modStatus, quit }: {
     return <>
         <p>Certain mods require particular Android permissions to be enabled in order to work. 
             To change the permisions, you will need to re-patch your game, which can be done automatically with the button below.</p>
-        <PermissionsMenu manifestMod={manifestMod} setManifestMod={mod => setManifestMod(mod)}/>
+        <PermissionsMenu manifest={manifest.current} />
         <br/>
         <button onClick={async () => {
             setPatching(true);
@@ -126,7 +127,7 @@ function RepatchMenu({ device, modStatus, quit }: {
                 // TODO: Right now we do not set the mod status back to the DeviceModder state for it.
                 // This is fine at the moment since repatching does not update this state in any important way,
                 // but would be a problem if repatching did update it!
-                await patchApp(device, modStatus, null, manifestMod, true, false, addLogEvent);
+                await patchApp(device, modStatus, null, manifest.current.toString(), true, false, addLogEvent);
             }   catch(e) {
                 // Force a quit so the app rechecks the state of the install is correct.
                 quit("Failed to remod Beat Saber: the install is now likely in an invalid state!: " + e);

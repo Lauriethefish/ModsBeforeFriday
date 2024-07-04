@@ -16,7 +16,7 @@ root.render(
   <App />
 );
 
-if(Animation){  
+if(Animation) {  
   AnimatedBackground();
 }
 

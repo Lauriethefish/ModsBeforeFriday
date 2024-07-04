@@ -11,6 +11,7 @@ pub use writer::AxmlWriter;
 pub use res_ids::ResourceIds;
 const UTF8_FLAG: u32 = 0x00000100;
 pub const ANDROID_NS_URI: &str = "http://schemas.android.com/apk/res/android";
+pub use axml2xml::{axml_to_xml, xml_to_axml};
 
 /// An XML event within the main body of an AXML file.
 #[derive(Debug, Clone)]

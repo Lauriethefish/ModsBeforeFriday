@@ -1,10 +1,8 @@
-use std::{fs::{File, OpenOptions}, io::{BufReader, Cursor, Read, Seek, Write}, path::{Path, PathBuf}, process::Command};
+use std::{fs::{File, OpenOptions}, io::{BufReader, Cursor, Read, Write}, path::{Path, PathBuf}, process::Command};
 
 use anyhow::{Context, Result, anyhow};
 use log::{info, warn};
-use crate::{axml::{AxmlReader, AxmlWriter}, data_fix::fix_colour_schemes, download_file_with_attempts, external_res::{self, Diff, VersionDiffs}, requests::{AppInfo, ModLoader}, zip::{self, ZIP_CRC}, ModTag, APK_ID, APP_OBB_PATH, DATAKEEPER_PATH, DATA_BACKUP_PATH, PLAYER_DATA_PATH};
-use crate::manifest::ManifestMod;
-use crate::axml::ResourceIds;
+use crate::{axml::{self, AxmlWriter}, data_fix::fix_colour_schemes, download_file_with_attempts, external_res::{self, Diff, VersionDiffs}, requests::{AppInfo, ModLoader}, zip::{self, ZIP_CRC}, ModTag, APK_ID, APP_OBB_PATH, DATAKEEPER_PATH, DATA_BACKUP_PATH, PLAYER_DATA_PATH};
 use crate::zip::{signing, FileCompression, ZipFile};
 
 const DEBUG_CERT_PEM: &[u8] = include_bytes!("debug_cert.pem");
@@ -17,8 +15,8 @@ const LIB_MAIN_PATH: &str = "lib/arm64-v8a/libmain.so";
 const LIB_UNITY_PATH: &str = "lib/arm64-v8a/libunity.so";
 
 // Mods the currently installed version of the given app and reinstalls it, without doing any downgrading.
-// If `manifest_only` is true, patching will only attempt to update permissions/features 
-pub fn mod_current_apk(temp_path: &Path, app_info: &AppInfo, manifest_mod: ManifestMod, manifest_only: bool) -> Result<()> {
+// If `manifest_only` is true, patching will only overwrite the manifest and will not add a modloader.
+pub fn mod_current_apk(temp_path: &Path, app_info: &AppInfo, manifest_mod: String, manifest_only: bool) -> Result<()> {
     let libunity_path = if manifest_only {
         None
     }   else    {
@@ -45,7 +43,7 @@ pub fn mod_current_apk(temp_path: &Path, app_info: &AppInfo, manifest_mod: Manif
 pub fn downgrade_and_mod_apk(temp_path: &Path,
     app_info: &AppInfo,
     diffs: VersionDiffs,
-    manifest_mod: ManifestMod) -> Result<()> {
+    manifest_mod: String) -> Result<()> {
     // Download libunity.so *for the downgraded version*
     info!("Downloading unstripped libunity.so (this could take a minute)");
     let libunity_path = save_libunity(temp_path, &diffs.to_version)
@@ -97,7 +95,7 @@ fn patch_and_reinstall(libunity_path: Option<PathBuf>,
     temp_apk_path: &Path,
     temp_path: &Path,
     obb_paths: Vec<PathBuf>,
-    manifest_mod: ManifestMod,
+    manifest_mod: String,
     manifest_only: bool) -> Result<()> {
     info!("Patching APK at {:?}", temp_path);
     patch_apk_in_place(&temp_apk_path, libunity_path, manifest_mod, manifest_only)?;
@@ -309,7 +307,7 @@ pub fn install_modloader() -> Result<()> {
     Ok(())
 }
 
-fn patch_apk_in_place(path: impl AsRef<Path>, libunity_path: Option<PathBuf>, manifest_mod: ManifestMod, manifest_only: bool) -> Result<()> {
+fn patch_apk_in_place(path: impl AsRef<Path>, libunity_path: Option<PathBuf>, manifest_mod: String, manifest_only: bool) -> Result<()> {
     let file = OpenOptions::new()
         .read(true)
         .write(true)
@@ -386,32 +384,14 @@ pub fn get_modloader_installed(apk: &mut ZipFile<File>) -> Result<Option<ModLoad
     }
 }
 
-fn patch_manifest(zip: &mut ZipFile<File>, additional_properties: ManifestMod) -> Result<()> {
-    let contents = zip.read_file("AndroidManifest.xml").context("APK had no manifest")?;
-    let mut cursor = Cursor::new(contents);
-    let mut reader = AxmlReader::new(&mut cursor).context("Failed to read AXML manifest")?;
+fn patch_manifest(zip: &mut ZipFile<File>, additional_properties: String) -> Result<()> {
+    let mut xml_reader = xml::EventReader::new(Cursor::new(additional_properties.as_bytes()));
+
     let mut data_output = Cursor::new(Vec::new());
-    let mut writer = AxmlWriter::new(&mut data_output);
+    let mut axml_writer = AxmlWriter::new(&mut data_output);
 
-    let manifest = additional_properties
-        .debuggable(true)
-        .hardware_accelerated(true)
-        .with_permission("android.permission.MANAGE_EXTERNAL_STORAGE");
-
-    let res_ids = ResourceIds::load()?;
-    
-    
-    let modified = manifest.apply_mod(&mut reader, &mut writer, &res_ids).context("Failed to apply mod")?;
-
-    writer.finish().context("Failed to save AXML manifest")?;
-
-    if !modified {
-        info!("Manifest unmodified, not saving");
-        return Ok(());
-    }
-
-    
-    cursor.seek(std::io::SeekFrom::Start(0))?;
+    axml::xml_to_axml(&mut axml_writer, &mut xml_reader).context("Failed to convert XML back to AXML")?;
+    axml_writer.finish().context("Failed to save AXML manifest")?;
 
     zip.delete_file("AndroidManifest.xml");
     zip.write_file(

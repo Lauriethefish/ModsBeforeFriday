@@ -1,16 +1,18 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
+use std::fs::File;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
-use crate::{data_fix, download_file_with_attempts, DATAKEEPER_PATH, DOWNLOADS_PATH, PLAYER_DATA_BAK_PATH, PLAYER_DATA_PATH, SONGS_PATH, TEMP_PATH};
+use crate::manifest::ManifestInfo;
+use crate::{axml, data_fix, download_file_with_attempts, DATAKEEPER_PATH, DOWNLOADS_PATH, PLAYER_DATA_BAK_PATH, PLAYER_DATA_PATH, SONGS_PATH, TEMP_PATH};
 use crate::{axml::AxmlReader, patching, zip::ZipFile};
 use crate::external_res::{get_diff_index, JsonPullError};
-use crate::manifest::{ManifestInfo, ManifestMod};
 use crate::mod_man::ModManager;
 use crate::requests::{AppInfo, CoreModsInfo, ImportResultType, ModModel, Request, Response};
 use anyhow::{anyhow, Context, Result};
 use log::{error, info, warn};
+use xml::EmitterConfig;
 
 
 pub fn handle_request(request: Request) -> Result<Response> {
@@ -149,17 +151,37 @@ fn get_app_info() -> Result<Option<AppInfo>> {
 
     let modloader = patching::get_modloader_installed(&mut apk)?;
 
-    let manifest = apk.read_file("AndroidManifest.xml").context("Failed to read manifest")?;
-    let mut manifest_reader = Cursor::new(manifest);
-
-    let mut axml_reader = AxmlReader::new(&mut manifest_reader)?;
-    let info = ManifestInfo::read(&mut axml_reader)?;
-
+    let (manifest_info, manifest_xml) = get_manifest_info_and_xml(&mut apk)?;
     Ok(Some(AppInfo {
         loader_installed: modloader,
-        version: info.package_version,
-        path: apk_path
+        version: manifest_info.package_version,
+        path: apk_path,
+        manifest_xml
     }))    
+}
+
+fn get_manifest_info_and_xml(apk: &mut ZipFile<File>) -> Result<(ManifestInfo, String)> {
+    let manifest = apk.read_file("AndroidManifest.xml").context("Failed to read manifest")?;
+
+    // Decode various important information from the manifest
+    let mut manifest_reader = Cursor::new(manifest);
+    let mut axml_reader = AxmlReader::new(&mut manifest_reader)?;
+    let manifest_info = ManifestInfo::read(&mut axml_reader).context("Failed to read manifest")?;
+
+    // Re-read the manifest as a full XML document.
+    manifest_reader.set_position(0);
+    axml_reader = AxmlReader::new(&mut manifest_reader).context("Failed to read manifest")?;
+    let mut xml_output = Vec::new();
+    let mut xml_writer = EmitterConfig::new()
+        .perform_indent(true)
+        .create_writer(Cursor::new(&mut xml_output));
+
+    axml::axml_to_xml(&mut xml_writer, &mut axml_reader).context("Failed to convert AXML to XML")?;
+
+    let xml_str = String::from_utf8(xml_output)
+        .expect("XML output should be valid UTF-8");
+
+    Ok((manifest_info, xml_str))
 }
 
 fn handle_import_mod_url(from_url: String) -> Result<Response> {
@@ -365,7 +387,7 @@ fn handle_fix_player_data() -> Result<Response> {
 
 fn handle_patch(downgrade_to: Option<String>,
     repatch: bool,
-    manifest_mod: ManifestMod,
+    manifest_mod: String,
     allow_no_core_mods: bool,
     override_core_mod_url: Option<String>) -> Result<Response> {
     let app_info = get_app_info()?

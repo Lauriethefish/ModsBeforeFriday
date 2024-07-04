@@ -9,3 +9,7 @@
 #namedSlider > p {
     margin: 8px;
 }
+
+.rightMargin {
+    margin-right: 10px;
+}

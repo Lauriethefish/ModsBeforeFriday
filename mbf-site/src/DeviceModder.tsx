@@ -1,14 +1,15 @@
 import { Adb } from '@yume-chan/adb';
 import { loadModStatus, patchApp, quickFix } from "./Agent";
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
 import { ModLoader, ModStatus } from './Messages';
 import './css/DeviceModder.css';
 import { LogWindow, useLog } from './components/LogWindow';
 import { ErrorModal, Modal, SyncingModal } from './components/Modal';
 import { ModManager } from './components/ModManager';
-import { ManifestMod, trimGameVersion } from './Models';
+import { trimGameVersion } from './Models';
 import { PermissionsMenu } from './components/PermissionsMenu';
 import { SelectableList } from './components/SelectableList';
+import { AndroidManifest } from './AndroidManifest';
 
 interface DeviceModderProps {
     device: Adb,
@@ -129,6 +130,7 @@ function ValidModLoaderMenu({ device, modStatus, setModStatus, quit }: { device:
     modStatus: ModStatus,
     setModStatus: (status: ModStatus) => void
     quit: () => void}) {
+
     return <>
         <div className='container mainContainer'>
             <h1>App is modded</h1>
@@ -251,10 +253,10 @@ function PatchingMenu(props: PatchingMenuProps) {
     const [versionSelectOpen, setVersionSelectOpen] = useState(false);
     const [versionOverridden, setVersionOverridden] = useState(false);
 
-    const [manifestMod, setManifestMod] = useState({
-        add_permissions: [],
-        add_features: []
-    } as ManifestMod);
+    let manifest = useRef(new AndroidManifest(props.modStatus.app_info!.manifest_xml));
+    useEffect(() => {
+        manifest.current.applyPatchingManifestMod();
+    }, []);
 
     const { onCompleted, modStatus, device, initialDowngradingTo } = props;
     const [downgradingTo, setDowngradingTo] = useState(initialDowngradingTo);
@@ -295,7 +297,7 @@ function PatchingMenu(props: PatchingMenuProps) {
                 <button className="largeCenteredButton" onClick={async () => {
                     setIsPatching(true);
                     try {
-                        onCompleted(await patchApp(device, modStatus, downgradingTo, manifestMod, false, isDeveloperUrl, addLogEvent));
+                        onCompleted(await patchApp(device, modStatus, downgradingTo, manifest.current.toString(), false, isDeveloperUrl, addLogEvent));
                     } catch (e) {
                         setPatchingError(String(e));
                         setIsPatching(false);
@@ -313,8 +315,7 @@ function PatchingMenu(props: PatchingMenuProps) {
                 <h2>Change Permissions</h2>
                 <p>Certain mods require particular Android permissions to be set on the Beat Saber app in order to work correctly.</p>
                 <p>(You can change these permissions later, so don't worry about enabling them all now unless you know which ones you need.)</p>
-                <PermissionsMenu manifestMod={manifestMod}
-                    setManifestMod={manifestMod => setManifestMod(manifestMod)} />
+                <PermissionsMenu manifest={manifest.current} />
                 <button className="largeCenteredButton" onClick={() => setSelectingPerms(false)}>Confirm permissions</button>
             </Modal>
 

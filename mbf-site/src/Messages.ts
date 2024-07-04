@@ -1,4 +1,4 @@
-import { ManifestMod, Mod } from "./Models";
+import { Mod } from "./Models";
 
 export interface GetModStatus {
     type: 'GetModStatus',
@@ -7,7 +7,7 @@ export interface GetModStatus {
 
 export interface Patch {
     type: 'Patch',
-    manifest_mod: ManifestMod,
+    manifest_mod: string,
     downgrade_to: string | null,
     allow_no_core_mods: boolean,
     override_core_mod_url: string | null,
@@ -92,7 +92,7 @@ export interface ModStatus {
     app_info: AppInfo | null,
     core_mods: CoreModsInfo | null,
     modloader_present: boolean,
-    installed_mods: Mod[]
+    installed_mods: Mod[],
 }
 
 export interface LogMsg {
@@ -113,7 +113,8 @@ export type ModLoader = "Scotland2" | "QuestLoader" | "Unknown";
 
 export interface AppInfo {
     version: string,
-    loader_installed: ModLoader | null
+    loader_installed: ModLoader | null,
+    manifest_xml: string
 }
 
 export type LogLevel = "Error" | "Warn" | "Info" | "Debug" | "Trace";

@@ -1,17 +1,12 @@
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { Slider } from "./Slider"
 
 import '../css/PermissionsMenu.css'
-import { ManifestMod } from "../Models"
 import { EditableList } from "./EditableList";
+import { AndroidManifest } from "../AndroidManifest";
+import { Modal } from "./Modal";
+import { toast } from "react-toastify";
 
-function includeValuesIfEnabled(valueNames: string[], enabled: boolean, inArray: string[]): string[] {
-    if(enabled) {
-        return Array.from(new Set([...inArray, ...valueNames]));
-    }   else    {
-        return inArray.filter(element => !valueNames.includes(element));
-    }
-}
 
 // A particular toggle in the "permissions" menu.
 // This option being enabled will constitute having one or more features or permissions enabled.
@@ -44,36 +39,77 @@ const displayedOptions: ManifestOptionInfo[] = [
     }
 ]
 
-interface ManifestStateProps {
-    manifestMod: ManifestMod,
-    setManifestMod: (mod: ManifestMod) => void
+// The current state of the manifest permissions/features.
+interface ManifestState {
+    permissions: string[],
+    features: string[]
 }
 
-export function PermissionsMenu({ manifestMod, setManifestMod }: ManifestStateProps) {
+interface ManifestStateProps {
+    // The current manifest state
+    state: ManifestState,
+    manifest: AndroidManifest,
+    // Regenerates the state based on the AndroidManifest
+    updateState: () => void
+}
+
+export function PermissionsMenu({ manifest }: { manifest: AndroidManifest }) {
     const [advanced, setAdvanced] = useState(false);
+    const [editXml, setEditXml] = useState(false);
+    const [manifestState, setManifestState] = useState({
+        permissions: manifest.getPermissions(),
+        features: manifest.getFeatures()
+    });
+
+    function updateState() {
+        setManifestState({
+            permissions: manifest.getPermissions(),
+            features: manifest.getFeatures()
+        })
+    }
 
     return <>
         <button className="discreetButton" onClick={() => setAdvanced(!advanced)}>{advanced ? "Simple options" : "Advanced Options"}</button>
-        {!advanced && <ToggleMenu manifestMod={manifestMod} setManifestMod={setManifestMod} />}
-        {advanced && <TextFieldMenu manifestMod={manifestMod} setManifestMod={setManifestMod} />}
+        {advanced && <button className="discreetButton rightMargin" onClick={() => setEditXml(true)}>Edit XML</button>}
+        {!advanced && <ToggleMenu manifest={manifest} state={manifestState} updateState={updateState} />}
+        {advanced && <TextFieldMenu manifest={manifest} state={manifestState} updateState={updateState} />}
+        <Modal isVisible={editXml}>
+            <XmlEditor manifestXml={manifest.toString()} setManifestXml={manifestString => {
+                try {
+                    manifest.loadFrom(manifestString);
+                    updateState();
+                    setEditXml(false);
+                    toast.success("Successfully updated manifest XML");
+                    return true;
+                }   catch(e) {
+                    toast.error("Provided file was not a valid XML manifest");
+                    return false;
+                }
+            }}/>
+            <button onClick={() => setEditXml(false)}>Back</button>
+        </Modal>
     </>
 }
 
-export function ToggleMenu({ manifestMod, setManifestMod }: ManifestStateProps) {
+function ToggleMenu({ state, manifest, updateState }: ManifestStateProps) {
     return <>
         {displayedOptions
         .map(permInfo => {
             // The option is enabled if all permissions/features are in the current manifest mod.
-            const enabled = permInfo.features.every(feature => manifestMod.add_features.includes(feature)) &&
-                permInfo.permissions.every(feature => manifestMod.add_permissions.includes(feature));
+            const enabled = permInfo.features.every(feature => state.features.includes(feature)) &&
+                permInfo.permissions.every(feature => state.permissions.includes(feature));
 
             return <span id="namedSlider" key={permInfo.name}>
                 <Slider on={enabled}
-                    valueChanged={v => {
-                        setManifestMod({
-                            add_features: includeValuesIfEnabled(permInfo.features, v, manifestMod.add_features),
-                            add_permissions: includeValuesIfEnabled(permInfo.permissions, v, manifestMod.add_permissions)
-                        })
+                    valueChanged={nowEnabled => {
+                        if(nowEnabled) {
+                            permInfo.permissions.forEach(perm => manifest.addPermission(perm));
+                            permInfo.features.forEach(feat => manifest.addFeature(feat));
+                        }   else    {
+                            permInfo.permissions.forEach(feat => manifest.removePermission(feat));
+                            permInfo.features.forEach(perm => manifest.removeFeature(perm));
+                        }
+                        updateState();
                     }} />
 
                 <p>{permInfo.name}</p>
@@ -82,16 +118,59 @@ export function ToggleMenu({ manifestMod, setManifestMod }: ManifestStateProps) 
     </>
 }
 
-export function TextFieldMenu({ manifestMod, setManifestMod }: ManifestStateProps) {
+
+function TextFieldMenu({ state, manifest, updateState }: ManifestStateProps) {
     return <>
-        <EditableList title="Permissions" list={manifestMod.add_permissions} setList={newPermissions => setManifestMod({
-            ...manifestMod,
-            add_permissions: newPermissions
-        })} />
+        <EditableList title="Permissions" list={state.permissions} addItem={item => {
+            manifest.addPermission(item);
+            updateState();
+        }} removeItem={item => {
+            manifest.removePermission(item);
+            updateState();
+        }} />
         <br/>
-        <EditableList title="Features" list={manifestMod.add_features} setList={newFeatures => setManifestMod({
-            ...manifestMod,
-            add_features: newFeatures
-        })} />
+        <EditableList title="Features" list={state.features} addItem={item => {
+            manifest.addFeature(item);
+            updateState();
+        }} removeItem={item => {
+            manifest.removeFeature(item);
+            updateState();
+        }} />
     </>
+}
+
+function XmlEditor({ manifestXml, setManifestXml }: {
+    manifestXml: string,
+    setManifestXml: (xml: string) => boolean // True iff the manifest was valid XML
+}) {
+    const xmlBlob = new Blob([manifestXml], { type: "text/xml" });
+    const inputFile = useRef<HTMLInputElement | null>(null);
+
+    return <>
+        <h2>Change manifest XML</h2>
+        <p>For development purposes, this menu will allow you to manually edit the entirety of the AndroidManifest.xml file within the APK</p>
+        <p>Be careful, as erroneous edits will prevent the APK from installing properly.</p>
+        <a href={URL.createObjectURL(xmlBlob)}
+            download="AndroidManifest.xml">
+            <button className="rightMargin">Download Current XML</button>
+        </a>
+
+        <button className="rightMargin" onClick={() => inputFile.current?.click()}>
+            <input type="file"
+                id="file"
+                multiple={false}
+                ref={inputFile}
+                style={{display: 'none'}}
+                onChange={async ev => {
+                    const files = ev.target.files;
+                    if(files !== null) {
+                        const fileUploaded = files[0];
+                        setManifestXml(await fileUploaded.text());
+                    }
+                    ev.target.value = "";
+                }}
+            />Upload XML
+        </button>
+    </>
+    
 }

@@ -36,7 +36,6 @@ type AxmlEvent = super::Event;
 type AxmlNamespace = super::Namespace;
 type AxmlAttribute = super::Attribute;
 type XmlName<'a> = xml::name::Name<'a>;
-type XmlNamespace = xml::namespace::Namespace;
 
 /// Converts an AXML document into readable XML format.
 pub fn axml_to_xml<W: std::io::Write,R: std::io::Read + std::io::Seek>
@@ -61,6 +60,9 @@ pub fn axml_to_xml<W: std::io::Write,R: std::io::Read + std::io::Seek>
                     string_attr_values.push(stringify_attr_value(attr.value.clone()));
                 }
 
+                // Must be written after the element as comments cannot come before the root.
+                let mut invalid_attr_errs = Vec::new();
+
                 // Create the opening tag and add all of its attributes.
                 let mut builder = XmlEvent::start_element(get_xml_name_from_axml(&name, &namespace, &current_ns_prefixes));
                 for (attr, string_value) in attributes.iter().zip(string_attr_values.iter()) {
@@ -69,7 +71,7 @@ pub fn axml_to_xml<W: std::io::Write,R: std::io::Read + std::io::Seek>
                     if attr.namespace.as_ref().map(|ns| ns.as_str()) == Some(ANDROID_NS_URI) {
                         // Check if the resource ID for this attribute exists, and if not, write a warning before the element.
                         if let None = res_ids.get_res_id_or_none(&attr.name) {
-                            writer.write(XmlEvent::CData(&format!("[WARNING: Attribute `{}` has `android` namespace but no valid resource ID was found]", attr.name)))?;
+                            invalid_attr_errs.push(format!("WARNING: Attribute `{}` has `android` namespace but no valid resource ID was found", attr.name));
                         }
                     }
                 }
@@ -83,7 +85,12 @@ pub fn axml_to_xml<W: std::io::Write,R: std::io::Read + std::io::Seek>
                     }
                 }
 
-                writer.write(builder)
+                writer.write(builder)?;
+                for err in invalid_attr_errs {
+                    writer.write(XmlEvent::comment(&err))?;
+                }
+
+                Ok(())
             },
             AxmlEvent::EndElement { line_num: _, namespace, name } => 
                 writer.write(XmlEvent::end_element()
@@ -101,14 +108,14 @@ pub fn axml_to_xml<W: std::io::Write,R: std::io::Read + std::io::Seek>
                 Ok(())
             }
             AxmlEvent::Unknown { contents: _, res_type } => 
-                writer.write(XmlEvent::CData(&format!("[WARNING: UNKNOWN AXML EVENT. RES_TYPE: {res_type}]"))),
+                writer.write(XmlEvent::comment(&format!("WARNING: UNKNOWN AXML EVENT. RES_TYPE: {res_type}"))),
         }?
     }
 
     Ok(())
 }
 
-fn xml_to_axml<W: std::io::Write,
+pub fn xml_to_axml<W: std::io::Write,
 R: std::io::Read + std::io::Seek>
     (writer: &mut AxmlWriter<W>, reader: &mut xml::EventReader<R>) -> Result<()> {
     use xml::reader::XmlEvent;

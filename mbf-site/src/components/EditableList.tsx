@@ -4,8 +4,8 @@ import '../css/EditableList.css';
 
 // A component that allows adding/removing items from an array.
 // The items in the array must be distinct.
-export function EditableList({ list, setList, title }: 
-    { list: string[], setList: (newList: string[]) => void, title: string}) {
+export function EditableList({ list, addItem, removeItem, title }: 
+    { list: string[], addItem: (item: string) => void, removeItem: (item: string) => void, title: string}) {
     
 
     const [isAdding, setAdding] = useState(false);
@@ -22,7 +22,7 @@ export function EditableList({ list, setList, title }:
             {list.length > 0 || isAdding ? <>
                 {list.map(item => 
                     <p key={item}
-                        onClick={() => setList(list.filter(member => member != item))}>
+                        onClick={() => removeItem(item)}>
                         {item}
                     </p>
                 )}
@@ -39,7 +39,7 @@ export function EditableList({ list, setList, title }:
                 }}
                 onBlur={_ => {
                     if(newValue !== "" && !list.includes(newValue)) {
-                        setList([...list, newValue]);
+                        addItem(newValue);
                     }
                     setNewValue("");
                     setAdding(false);

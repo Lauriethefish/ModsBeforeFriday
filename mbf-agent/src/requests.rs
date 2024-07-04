@@ -3,14 +3,15 @@ use std::collections::HashMap;
 use semver::Version;
 use serde::{Deserialize, Serialize};
 
-use crate::{manifest::ManifestMod, mod_man::Mod};
+use crate::mod_man::Mod;
 
 #[derive(Serialize)]
 pub struct AppInfo {
     pub loader_installed: Option<ModLoader>,
-    pub version: String,
     #[serde(skip_serializing)]
-    pub path: String
+    pub path: String,
+    pub version: String,
+    pub manifest_xml: String
 }
 
 
@@ -65,10 +66,9 @@ pub enum Request {
     /// Returns a `Mods` response to update the frontend with the newly installed core mods.
     Patch {
         downgrade_to: Option<String>,
-        /// Any additional settings to add to the app manifest.
-        /// Settings such as debuggable = true and external storage permissions do not need to be specified here - 
-        /// they will automatically be added no matter what.
-        manifest_mod: ManifestMod,
+        // The contents of the manifest of the patched app, as XML
+        // The frontend is reponsible for adding the necessary permissions and features here.
+        manifest_mod: String,
 
         // If this is true, patching will skip adding the modloader and libunity.so and will ONLY change permissions.
         // Patching will also not attempt to reinstall core mods.

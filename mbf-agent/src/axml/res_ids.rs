@@ -36,9 +36,4 @@ impl ResourceIds {
     pub fn get_res_id_or_none(&self, name: &str) -> Option<u32> {
         self.ids.get(name).map(|res_id| *res_id)
     }
-
-    // Gets the resource ID for a particular attribute name. Panics if no ID exists.
-    pub fn get_res_id(&self, name: &str) -> u32 {
-        *self.ids.get(name).expect("No resource ID existed for given attribute name")
-    }
 }

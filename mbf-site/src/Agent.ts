@@ -1,8 +1,8 @@
 import { AdbSync, AdbSyncWriteOptions, Adb, encodeUtf8 } from '@yume-chan/adb';
-import { ConsumableReadableStream, Consumable, DecodeUtf8Stream, ConcatStringStream } from '@yume-chan/stream-extra';
-import { Request, Response, LogMsg, ModStatus, Mods, ImportedMod, ImportResultType, FixedPlayerData, ImportResult } from "./Messages";
-import { ManifestMod, Mod } from './Models';
-import { AGENT_LENGTH, AGENT_SHA1 } from './agent_manifest';
+import { ConsumableReadableStream, Consumable, ConcatStringStream, DecodeUtf8Stream } from '@yume-chan/stream-extra';
+import { Request, Response, LogMsg, ModStatus, Mods, FixedPlayerData, ImportResult } from "./Messages";
+import { Mod } from './Models';
+import { AGENT_SHA1 } from './agent_manifest';
 
 const AgentPath: string = "/data/local/tmp/mbf-agent";
 
@@ -332,10 +332,12 @@ export async function removeMod(device: Adb,
 export async function patchApp(device: Adb,
   beforePatch: ModStatus,
   downgradeToVersion: string | null,
-  manifestMod: ManifestMod,
+  manifestMod: string,
   remodding: boolean,
   allow_no_core_mods: boolean,
   eventSink: LogEventSink = null): Promise<ModStatus> {
+  console.log("Patching with manifest", manifestMod);
+
   let response = await sendRequest(device, {
       type: 'Patch',
       downgrade_to: downgradeToVersion,
@@ -351,7 +353,8 @@ export async function patchApp(device: Adb,
       'type': 'ModStatus',
       app_info: {
           loader_installed: 'Scotland2',
-          version: downgradeToVersion ?? beforePatch.app_info!.version
+          version: downgradeToVersion ?? beforePatch.app_info!.version,
+          manifest_xml: manifestMod
       },
       core_mods: {
           all_core_mods_installed: true,
