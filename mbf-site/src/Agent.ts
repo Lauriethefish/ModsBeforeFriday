@@ -167,7 +167,7 @@ function logFromAgent(log: LogMsg) {
 async function sendRequest(adb: Adb, request: Request, eventSink: LogEventSink = null): Promise<Response> {
   let command_buffer = encodeUtf8(JSON.stringify(request) + "\n");
 
-  let agentProcess = await adb.subprocess.shell(AgentPath);
+  let agentProcess = await adb.subprocess.spawn(AgentPath);
 
   const stdin = agentProcess.stdin.getWriter();
   try {
@@ -260,7 +260,7 @@ export async function loadModStatus(device: Adb, eventSink: LogEventSink = null)
 
   return await sendRequest(device, {
       type: 'GetModStatus',
-      override_core_mod_url: CORE_MOD_OVERRIDE_URL
+      override_core_mod_url: CORE_MOD_OVERRIDE_URL,
   }, eventSink) as ModStatus;
 }
 
