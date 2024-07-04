@@ -3,7 +3,8 @@ use std::{fs::{File, OpenOptions}, io::{BufReader, Cursor, Read, Seek, Write}, p
 use anyhow::{Context, Result, anyhow};
 use log::{info, warn};
 use crate::{axml::{AxmlReader, AxmlWriter}, data_fix::fix_colour_schemes, download_file_with_attempts, external_res::{self, Diff, VersionDiffs}, requests::{AppInfo, ModLoader}, zip::{self, ZIP_CRC}, ModTag, APK_ID, APP_OBB_PATH, DATAKEEPER_PATH, DATA_BACKUP_PATH, PLAYER_DATA_PATH};
-use crate::manifest::{ManifestMod, ResourceIds};
+use crate::manifest::ManifestMod;
+use crate::axml::ResourceIds;
 use crate::zip::{signing, FileCompression, ZipFile};
 
 const DEBUG_CERT_PEM: &[u8] = include_bytes!("debug_cert.pem");

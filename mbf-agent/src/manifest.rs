@@ -1,16 +1,13 @@
 //! Module containing convenience functions for modifying AndroidManifest.xml
 
-use std::{collections::{HashMap, HashSet}, io::{Cursor, Read, Seek, Write}, rc::Rc};
+use std::{collections::HashSet, io::{Read, Seek, Write}};
 
 use anyhow::{Context, Result, anyhow};
-use byteorder::{ReadBytesExt, LE};
 use log::info;
 use serde::Deserialize;
 
-use crate::axml::{Attribute, AttributeValue, AxmlReader, AxmlWriter, Event};
+use crate::axml::{Attribute, AttributeValue, AxmlReader, AxmlWriter, Event, ResourceIds, ANDROID_NS_URI};
 
-const ANDROID_NS_URI: &str = "http://schemas.android.com/apk/res/android";
-const RESOURCE_ID_TABLE: &[u8] = include_bytes!("resourceIds.bin");
 const METADATA_TAG: &str = "com.modsbeforefriday.modded";
 
 pub struct ManifestInfo {
@@ -60,8 +57,8 @@ impl ManifestInfo {
 /// Convenient builder that can be used to modify the APK manifest
 #[derive(Deserialize)]
 pub struct ManifestMod {
-    add_permissions: Vec<Rc<str>>,
-    add_features: Vec<Rc<str>>,
+    add_permissions: Vec<String>,
+    add_features: Vec<String>,
     #[serde(default = "bool::default")]
     debuggable: bool,
     #[serde(default = "bool::default")]
@@ -125,13 +122,13 @@ impl ManifestMod {
         }
     }
 
-    fn get_name_attribute(attributes: &[Attribute]) -> Result<Rc<str>> {
+    fn get_name_attribute(attributes: &[Attribute]) -> Result<&str> {
         match &attributes.iter()
             .filter(|attr| &*attr.name == "name")
             .next()
             .ok_or(anyhow!("No valid `name` attribute existed"))?.value
         {
-            AttributeValue::String(s) => Ok(s.clone()),
+            AttributeValue::String(s) => Ok(s),
             _ => Err(anyhow!("`name` attribute had non-string value!"))
         }
     }
@@ -169,10 +166,10 @@ impl ManifestMod {
                         // Silently fail for permissions without a name attribute
                         // TODO: figure out why some permissions/features in the Beat Saber manifest don't have one.
                         let _ = Self::get_name_attribute(attributes)
-                            .map(|permission| existing_permissions.insert(permission));
+                            .map(|permission| existing_permissions.insert(permission.to_owned()));
                     }   else if &**name == "uses-feature" && !skipping_subsequent {
                         let _ = Self::get_name_attribute(attributes)
-                            .map(|feature| existing_features.insert(feature));
+                            .map(|feature| existing_features.insert(feature.to_owned()));
                     }
                     false
                 },
@@ -182,8 +179,6 @@ impl ManifestMod {
             };
 
             if is_end_of_manifest {
-                let uses_feature: Rc<str> = "uses-feature".into();
-                let uses_permission: Rc<str> = "uses-permission".into();
                 // Before writing out the permissions and features, write a metadata tag indicating that the app was modded by MBF.
                 write_valued_element(writer,
                     "meta-data".into(),
@@ -194,16 +189,16 @@ impl ManifestMod {
 
                 // Write out permissions and features just before the final (closing) tag
                 for feature in &self.add_features {
-                    if !existing_features.contains(feature) {
+                    if !existing_features.contains(feature.as_str()) {
                         info!("Adding feature `{feature}`");
-                        write_named_element(writer, uses_feature.clone(), feature.clone(), res_ids);
+                        write_named_element(writer, "uses-feature".to_string(), feature.clone(), res_ids);
                         modified = true;
                     }
                 }
                 for permission in &self.add_permissions {
-                    if !existing_permissions.contains(permission) {
+                    if !existing_permissions.contains(permission.as_str()) {
                         info!("Adding permission `{permission}`");
-                        write_named_element(writer, uses_permission.clone(), permission.clone(), res_ids);
+                        write_named_element(writer, "uses-permission".to_string(), permission.clone(), res_ids);
                         modified = true;
                     }
                 }
@@ -220,44 +215,10 @@ impl ManifestMod {
     }
 }
 
-
-/// Stores a map of AXML attribute names to resource IDs
-pub struct ResourceIds {
-    ids: HashMap<Rc<str>, u32>
-}
-
-impl ResourceIds {
-    /// Loads the resource IDs from a file within the binary
-    /// Ideally, reuse the same instance once you have called this method. 
-    pub fn load() -> Result<Self> {
-        let mut file = Cursor::new(RESOURCE_ID_TABLE);
-        let mut ids = HashMap::new();
-        while file.stream_position()? < RESOURCE_ID_TABLE.len() as u64 {
-            let name_length = file.read_u32::<LE>()? >> 1;
-
-            let mut buffer: Vec<u16> = Vec::with_capacity(name_length as usize);
-            for _ in 0..name_length {
-                buffer.push(file.read_u16::<LE>()?);
-            }
-
-            let resource_id = file.read_u32::<LE>()?;
-            ids.insert(String::from_utf16(&buffer)?.into(), resource_id);
-        }
-
-        Ok(Self {
-            ids
-        })
-    }
-
-    pub fn get_res_id(&self, name: &str) -> u32 {
-        *self.ids.get(name).expect("No resource ID existed for given attribute name")
-    }
-}
-
 // Writes an element with the "name" and "value attributes"
 fn write_valued_element<W: Write>(writer: &mut AxmlWriter<W>,
-    element_name: Rc<str>,
-    name: Rc<str>,
+    element_name: String,
+    name: String,
     value: AttributeValue,
     res_ids: &ResourceIds) {
     writer.write_event(Event::StartElement {
@@ -277,7 +238,7 @@ fn write_valued_element<W: Write>(writer: &mut AxmlWriter<W>,
 }
 
 // Writes an element with the "name" attribute.
-fn write_named_element<W: Write>(writer: &mut AxmlWriter<W>, element_name: Rc<str>, name_value: Rc<str>, res_ids: &ResourceIds) {
+fn write_named_element<W: Write>(writer: &mut AxmlWriter<W>, element_name: String, name_value: String, res_ids: &ResourceIds) {
     writer.write_event(Event::StartElement {
         attributes: vec![name_attribute(name_value, res_ids)],
         name: element_name.clone(),
@@ -291,7 +252,7 @@ fn write_named_element<W: Write>(writer: &mut AxmlWriter<W>, element_name: Rc<st
     })
 }
 
-fn name_attribute(name: Rc<str>, res_ids: &ResourceIds) -> Attribute {
+fn name_attribute(name: String, res_ids: &ResourceIds) -> Attribute {
     android_attribute("name", AttributeValue::String(name), res_ids)
 }
 
