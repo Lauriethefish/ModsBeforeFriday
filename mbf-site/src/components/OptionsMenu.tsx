@@ -128,6 +128,7 @@ function RepatchMenu({ device, modStatus, quit }: {
                 // This is fine at the moment since repatching does not update this state in any important way,
                 // but would be a problem if repatching did update it!
                 await patchApp(device, modStatus, null, manifest.current.toString(), true, false, addLogEvent);
+                toast.success("Successfully applied permissions");
             }   catch(e) {
                 // Force a quit so the app rechecks the state of the install is correct.
                 quit("Failed to remod Beat Saber: the install is now likely in an invalid state!: " + e);
