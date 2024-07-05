@@ -65,7 +65,7 @@ fn download_file_with_attempts(to: impl AsRef<Path>, url: &str) -> Result<Option
         attempt += 1;
         match download_file_one_attempt(&to, url) {
             Ok(filename) => return Ok(filename),
-            Err(err) => if attempt == 3 {
+            Err(err) => if attempt == DOWNLOAD_ATTEMPTS {
                 return Err(err).context("Failed to download file after maximum attempts")
             }   else    {
                 warn!("Failed to download file {url}: {err}. Trying again...")
