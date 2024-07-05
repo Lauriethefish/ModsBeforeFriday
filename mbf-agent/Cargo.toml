@@ -10,6 +10,9 @@ path = "src/diff_gen.rs"
 [profile.dev.package."*"]
 opt-level = 3
 
+[profile.release]
+strip = true
+
 [dependencies]
 qbsdiff = "1.4.1"
 rsa = { version = "0.9.6", features = ["sha2"] }
