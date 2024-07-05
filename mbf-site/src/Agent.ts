@@ -1,8 +1,9 @@
 import { AdbSync, AdbSyncWriteOptions, Adb, encodeUtf8 } from '@yume-chan/adb';
 import { ConsumableReadableStream, Consumable, ConcatStringStream, DecodeUtf8Stream } from '@yume-chan/stream-extra';
-import { Request, Response, LogMsg, ModStatus, Mods, FixedPlayerData, ImportResult, DowngradedManifest } from "./Messages";
+import { Request, Response, LogMsg, ModStatus, Mods, FixedPlayerData, ImportResult, DowngradedManifest, Patched } from "./Messages";
 import { Mod } from './Models';
 import { AGENT_SHA1 } from './agent_manifest';
+import { toast } from 'react-toastify';
 
 const AgentPath: string = "/data/local/tmp/mbf-agent";
 
@@ -354,7 +355,12 @@ export async function patchApp(device: Adb,
       allow_no_core_mods: allow_no_core_mods,
       override_core_mod_url: CORE_MOD_OVERRIDE_URL,
       remodding
-  }, eventSink);
+  }, eventSink) as Patched;
+
+  if(response.did_remove_dlc) {
+    toast.warning("MBF (temporarily) deleted installed DLC while downgrading your game. To get them back, FIRST restart your headset THEN download the DLC in-game.",
+        { autoClose: false })
+  }
 
   // Return the new mod status assumed after patching
   // (patching should fail if any of this is not the case)
@@ -371,7 +377,7 @@ export async function patchApp(device: Adb,
           downgrade_versions: []
       },
       modloader_present: true,
-      installed_mods: (response as Mods).installed_mods
+      installed_mods: response.installed_mods
   };
 }
 

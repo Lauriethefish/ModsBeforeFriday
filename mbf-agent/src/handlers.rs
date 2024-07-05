@@ -415,15 +415,13 @@ fn handle_patch(downgrade_to: Option<String>,
             .context("Failed to downgrade and patch APK")
     }   else {
         patching::mod_current_apk(Path::new(TEMP_PATH), &app_info, manifest_mod, repatch)
-            .context("Failed to patch APK")
+            .context("Failed to patch APK").map(|_| false) // Modding the currently installed APK will never remove DLC as they are restored automatically.
     };
 
     // No matter what, make sure that all temporary files are gone.
     std::fs::remove_dir_all(TEMP_PATH)?;
 
-    if let Err(err) = patching_result {
-        return Err(err).context("Failed to patch")
-    }
+    let removed_dlc = patching_result.context("Failed to patch game")?;
 
     patching::install_modloader().context("Failed to save modloader")?;
 
@@ -445,7 +443,7 @@ fn handle_patch(downgrade_to: Option<String>,
             }
     }
     
-    Ok(Response::Mods { installed_mods: get_mod_models(mod_manager) })
+    Ok(Response::Patched { installed_mods: get_mod_models(mod_manager), did_remove_dlc: removed_dlc })
 }
 
 fn install_core_mods(mod_manager: &mut ModManager, app_info: AppInfo, override_core_mod_url: Option<String>) -> Result<()> {

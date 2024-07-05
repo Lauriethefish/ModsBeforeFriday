@@ -149,6 +149,10 @@ pub enum Response {
     Mods {
         installed_mods: Vec<ModModel>
     },
+    Patched {
+        installed_mods: Vec<ModModel>,
+        did_remove_dlc: bool
+    },
     ImportResult {
         result: ImportResultType, // The result of importing the file.
         used_filename: String // The filename that was actually used to determine how to import the mod.

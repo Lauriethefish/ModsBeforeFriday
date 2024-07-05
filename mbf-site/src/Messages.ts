@@ -64,6 +64,12 @@ export interface Mods {
     installed_mods: Mod[]
 }
 
+export interface Patched {
+    type: 'Patched',
+    installed_mods: Mod[],
+    did_remove_dlc: boolean
+}
+
 export interface ImportedMod {
     type: 'ImportedMod',
     installed_mods: Mod[],
@@ -112,7 +118,7 @@ export interface DowngradedManifest {
     manifest_xml: string
 }
 
-export type Response = LogMsg | ModStatus | Mods | ImportResult | FixedPlayerData | DowngradedManifest;
+export type Response = LogMsg | ModStatus | Mods | ImportResult | FixedPlayerData | DowngradedManifest | Patched;
 
 export interface CoreModsInfo {
     supported_versions: string[],

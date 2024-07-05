@@ -40,10 +40,11 @@ pub fn mod_current_apk(temp_path: &Path, app_info: &AppInfo, manifest_mod: Strin
 }
 
 // Downgrades the APK/OBB files for the given app using the diffs provided, then reinstalls the app.
+// Returns true if any DLC were found while modding the APK, false otherwise.
 pub fn downgrade_and_mod_apk(temp_path: &Path,
     app_info: &AppInfo,
     diffs: VersionDiffs,
-    manifest_mod: String) -> Result<()> {
+    manifest_mod: String) -> Result<bool> {
     // Download libunity.so *for the downgraded version*
     info!("Downloading unstripped libunity.so (this could take a minute)");
     let libunity_path = save_libunity(temp_path, &diffs.to_version)
@@ -79,8 +80,28 @@ pub fn downgrade_and_mod_apk(temp_path: &Path,
         obb_backup_paths.push(obb_backup_path);
     }
 
+    // Beat Saber DLC asset files do not have the .obb suffix.
+    // If there are any DLC, then these have been deleted by the patching process so we return true so that the user can later be informed of this.
+    let contains_dlc = has_file_with_no_extension(APP_OBB_PATH)
+        .context("Failed to check for DLC")?;
+
     patch_and_reinstall(libunity_path, &temp_apk_path, temp_path, obb_backup_paths, manifest_mod, false)?;
-    Ok(())
+    Ok(contains_dlc)
+}
+
+// Returns true if the given folder contains any files with no file extension.
+fn has_file_with_no_extension(obb_dir: impl AsRef<Path>) -> Result<bool> {
+    for err_or_stat in std::fs::read_dir(obb_dir)? {
+        if let Ok(stat) = err_or_stat {
+            let path = stat.path();
+            
+            if let None = path.extension() {
+                return Ok(true)
+            }
+        }
+    }
+
+    Ok(false)
 }
 
 pub fn kill_app() -> Result<()> {
@@ -257,16 +278,13 @@ fn save_obbs(obb_dir: &Path, obb_backups_path: &Path) -> Result<Vec<PathBuf>> {
     for err_or_stat in std::fs::read_dir(obb_dir)? {
         if let Ok(stat) = err_or_stat {
             let path = stat.path();
-            let ext = path.extension();
-            // Make sure that we check the extension is OBB: We don't backup DLCs (no extension) since this might cause further issues and they can easily be redownloaded.
-            if ext.is_some_and(|ext| ext == "obb") {
-                // Rename doesn't work due to different mount points
-                let obb_backup_path = obb_backups_path.join(path.file_name().unwrap());
-                std::fs::copy(&path, &obb_backup_path)?;
-                std::fs::remove_file(&path)?;
-                
-                paths.push(obb_backup_path);
-            }
+            
+            // Rename doesn't work due to different mount points
+            let obb_backup_path = obb_backups_path.join(path.file_name().unwrap());
+            std::fs::copy(&path, &obb_backup_path)?;
+            std::fs::remove_file(&path)?;
+            
+            paths.push(obb_backup_path);
         }
     }
 
