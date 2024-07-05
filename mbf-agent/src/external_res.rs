@@ -3,7 +3,7 @@ use log::info;
 use semver::Version;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Display, sync, time::Duration};
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, anyhow};
 
 
 #[derive(Deserialize)]
@@ -151,5 +151,25 @@ pub fn get_diff_index() -> Result<DiffIndex, JsonPullError> {
 
 pub fn get_diff_url(diff: &Diff) -> String {
     format!("{DIFF_INDEX_STEM}/{}", diff.diff_name)
+}
+
+const MANIFEST_FORMAT: &str = "https://github.com/Lauriethefish/mbf-manifests/releases/download/1.0.0/{0}.xml";
+
+// Downloads the AndroidManifest.xml file for the given Beat Saber version (in AXML format) and returns it to the frontend.
+pub fn get_manifest_axml(version: String) -> Result<Vec<u8>> {
+    let manifest_url = MANIFEST_FORMAT.replace("{0}", &version);
+
+    let resp = get_agent().get(&manifest_url)
+        .call()
+        .context("Failed to make request to fetch manifest")?;
+
+    if resp.status() == 404 {
+        return Err(anyhow!("Could not find an AXML manifest for version {version} (404). Report this so that one can be added"));
+    }
+
+    let mut buffer = Vec::new();
+    resp.into_reader().read_to_end(&mut buffer).context("Failed to read response")?;
+
+    Ok(buffer)
 }
 

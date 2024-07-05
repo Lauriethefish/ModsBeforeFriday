@@ -1,6 +1,6 @@
 import { Adb } from '@yume-chan/adb';
-import { loadModStatus, patchApp, quickFix } from "./Agent";
-import { ReactNode, useEffect, useRef, useState } from 'react';
+import { getDowngradedManifest, loadModStatus, patchApp, quickFix } from "./Agent";
+import { ReactNode, useEffect, useState } from 'react';
 import { ModLoader, ModStatus } from './Messages';
 import './css/DeviceModder.css';
 import { LogWindow, useLog } from './components/LogWindow';
@@ -67,7 +67,7 @@ export function DeviceModder(props: DeviceModderProps) {
 
     useEffect(() => {
         loadModStatus(device, addLogEvent)
-            .then(data => setModStatus(data))
+            .then(loadedModStatus => setModStatus(loadedModStatus))
             .catch(err => quit(err));
     }, [device, quit]);
 
@@ -103,6 +103,7 @@ export function DeviceModder(props: DeviceModderProps) {
             return <IncompatibleAlreadyModded installedVersion={modStatus.app_info.version} device={device} quit={() => quit(undefined)} />
         } else {
             return <PatchingMenu
+                quit={quit}
                 modStatus={modStatus}
                 onCompleted={status => setModStatus(status)}
                 device={device}
@@ -119,6 +120,7 @@ export function DeviceModder(props: DeviceModderProps) {
         }
     } else {
         return <PatchingMenu
+            quit={quit}
             device={device}
             modStatus={modStatus}
             onCompleted={modStatus => setModStatus(modStatus)}
@@ -242,7 +244,8 @@ interface PatchingMenuProps {
     modStatus: ModStatus
     device: Adb,
     onCompleted: (newStatus: ModStatus) => void,
-    initialDowngradingTo: string | null
+    initialDowngradingTo: string | null,
+    quit: (err: unknown) => void
 }
 
 function PatchingMenu(props: PatchingMenuProps) {
@@ -253,17 +256,35 @@ function PatchingMenu(props: PatchingMenuProps) {
     const [versionSelectOpen, setVersionSelectOpen] = useState(false);
     const [versionOverridden, setVersionOverridden] = useState(false);
 
-    let manifest = useRef(new AndroidManifest(props.modStatus.app_info!.manifest_xml));
-    useEffect(() => {
-        manifest.current.applyPatchingManifestMod();
-    }, []);
-
     const { onCompleted, modStatus, device, initialDowngradingTo } = props;
     const [downgradingTo, setDowngradingTo] = useState(initialDowngradingTo);
     const downgradeChoices = GetSortedDowngradableVersions(modStatus)!
         .filter(version => version != initialDowngradingTo);
 
-    if(!isPatching) {
+    const [manifest, setManifest] = useState(null as null | AndroidManifest); 
+    manifest?.applyPatchingManifestMod();
+
+    useEffect(() => {
+        if(downgradingTo === null) {
+            setManifest(new AndroidManifest(props.modStatus.app_info!.manifest_xml));
+        }   else    {
+            getDowngradedManifest(device, downgradingTo, addLogEvent)
+                .then(manifest_xml => setManifest(new AndroidManifest(manifest_xml)))
+                .catch(e => {
+                    // TODO: Perhaps revert to "not downgrading" if this error comes up (but only if the latest version is moddable)
+                    // This is low priority as this error message should only show up very rarely - there is already a previous check for internet access.
+                    console.error("Failed to fetch older manifest: " + e);
+                    props.quit("Failed to fetch AndroidManifest.xml for the selected downgrade version. Did your quest lose its internet connection suddenly?");
+                });
+        }
+    }, [downgradingTo]);
+
+    if(manifest === null) {
+        return <div className='container mainContainer'>
+            <h2>Loading downgraded APK manifest</h2>
+            <p>This should only take a few seconds.</p>
+        </div>
+    } else if(!isPatching) {
         return <div className='container mainContainer'>
             {downgradingTo !== null && <DowngradeMessage
                 toVersion={downgradingTo}
@@ -285,6 +306,7 @@ function PatchingMenu(props: PatchingMenuProps) {
                 onConfirm={version => {
                     if(version !== null) {
                         setDowngradingTo(version);
+                        setManifest(null);
                         setVersionOverridden(true);
                     }
                     setVersionSelectOpen(false);
@@ -297,7 +319,7 @@ function PatchingMenu(props: PatchingMenuProps) {
                 <button className="largeCenteredButton" onClick={async () => {
                     setIsPatching(true);
                     try {
-                        onCompleted(await patchApp(device, modStatus, downgradingTo, manifest.current.toString(), false, isDeveloperUrl, addLogEvent));
+                        onCompleted(await patchApp(device, modStatus, downgradingTo, manifest.toString(), false, isDeveloperUrl, addLogEvent));
                     } catch (e) {
                         setPatchingError(String(e));
                         setIsPatching(false);
@@ -315,7 +337,7 @@ function PatchingMenu(props: PatchingMenuProps) {
                 <h2>Change Permissions</h2>
                 <p>Certain mods require particular Android permissions to be set on the Beat Saber app in order to work correctly.</p>
                 <p>(You can change these permissions later, so don't worry about enabling them all now unless you know which ones you need.)</p>
-                <PermissionsMenu manifest={manifest.current} />
+                <PermissionsMenu manifest={manifest} />
                 <button className="largeCenteredButton" onClick={() => setSelectingPerms(false)}>Confirm permissions</button>
             </Modal>
 

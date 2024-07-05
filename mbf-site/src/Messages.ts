@@ -44,6 +44,11 @@ export interface ImportUrl {
     from_url: string
 }
 
+export interface GetDowngradedManifest {
+    type: 'GetDowngradedManifest',
+    version: string
+}
+
 export type Request = GetModStatus | 
     Patch | 
     SetModsEnabled | 
@@ -51,7 +56,8 @@ export type Request = GetModStatus |
     RemoveMod | 
     Import | 
     ImportUrl | 
-    FixPlayerData;
+    FixPlayerData |
+    GetDowngradedManifest;
 
 export interface Mods {
     type: 'Mods',
@@ -101,7 +107,12 @@ export interface LogMsg {
     level: LogLevel
 }
 
-export type Response = LogMsg | ModStatus | Mods | ImportResult | FixedPlayerData;
+export interface DowngradedManifest {
+    type: 'DowngradedManifest',
+    manifest_xml: string
+}
+
+export type Response = LogMsg | ModStatus | Mods | ImportResult | FixedPlayerData | DowngradedManifest;
 
 export interface CoreModsInfo {
     supported_versions: string[],

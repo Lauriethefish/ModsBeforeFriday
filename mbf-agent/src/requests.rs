@@ -89,7 +89,10 @@ pub enum Request {
     // unfortunately chmod 777 doesn't seem to fix the issue.)
     // Gives a `FixedPlayerData` response.
     FixPlayerData,
-
+    /// Gets a copy of the AndroidManifest.xml for the given Beat Saber version, converted from AXML into an XML string.
+    GetDowngradedManifest {
+        version: String
+    },
     /// Reinstalls any core mods that are misssing/out of date and overwrites the modloader in case it is corrupt.
     /// Should fix most issues with any installation.
     /// Returns a `Mods` response containing the newly installed mods.
@@ -159,6 +162,9 @@ pub enum Response {
     FixedPlayerData {
         // True if a PlayerData.dat existed to fix, false if the request did nothing.
         existed: bool
+    },
+    DowngradedManifest {
+        manifest_xml: String
     }
 }
 

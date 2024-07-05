@@ -5,7 +5,7 @@ use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
 use crate::manifest::ManifestInfo;
-use crate::{axml, data_fix, download_file_with_attempts, DATAKEEPER_PATH, DOWNLOADS_PATH, PLAYER_DATA_BAK_PATH, PLAYER_DATA_PATH, SONGS_PATH, TEMP_PATH};
+use crate::{axml, data_fix, download_file_with_attempts, external_res, DATAKEEPER_PATH, DOWNLOADS_PATH, PLAYER_DATA_BAK_PATH, PLAYER_DATA_PATH, SONGS_PATH, TEMP_PATH};
 use crate::{axml::AxmlReader, patching, zip::ZipFile};
 use crate::external_res::{get_diff_index, JsonPullError};
 use crate::mod_man::ModManager;
@@ -27,7 +27,8 @@ pub fn handle_request(request: Request) -> Result<Response> {
         Request::Import { from_path } => handle_import(from_path, None),
         Request::RemoveMod { id } => handle_remove_mod(id),
         Request::ImportUrl { from_url } => handle_import_mod_url(from_url),
-        Request::FixPlayerData => handle_fix_player_data()
+        Request::FixPlayerData => handle_fix_player_data(),
+        Request::GetDowngradedManifest { version } => handle_get_downgraded_manifest(version)
     }
 }
 
@@ -160,17 +161,11 @@ fn get_app_info() -> Result<Option<AppInfo>> {
     }))    
 }
 
-fn get_manifest_info_and_xml(apk: &mut ZipFile<File>) -> Result<(ManifestInfo, String)> {
-    let manifest = apk.read_file("AndroidManifest.xml").context("Failed to read manifest")?;
+fn axml_bytes_to_xml_string(bytes: &[u8]) -> Result<String> {
+    let mut cursor = Cursor::new(bytes);
+    let mut axml_reader = AxmlReader::new(&mut cursor)
+        .context("File on manifests URI was invalid AXML. Report this!")?;
 
-    // Decode various important information from the manifest
-    let mut manifest_reader = Cursor::new(manifest);
-    let mut axml_reader = AxmlReader::new(&mut manifest_reader)?;
-    let manifest_info = ManifestInfo::read(&mut axml_reader).context("Failed to read manifest")?;
-
-    // Re-read the manifest as a full XML document.
-    manifest_reader.set_position(0);
-    axml_reader = AxmlReader::new(&mut manifest_reader).context("Failed to read manifest")?;
     let mut xml_output = Vec::new();
     let mut xml_writer = EmitterConfig::new()
         .perform_indent(true)
@@ -178,8 +173,20 @@ fn get_manifest_info_and_xml(apk: &mut ZipFile<File>) -> Result<(ManifestInfo, S
 
     axml::axml_to_xml(&mut xml_writer, &mut axml_reader).context("Failed to convert AXML to XML")?;
 
-    let xml_str = String::from_utf8(xml_output)
-        .expect("XML output should be valid UTF-8");
+    Ok(String::from_utf8(xml_output)
+        .expect("XML output should be valid UTF-8"))
+}
+
+fn get_manifest_info_and_xml(apk: &mut ZipFile<File>) -> Result<(ManifestInfo, String)> {
+    let manifest = apk.read_file("AndroidManifest.xml").context("Failed to read manifest")?;
+
+    // Decode various important information from the manifest
+    let mut manifest_reader = Cursor::new(&manifest);
+    let mut axml_reader = AxmlReader::new(&mut manifest_reader)?;
+    let manifest_info = ManifestInfo::read(&mut axml_reader).context("Failed to read manifest")?;
+
+    // Re-read the manifest as a full XML document.
+    let xml_str = axml_bytes_to_xml_string(&manifest).context("Failed to convert manifest to XML")?;
 
     Ok((manifest_info, xml_str))
 }
@@ -478,4 +485,14 @@ fn install_core_mods(mod_manager: &mut ModManager, app_info: AppInfo, override_c
     }
     
     Ok(())
+}
+
+fn handle_get_downgraded_manifest(version: String) -> Result<Response> {
+    info!("Downloading manifest AXML file");
+    let manifest_bytes = external_res::get_manifest_axml(version)
+        .context("Failed to GET AndroidManifest.xml")?;
+    info!("Converting into readable XML");
+    let manifest_xml = axml_bytes_to_xml_string(&manifest_bytes)?;
+
+    Ok(Response::DowngradedManifest { manifest_xml })
 }

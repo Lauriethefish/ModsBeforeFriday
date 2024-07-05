@@ -1,6 +1,6 @@
 import { AdbSync, AdbSyncWriteOptions, Adb, encodeUtf8 } from '@yume-chan/adb';
 import { ConsumableReadableStream, Consumable, ConcatStringStream, DecodeUtf8Stream } from '@yume-chan/stream-extra';
-import { Request, Response, LogMsg, ModStatus, Mods, FixedPlayerData, ImportResult } from "./Messages";
+import { Request, Response, LogMsg, ModStatus, Mods, FixedPlayerData, ImportResult, DowngradedManifest } from "./Messages";
 import { Mod } from './Models';
 import { AGENT_SHA1 } from './agent_manifest';
 
@@ -276,6 +276,15 @@ export async function setModStatuses(device: Adb,
   return (response as Mods).installed_mods;
 }
 
+// Gets the AndroidManifest.xml file for the given Beat Saber APK version, converted from AXML to XML.
+export async function getDowngradedManifest(device: Adb, gameVersion: string, eventSink: LogEventSink = null): Promise<string> {
+  let response = await sendRequest(device, {
+    type: 'GetDowngradedManifest',
+    version: gameVersion
+  }, eventSink);
+
+  return (response as DowngradedManifest).manifest_xml;
+}
 
 export async function importFile(device: Adb,
     file: File,
