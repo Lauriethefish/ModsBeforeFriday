@@ -41,7 +41,7 @@ jobs:
       - name: Output cargo config
         run: cat /home/runner/.cargo/config.toml
       - name: Run agent build script
-        run: ./mbf-agent/build.ps1
+        run: ./mbf-agent/build.ps1 -Release
         shell: pwsh
       - name: yarn install
         run: yarn --cwd ./mbf-site install

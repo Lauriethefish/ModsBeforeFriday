@@ -7,6 +7,9 @@ edition = "2021"
 name = "diff_gen"
 path = "src/diff_gen.rs"
 
+[profile.dev.package."*"]
+opt-level = 3
+
 [dependencies]
 qbsdiff = "1.4.1"
 rsa = { version = "0.9.6", features = ["sha2"] }
@@ -18,7 +21,7 @@ pem = "3.0.3"
 anyhow = "1.0.79"
 libflate = "2.0.0"
 crc = "3.0.1"
-serde = { version = "1.0.197", features = ["derive", "rc"] }
+serde = { version = "1.0.197", features = ["derive"] }
 serde_json = "1.0.115"
 semver = { version = "1.0.22", features = ["serde"] }
 ureq = "2.9.6"

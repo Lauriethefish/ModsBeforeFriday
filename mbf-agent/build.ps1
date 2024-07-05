@@ -1,11 +1,24 @@
+$Release = $args[0]
+
 $TARGET = "aarch64-linux-android"
 $OutputDirectory = "$PSScriptRoot/../mbf-site/public"
 $AgentDetailsOutputPath = "$PSScriptRoot/../mbf-site/src/agent_manifest.ts"
 $OutputPath = "$OutputDirectory/mbf-agent"
 
-cargo build --manifest-path $PSScriptRoot/Cargo.toml --target $TARGET --release
-Copy-Item $PSScriptRoot/target/$TARGET/release/mbf-agent $OutputPath
-$SHA1Hash = Get-FileHash -Algorithm SHA1 -Path $PSScriptRoot/target/$TARGET/release/mbf-agent | select -ExpandProperty Hash
+if ( $Release.Length -ne 0 )
+{
+    cargo build --manifest-path $PSScriptRoot/Cargo.toml --target $TARGET --release
+    $Configuration = "release"
+}   
+else
+{
+    cargo build --manifest-path $PSScriptRoot/Cargo.toml --target $TARGET
+    $Configuration = "debug"
+}
+$ExecutablePath = "$PSScriptRoot/target/$TARGET/$Configuration/mbf-agent"
+
+Copy-Item $ExecutablePath $OutputPath
+$SHA1Hash = Get-FileHash -Algorithm SHA1 -Path $ExecutablePath | select -ExpandProperty Hash
 $Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding $False
 $AgentLength = (Get-Item $OutputPath).Length;
 $AgentDetailsContents = @'
