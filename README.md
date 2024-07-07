@@ -39,9 +39,7 @@ ar = "<contents OF AR_aarch64-linux-android environment variable>"
 ```
 
 ### Compiling Agent
-- To compile the agent and copy it to the `public` directory so that it can be used by the site, navigate to `./mbf-agent` and run `./build.ps1`.
-- The `./run_android` script can be used to automatically copy the agent to the correct location on the Quest if you want to invoke it manually in `adb shell`. The site will do this automatically otherwise.
-- `./reset_bs` will reinstall vanilla Beat Saber. (The paths in this file reflect the directory structure of Lauriethefish's computer and will need updating with the path of your APK/OBB.)
+- To compile the agent and copy it to the `public` directory so that it can be used by the site, run `./build_agent.ps1`.
 
 ### Debugging site
 To serve the site for testing, navigate to `./mbf-site` and run `yarn start`.

@@ -7,21 +7,20 @@ edition = "2021"
 mbf-res-man = { path = "../mbf-res-man" }
 qbsdiff = "1.4.2"
 rsa = { version = "0.9.6", features = ["sha2"] }
-rasn = "0.12.4"
-rasn-pkix = "0.12.4"
+rasn = "0.15.3"
+rasn-pkix = "0.15.3"
 rand = "0.8.5"
 byteorder = "1.5.0"
-pem = "3.0.3"
-anyhow = "1.0.79"
-libflate = "2.0.0"
-crc = "3.0.1"
-serde = { version = "1.0.197", features = ["derive"] }
-serde_json = "1.0.115"
-semver = { version = "1.0.22", features = ["serde"] }
+pem = "3.0.4"
+anyhow = "1.0.86"
+libflate = "2.1.0"
+crc = "3.2.1"
+serde = { version = "1.0.204", features = ["derive"] }
+serde_json = "1.0.120"
+semver = { version = "1.0.23", features = ["serde"] }
 ureq = "2.10.0"
-log = "0.4.21"
+log = "0.4.22"
 const_format = "0.2.32"
-rustls = "0.22.4"
 jsonschema = "0.18.0"
 xml = "0.8.20"
 
