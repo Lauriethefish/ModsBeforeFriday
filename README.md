@@ -10,6 +10,7 @@ MBF has some query parameters which can be passed with the URL. These are useful
 ## Project Structure
 
 `./mbf-agent` contains the agent, which is an executable written in Rust that is executed by the frontend via ADB. This agent does pretty much all the work, including installing mods and patching the game.
+`./mbf-res-man` contains the MBF resource management project, which contains code used by MBF to access external resources e.g. core mods, but also for updating its own resource repositories, e.g. [MBF Diffs](https://github.com/Lauriethefish/mbf-diffs/releases) whenever a new version of Beat Saber is released.
 `./mbf-site` contains the frontend, which communicates with the agent via JSON. (Written in typescript with React).
 
 ## Compilation Instructions
