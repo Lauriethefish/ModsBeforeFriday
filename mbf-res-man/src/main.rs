@@ -52,7 +52,7 @@ fn download_installed_bs() -> Result<String> {
 // Installs the APK and pushes OBBs for the given Beat Saber version to the quest.
 fn install_bs_version(bs_version: &str) -> Result<()> {
     info!("Removing existing installation (if there is one)");
-    let _ = uninstall_package(APK_ID)?; // Allow failure, i.e. if app not already installed.
+    let _ = uninstall_package(APK_ID); // Allow failure, i.e. if app not already installed.
 
     info!("Installing BS {bs_version}");
     let version_path = Path::new(BS_VERSIONS_PATH).join(&bs_version);
