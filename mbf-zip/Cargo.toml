@@ -1,0 +1,15 @@
+[package]
+name = "mbf-zip"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rsa = { version = "0.9.6", features = ["sha2"] }
+rasn = "0.15.3"
+rasn-pkix = "0.15.3"
+rand = "0.8.5"
+byteorder = "1.5.0"
+crc = "3.2.1"
+libflate = "2.1.0"
+pem = "3.0.4"
+anyhow = "1.0.86"

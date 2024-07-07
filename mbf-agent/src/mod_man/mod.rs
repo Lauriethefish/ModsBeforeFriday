@@ -6,9 +6,10 @@ use log::{error, info, warn};
 pub use manifest::*;
 
 use anyhow::{Context, Result, anyhow};
+use mbf_zip::ZipFile;
 use semver::Version;
 
-use crate::{download_file_with_attempts, zip::ZipFile, EARLY_MODS_DIR, LATE_MODS_DIR, LIBS_DIR, QMODS_DIR};
+use crate::{download_file_with_attempts, EARLY_MODS_DIR, LATE_MODS_DIR, LIBS_DIR, QMODS_DIR};
 
 const QMOD_SCHEMA: &str = include_str!("qmod_schema.json");
 const MAX_SCHEMA_VERSION: Version = Version::new(1, 2, 0);

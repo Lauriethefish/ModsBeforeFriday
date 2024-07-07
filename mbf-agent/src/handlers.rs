@@ -6,7 +6,8 @@ use std::path::{Path, PathBuf};
 
 use crate::manifest::ManifestInfo;
 use crate::{axml, data_fix, download_file_with_attempts, DATAKEEPER_PATH, DOWNLOADS_PATH, PLAYER_DATA_BAK_PATH, PLAYER_DATA_PATH, SONGS_PATH, TEMP_PATH};
-use crate::{axml::AxmlReader, patching, zip::ZipFile};
+use crate::{axml::AxmlReader, patching};
+use mbf_zip::ZipFile;
 use crate::mod_man::ModManager;
 use crate::requests::{AppInfo, CoreModsInfo, ImportResultType, ModModel, Request, Response};
 use anyhow::{anyhow, Context, Result};

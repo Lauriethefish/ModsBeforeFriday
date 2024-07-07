@@ -918,17 +918,11 @@ dependencies = [
  "anyhow",
  "byteorder",
  "const_format",
- "crc",
  "jsonschema",
- "libflate",
  "log",
  "mbf-res-man",
- "pem",
+ "mbf-zip",
  "qbsdiff",
- "rand",
- "rasn",
- "rasn-pkix",
- "rsa",
  "rustls 0.22.4",
  "semver",
  "serde",
@@ -953,6 +947,21 @@ dependencies = [
  "serde",
  "serde_json",
  "ureq",
+]
+
+[[package]]
+name = "mbf-zip"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "byteorder",
+ "crc",
+ "libflate",
+ "pem",
+ "rand",
+ "rasn",
+ "rasn-pkix",
+ "rsa",
 ]
 
 [[package]]

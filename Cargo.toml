@@ -3,7 +3,8 @@ resolver = "2"
 
 members = [
     "mbf-agent",
-    "mbf-res-man"
+    "mbf-res-man",
+    "mbf-zip",    
 ]
 
 [profile.dev.package."*"]

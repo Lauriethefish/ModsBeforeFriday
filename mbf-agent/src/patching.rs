@@ -2,8 +2,8 @@ use std::{fs::{File, OpenOptions}, io::{BufReader, Cursor, Read, Write}, path::{
 
 use anyhow::{Context, Result, anyhow};
 use log::{info, warn};
-use crate::{axml::{self, AxmlWriter}, data_fix::fix_colour_schemes, download_file_with_attempts, requests::{AppInfo, ModLoader}, zip::{self, ZIP_CRC}, ModTag, APK_ID, APP_OBB_PATH, DATAKEEPER_PATH, DATA_BACKUP_PATH, PLAYER_DATA_PATH};
-use crate::zip::{signing, FileCompression, ZipFile};
+use crate::{axml::{self, AxmlWriter}, data_fix::fix_colour_schemes, download_file_with_attempts, requests::{AppInfo, ModLoader}, ModTag, APK_ID, APP_OBB_PATH, DATAKEEPER_PATH, DATA_BACKUP_PATH, PLAYER_DATA_PATH};
+use mbf_zip::{signing, FileCompression, ZipFile, ZIP_CRC};
 use mbf_res_man::{external_res, models::{Diff, VersionDiffs}};
 
 const DEBUG_CERT_PEM: &[u8] = include_bytes!("debug_cert.pem");
@@ -333,7 +333,7 @@ fn patch_apk_in_place(path: impl AsRef<Path>, libunity_path: Option<PathBuf>, ma
         .open(path)
         .expect("Failed to open APK");
         
-    let mut zip = zip::ZipFile::open(file).unwrap();
+    let mut zip = ZipFile::open(file).unwrap();
 
     info!("Applying manifest mods");
     patch_manifest(&mut zip, manifest_mod).context("Failed to patch manifest")?;

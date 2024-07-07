@@ -1,5 +1,4 @@
 mod requests;
-mod zip;
 mod manifest;
 mod axml;
 mod patching;
