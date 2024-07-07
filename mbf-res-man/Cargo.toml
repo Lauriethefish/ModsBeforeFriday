@@ -1,5 +1,5 @@
 [package]
-name = "mbf-diff-gen"
+name = "mbf-res-man"
 version = "0.1.0"
 edition = "2021"
 
@@ -18,9 +18,9 @@ clap = { version = "4.5.8", features = ["derive"] }
 semver = { version = "1.0.22", features = ["serde"] }
 
 [lib]
-name = "mbf_diff_gen"
+name = "mbf_res_man"
 path = "src/lib.rs"
 
 [[bin]]
-name = "mbf_diff_gen"
+name = "mbf_res_man"
 path = "src/main.rs"

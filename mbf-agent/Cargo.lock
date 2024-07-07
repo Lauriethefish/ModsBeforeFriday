@@ -924,7 +924,7 @@ dependencies = [
  "jsonschema",
  "libflate",
  "log",
- "mbf-diff-gen",
+ "mbf-res-man",
  "pem",
  "qbsdiff",
  "rand",
@@ -940,7 +940,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "mbf-diff-gen"
+name = "mbf-res-man"
 version = "0.1.0"
 dependencies = [
  "anyhow",

@@ -3,10 +3,6 @@ name = "mbf-agent"
 version = "0.1.0"
 edition = "2021"
 
-[[bin]]
-name = "diff_gen"
-path = "src/diff_gen.rs"
-
 [profile.dev.package."*"]
 opt-level = 3
 
@@ -14,7 +10,7 @@ opt-level = 3
 strip = true
 
 [dependencies]
-mbf-diff-gen = { path = "../mbf-diff-gen" }
+mbf-res-man = { path = "../mbf-res-man" }
 qbsdiff = "1.4.2"
 rsa = { version = "0.9.6", features = ["sha2"] }
 rasn = "0.12.4"

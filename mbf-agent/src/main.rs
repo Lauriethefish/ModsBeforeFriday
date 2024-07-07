@@ -73,7 +73,7 @@ fn download_file_with_attempts(to: impl AsRef<Path>, url: &str) -> Result<Option
 }
 
 fn download_file_one_attempt(to: impl AsRef<Path>, url: &str) -> Result<Option<String>> {
-    let resp = mbf_diff_gen::external_res::get_agent().get(url)
+    let resp = mbf_res_man::external_res::get_agent().get(url)
         .call()
         .context("Failed to request file")?;
 
