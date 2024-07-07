@@ -942,6 +942,7 @@ dependencies = [
  "crc",
  "env_logger",
  "log",
+ "mbf-zip",
  "qbsdiff",
  "semver",
  "serde",

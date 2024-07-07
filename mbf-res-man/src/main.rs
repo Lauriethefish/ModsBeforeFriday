@@ -1,12 +1,13 @@
 // Allow dead code since some functions are only used when this crate is imported by the MBF agent.
 #![allow(unused)]
 
-use std::{ffi::OsStr, path::{Path, PathBuf}};
+use std::{ffi::OsStr, io::Write, path::{Path, PathBuf}};
 use adb::uninstall_package;
 use anyhow::{anyhow, Context, Result};
 use clap::{arg, command, Parser, Subcommand};
 use const_format::formatcp;
 use log::{info, warn};
+use mbf_zip::ZipFile;
 use models::{DiffIndex, VersionDiffs};
 use release_editor::Repo;
 
@@ -20,6 +21,7 @@ const APK_ID: &str = "com.beatgames.beatsaber";
 const APK_DATA_DIR: &str = "apk_data";
 const BS_VERSIONS_PATH: &str = formatcp!("{APK_DATA_DIR}/versions");
 const DIFFS_PATH: &str = formatcp!("{APK_DATA_DIR}/diffs");
+const MANIFESTS_PATH: &str = formatcp!("{APK_DATA_DIR}/manifests");
 const DIFF_INDEX_PATH: &str = formatcp!("{DIFFS_PATH}/index.json");
 
 // Downloads the installed version of Beat Saber to BS_VERSIONS_PATH
@@ -258,6 +260,51 @@ fn upload_diff_index() -> Result<()> {
     Ok(())
 }
 
+// Updates the AndroidManifest.xml files to reflect the current Beat Saber versions the script knows about.
+fn update_manifests() -> Result<()> {
+    info!("Extracting manifests from APKs");
+    std::fs::create_dir_all(MANIFESTS_PATH)?;
+
+    for folder_result in std::fs::read_dir(BS_VERSIONS_PATH)? {
+        let folder = folder_result?;
+
+        let version_name = folder
+            .path()
+            .file_name()
+            .expect("No filename in BS version")
+            .to_string_lossy()
+            .to_string();
+        info!("Extracting manifest for {version_name}");
+
+        // Extract the manifest to an external file.
+        let apk_path = folder.path().join(format!("{APK_ID}.apk"));
+        let apk_handle = std::fs::File::open(apk_path).context("No APK found for BS version")?;
+        let mut apk_zip = ZipFile::open(apk_handle).context("APK wasn't a valid ZIP file")?;
+        let manifest_contents = apk_zip.read_file("AndroidManifest.xml").context("Failed to read manifest")?;
+
+        let manifest_output_path = Path::new(MANIFESTS_PATH).join(format!("{version_name}.xml"));
+        let mut out_handle = std::fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .open(manifest_output_path)?;
+
+        out_handle.write_all(&manifest_contents)?;
+    }
+
+    Ok(())
+}
+
+fn upload_manifests() -> Result<()> {
+    info!("Updating manifests GH release");
+    let repo = Repo {
+        repo: "mbf-manifests".to_string(),
+        owner: "Lauriethefish".to_string()
+    };
+    let latest_release = release_editor::get_latest_release(repo, GITHUB_AUTH_TOKEN)?;
+    release_editor::update_release_from_directory(MANIFESTS_PATH, &latest_release, GITHUB_AUTH_TOKEN)?;
+    Ok(())
+}
+
 #[derive(Parser)]
 #[command(version, long_about = None)]
 #[command(arg_required_else_help = true)]
@@ -300,7 +347,9 @@ enum Commands {
     /// Installs the latest moddable Beat Saber version onto the Quest.
     InstallLatestModdable,
     /// Uploads any changes made to the mbf diffs index.
-    UpdateDiffIndex
+    UpdateDiffIndex,
+    /// Extracts all AndroidManifest.xml files from APKs and uploads them to the MBF manifests repo.
+    UpdateManifestsRepo
 }
 
 
@@ -334,7 +383,11 @@ fn main() -> Result<()> {
         }
         Commands::UpdateDiffIndex => upload_diff_index()?,
         Commands::InstallVersion { version } => install_bs_version(&version)?,
-        Commands::InstallLatestModdable => install_bs_version(&get_latest_moddable_bs()?)?
+        Commands::InstallLatestModdable => install_bs_version(&get_latest_moddable_bs()?)?,
+        Commands::UpdateManifestsRepo => {
+            update_manifests()?;
+            upload_manifests()?;
+        }
     }
 
     Ok(())
