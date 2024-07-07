@@ -1,5 +1,5 @@
 # Directory Structure
-This directory is used by the diff_gen script.
+This directory is used by the `mbf-res-man` CLI.
 
 ## Beat Saber Versions
 - Each Beat Saber version is stored in `./versions/VERSION/`
