@@ -293,11 +293,11 @@ enum Commands {
         #[arg(short, long)]
         overwrite: bool
     },
-    // Installs the given Beat Saber version onto the Quest.
+    /// Installs the given Beat Saber version onto the Quest.
     InstallVersion {
         version: String
     },
-    // Installs the latest moddable Beat Saber version onto the Quest.
+    /// Installs the latest moddable Beat Saber version onto the Quest.
     InstallLatestModdable,
     /// Uploads any changes made to the mbf diffs index.
     UpdateDiffIndex
