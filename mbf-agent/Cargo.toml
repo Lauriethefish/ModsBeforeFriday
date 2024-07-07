@@ -3,12 +3,6 @@ name = "mbf-agent"
 version = "0.1.0"
 edition = "2021"
 
-[profile.dev.package."*"]
-opt-level = 3
-
-[profile.release]
-strip = true
-
 [dependencies]
 mbf-res-man = { path = "../mbf-res-man" }
 qbsdiff = "1.4.2"

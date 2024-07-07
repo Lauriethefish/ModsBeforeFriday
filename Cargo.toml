@@ -1,0 +1,13 @@
+[workspace]
+resolver = "2"
+
+members = [
+    "mbf-agent",
+    "mbf-res-man"
+]
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+strip = true

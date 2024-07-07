@@ -1,18 +1,19 @@
 $Release = $args[0]
 
 $TARGET = "aarch64-linux-android"
-$OutputDirectory = "$PSScriptRoot/../mbf-site/public"
-$AgentDetailsOutputPath = "$PSScriptRoot/../mbf-site/src/agent_manifest.ts"
+$OutputDirectory = "$PSScriptRoot/mbf-site/public"
+$AgentDetailsOutputPath = "$PSScriptRoot/mbf-site/src/agent_manifest.ts"
 $OutputPath = "$OutputDirectory/mbf-agent"
+$CargoManifestPath = "$PSScriptRoot/mbf-agent/Cargo.toml"
 
 if ( $Release.Length -ne 0 )
 {
-    cargo build --manifest-path $PSScriptRoot/Cargo.toml --target $TARGET --release
+    cargo build --manifest-path $CargoManifestPath --target $TARGET --release
     $Configuration = "release"
 }   
 else
 {
-    cargo build --manifest-path $PSScriptRoot/Cargo.toml --target $TARGET
+    cargo build --manifest-path $CargoManifestPath --target $TARGET
     $Configuration = "debug"
 }
 $ExecutablePath = "$PSScriptRoot/target/$TARGET/$Configuration/mbf-agent"
