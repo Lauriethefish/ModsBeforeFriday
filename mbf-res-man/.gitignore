@@ -1,4 +1,5 @@
 apk_data/diffs
 apk_data/versions
+apk_data/manifests
 target/
 GITHUB_TOKEN.txt
