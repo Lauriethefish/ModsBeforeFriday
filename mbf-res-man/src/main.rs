@@ -334,12 +334,6 @@ enum Commands {
         #[arg(short, long)]
         overwrite: bool
     },
-    /// Downloads the currently installed Beat Saber APK and OBB(s) into the local version list.
-    /// then generates a diff-file to downgrade this to the latest Beat Saber version and adds it to the index
-    PullAndGenToLatest {
-        #[arg(short, long)]
-        overwrite: bool
-    },
     /// Installs the given Beat Saber version onto the Quest.
     InstallVersion {
         version: String
@@ -349,7 +343,14 @@ enum Commands {
     /// Uploads any changes made to the mbf diffs index.
     UpdateDiffIndex,
     /// Extracts all AndroidManifest.xml files from APKs and uploads them to the MBF manifests repo.
-    UpdateManifestsRepo
+    UpdateManifestsRepo,
+    /// Convenience command for use when a Beat Saber update releases.
+    /// - Pulls the new update from the quest.
+    /// - Generates a diff from this version to the latest moddable version.
+    /// - Uploads the diff to the mbf-diffs repo.
+    /// - Extracts the manifest from this version's APK.
+    /// - Uploads the manifest to the manifests repo.
+    AcceptNewVersion
 }
 
 
@@ -364,15 +365,6 @@ fn main() -> Result<()> {
     match cli.command {
         Commands::PullVersion => { download_installed_bs()?; },
         Commands::GenerateDiff { from_version, to_version, overwrite } => add_diff_to_index(from_version, to_version, overwrite)?,
-        Commands::PullAndGenToLatest { overwrite } => {
-            let installed_bs_version = download_installed_bs()?;
-            let latest_moddable = get_latest_moddable_bs()?;
-            if installed_bs_version == latest_moddable {
-                return Err(anyhow!("The installed Beat Saber version is already the latest moddable version"));
-            }
-
-            add_diff_to_index(installed_bs_version, latest_moddable, overwrite)?;
-        },
         Commands::GenerateDiffToLatest { from_version, overwrite } => {
             let latest_moddable = get_latest_moddable_bs()?;
             if from_version == latest_moddable {
@@ -387,7 +379,19 @@ fn main() -> Result<()> {
         Commands::UpdateManifestsRepo => {
             update_manifests()?;
             upload_manifests()?;
-        }
+        },
+        Commands::AcceptNewVersion => {
+            let installed_bs_version = download_installed_bs()?;
+            let latest_moddable = get_latest_moddable_bs()?;
+            if installed_bs_version == latest_moddable {
+                return Err(anyhow!("The installed Beat Saber version is already the latest moddable version"));
+            }
+
+            add_diff_to_index(installed_bs_version, latest_moddable, false)?;
+            upload_diff_index()?;
+            update_manifests()?;
+            upload_manifests()?;
+        },
     }
 
     Ok(())
