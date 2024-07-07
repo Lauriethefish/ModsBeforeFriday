@@ -2,8 +2,9 @@ use std::{fs::{File, OpenOptions}, io::{BufReader, Cursor, Read, Write}, path::{
 
 use anyhow::{Context, Result, anyhow};
 use log::{info, warn};
-use crate::{axml::{self, AxmlWriter}, data_fix::fix_colour_schemes, download_file_with_attempts, external_res::{self, Diff, VersionDiffs}, requests::{AppInfo, ModLoader}, zip::{self, ZIP_CRC}, ModTag, APK_ID, APP_OBB_PATH, DATAKEEPER_PATH, DATA_BACKUP_PATH, PLAYER_DATA_PATH};
+use crate::{axml::{self, AxmlWriter}, data_fix::fix_colour_schemes, download_file_with_attempts, requests::{AppInfo, ModLoader}, zip::{self, ZIP_CRC}, ModTag, APK_ID, APP_OBB_PATH, DATAKEEPER_PATH, DATA_BACKUP_PATH, PLAYER_DATA_PATH};
 use crate::zip::{signing, FileCompression, ZipFile};
+use mbf_diff_gen::{external_res, models::{Diff, VersionDiffs}};
 
 const DEBUG_CERT_PEM: &[u8] = include_bytes!("debug_cert.pem");
 const LIB_MAIN: &[u8] = include_bytes!("../libs/libmain.so");

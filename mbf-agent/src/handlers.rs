@@ -5,13 +5,13 @@ use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
 use crate::manifest::ManifestInfo;
-use crate::{axml, data_fix, download_file_with_attempts, external_res, DATAKEEPER_PATH, DOWNLOADS_PATH, PLAYER_DATA_BAK_PATH, PLAYER_DATA_PATH, SONGS_PATH, TEMP_PATH};
+use crate::{axml, data_fix, download_file_with_attempts, DATAKEEPER_PATH, DOWNLOADS_PATH, PLAYER_DATA_BAK_PATH, PLAYER_DATA_PATH, SONGS_PATH, TEMP_PATH};
 use crate::{axml::AxmlReader, patching, zip::ZipFile};
-use crate::external_res::{get_diff_index, JsonPullError};
 use crate::mod_man::ModManager;
 use crate::requests::{AppInfo, CoreModsInfo, ImportResultType, ModModel, Request, Response};
 use anyhow::{anyhow, Context, Result};
 use log::{error, info, warn};
+use mbf_diff_gen::external_res::JsonPullError;
 use xml::EmitterConfig;
 
 
@@ -98,7 +98,7 @@ fn get_mod_models(mod_manager: ModManager) -> Vec<ModModel> {
 fn get_core_mods_info(apk_version: &str, mod_manager: &ModManager, override_core_mod_url: Option<String>) -> Result<Option<CoreModsInfo>> {
     // Fetch the core mods from the resources repo
     info!("Fetching core mod index");
-    let core_mods = match crate::external_res::fetch_core_mods(override_core_mod_url) {
+    let core_mods = match mbf_diff_gen::external_res::fetch_core_mods(override_core_mod_url) {
         Ok(mods) => mods,
         Err(JsonPullError::FetchError(_)) => return Ok(None),
         Err(JsonPullError::ParseError(err)) => return Err(err)
@@ -127,7 +127,7 @@ fn get_core_mods_info(apk_version: &str, mod_manager: &ModManager, override_core
         _minor.parse::<i64>().expect("Invalid version in core mod index") >= 35
     }).collect();
 
-    let downgrade_versions: Vec<String> = get_diff_index()
+    let downgrade_versions: Vec<String> = mbf_diff_gen::external_res::get_diff_index()
         .context("Failed to get downgrading information")?
         .into_iter()
         .filter(|diff| diff.from_version == apk_version)
@@ -404,7 +404,7 @@ fn handle_patch(downgrade_to: Option<String>,
 
     // Either downgrade or just patch the current APK depending on the caller's choice.
     let patching_result = if let Some(to_version) = downgrade_to {
-        let diff_index = get_diff_index()
+        let diff_index = mbf_diff_gen::external_res::get_diff_index()
             .context("Failed to get diff index to downgrade")?;
         let version_diffs = diff_index.into_iter()
             .filter(|diff| diff.from_version == app_info.version && diff.to_version == to_version)
@@ -448,7 +448,7 @@ fn handle_patch(downgrade_to: Option<String>,
 
 fn install_core_mods(mod_manager: &mut ModManager, app_info: AppInfo, override_core_mod_url: Option<String>) -> Result<()> {
     info!("Preparing core mods");
-    let core_mod_index = crate::external_res::fetch_core_mods(override_core_mod_url)?;
+    let core_mod_index = mbf_diff_gen::external_res::fetch_core_mods(override_core_mod_url)?;
 
     let core_mods = core_mod_index.get(&app_info.version)
         .ok_or(anyhow!("No core mods existed for {}", app_info.version))?;
@@ -487,7 +487,7 @@ fn install_core_mods(mod_manager: &mut ModManager, app_info: AppInfo, override_c
 
 fn handle_get_downgraded_manifest(version: String) -> Result<Response> {
     info!("Downloading manifest AXML file");
-    let manifest_bytes = external_res::get_manifest_axml(version)
+    let manifest_bytes = mbf_diff_gen::external_res::get_manifest_axml(version)
         .context("Failed to GET AndroidManifest.xml")?;
     info!("Converting into readable XML");
     let manifest_xml = axml_bytes_to_xml_string(&manifest_bytes)?;

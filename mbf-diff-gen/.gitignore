@@ -1,0 +1,4 @@
+apk_data/diffs
+apk_data/versions
+target/
+GITHUB_TOKEN.txt

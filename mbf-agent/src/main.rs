@@ -3,7 +3,6 @@ mod zip;
 mod manifest;
 mod axml;
 mod patching;
-mod external_res;
 mod mod_man;
 mod handlers;
 mod data_fix;
@@ -11,7 +10,6 @@ mod data_fix;
 use crate::requests::Request;
 use anyhow::{Context, Result};
 use const_format::formatcp;
-use external_res::get_agent;
 use log::{error, info, warn, Level};
 use requests::Response;
 use serde::{Deserialize, Serialize};
@@ -75,7 +73,7 @@ fn download_file_with_attempts(to: impl AsRef<Path>, url: &str) -> Result<Option
 }
 
 fn download_file_one_attempt(to: impl AsRef<Path>, url: &str) -> Result<Option<String>> {
-    let resp = get_agent().get(url)
+    let resp = mbf_diff_gen::external_res::get_agent().get(url)
         .call()
         .context("Failed to request file")?;
 

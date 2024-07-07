@@ -1,28 +1,9 @@
 //! Collection of types used to read the BMBF resources repository to fetch core mod information.
 use log::info;
-use semver::Version;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use crate::models::{Diff, DiffIndex, VersionedCoreMods};
+use serde::de::DeserializeOwned;
 use std::{collections::HashMap, fmt::Display, sync, time::Duration};
 use anyhow::{Context, Result, anyhow};
-
-
-#[derive(Deserialize)]
-#[derive(Serialize)]
-pub struct CoreMod {
-    #[serde(rename = "id")]
-    pub id: String,
-    #[serde(rename = "version")]
-    pub version: Version,
-    #[serde(rename = "downloadLink")]
-    pub download_url: String
-}
-
-#[derive(Deserialize)]
-#[derive(Serialize)]
-pub struct VersionedCoreMods {
-    // lastUpdated omitted
-    pub mods: Vec<CoreMod>
-}
 
 pub type CoreModIndex = HashMap<String, VersionedCoreMods>;
 
@@ -120,30 +101,6 @@ pub fn get_libunity_url(apk_id: &str, version: &str) -> Result<Option<String>> {
 /// since there is no quota on the total size of a release.
 
 const DIFF_INDEX_STEM: &str = "https://github.com/Lauriethefish/mbf-diffs/releases/download/1.0.0";
-
-pub type DiffIndex = Vec<VersionDiffs>;
-
-/// The diffs needed to downgrade between two particular Beat Saber versions.
-#[derive(Clone, Deserialize, Serialize)]
-pub struct VersionDiffs {
-    pub from_version: String,
-    pub to_version: String,
-
-    pub apk_diff: Diff,
-    pub obb_diffs: Vec<Diff>
-}
-
-/// A diff for a particular file.
-#[derive(Clone, Deserialize, Serialize)]
-pub struct Diff {
-    pub diff_name: String,
-
-    pub file_name: String,
-    pub file_crc: u32,
-    pub output_file_name: String,
-    pub output_crc: u32,
-    pub output_size: usize
-}
 
 pub fn get_diff_index() -> Result<DiffIndex, JsonPullError> {
     fetch_json(&format!("{DIFF_INDEX_STEM}/index.json"))

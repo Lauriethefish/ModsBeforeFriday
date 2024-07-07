@@ -1,0 +1,26 @@
+[package]
+name = "mbf-diff-gen"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ureq = "2.10.0"
+serde = { version = "1.0.197", features = ["derive"] }
+serde_json = "1.0.115"
+qbsdiff = "1.4.2"
+anyhow = "1.0.79"
+const_format = "0.2.32"
+crc = "3.0.1"
+byteorder = "1.5.0"
+log = "0.4.21"
+env_logger = "0.11.3"
+clap = { version = "4.5.8", features = ["derive"] }
+semver = { version = "1.0.22", features = ["serde"] }
+
+[lib]
+name = "mbf_diff_gen"
+path = "src/lib.rs"
+
+[[bin]]
+name = "mbf_diff_gen"
+path = "src/main.rs"
