@@ -242,7 +242,7 @@ fn get_latest_moddable_bs() -> Result<String> {
     latest_ver.ok_or(anyhow!("No Beat Saber versions were moddable"))
 }
 
-const GITHUB_AUTH_TOKEN: &str = include_str!("GITHUB_TOKEN.txt");
+const GITHUB_AUTH_TOKEN: &str = include_str!("../GITHUB_TOKEN.txt");
 
 // Updates the current diff index on github with the diffs in the diffs folder
 fn upload_diff_index() -> Result<()> {
