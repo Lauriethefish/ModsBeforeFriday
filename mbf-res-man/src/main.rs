@@ -277,6 +277,11 @@ fn update_manifests() -> Result<()> {
             .expect("No filename in BS version")
             .to_string_lossy()
             .to_string();
+
+        let manifest_output_path = Path::new(MANIFESTS_PATH).join(format!("{version_name}.xml"));
+        if manifest_output_path.exists() {
+            continue;
+        }
         info!("Extracting manifest for {version_name}");
 
         // Extract the manifest to an external file.
@@ -285,7 +290,6 @@ fn update_manifests() -> Result<()> {
         let mut apk_zip = ZipFile::open(apk_handle).context("APK wasn't a valid ZIP file")?;
         let manifest_contents = apk_zip.read_file("AndroidManifest.xml").context("Failed to read manifest")?;
 
-        let manifest_output_path = Path::new(MANIFESTS_PATH).join(format!("{version_name}.xml"));
         let mut out_handle = std::fs::OpenOptions::new()
             .create(true)
             .write(true)
@@ -305,6 +309,27 @@ fn upload_manifests() -> Result<()> {
     };
     let latest_release = release_editor::get_latest_release(repo, GITHUB_AUTH_TOKEN)?;
     release_editor::update_release_from_directory(MANIFESTS_PATH, &latest_release, GITHUB_AUTH_TOKEN)?;
+    Ok(())
+}
+
+// Based on the current Beat Saber versions in the index, does a few key actions:
+// - Ensures all manifests are available on the manifests repo.
+// - Ensures a diff exists from the latest version to the latest moddable version.
+fn update_all_repositories(latest_bs_version: String) -> Result<()> {
+    // First check all manifests are available
+    update_manifests()?;
+    upload_manifests()?;
+
+    // Then generate a diff if necessary.
+    let latest_moddable = get_latest_moddable_bs()?;
+    if latest_bs_version == latest_moddable {
+        info!("The installed Beat Saber version is already the latest moddable version, no need to generate diff");
+    }   else {
+        info!("Ensuring diff exists from latest to latest moddable");
+        add_diff_to_index(latest_bs_version, latest_moddable, false)?;
+        upload_diff_index()?;
+    }
+
     Ok(())
 }
 
@@ -362,8 +387,11 @@ enum Commands {
         #[arg(short, long)]
         password: String
     },
-    /// Fetches Beat Saber versions from the oculus database
-    DownloadVersions {
+    /// Fetches Beat Saber versions from the oculus database, then:
+    /// - Ensures all manifests are available on the manifests repo.
+    /// - Ensures the latest version has a diff to the latest moddable version (if not the same)
+    /// - Uploads the diff to the mbf-diffs repo.
+    UpdateReposFromOculusApi {
         #[arg(short, long)]
         access_token: String,
         #[arg(short, long)]
@@ -400,27 +428,23 @@ fn main() -> Result<()> {
         },
         Commands::AcceptNewVersion => {
             let installed_bs_version = download_installed_bs()?;
-            let latest_moddable = get_latest_moddable_bs()?;
-            if installed_bs_version == latest_moddable {
-                return Err(anyhow!("The installed Beat Saber version is already the latest moddable version"));
-            }
-
-            add_diff_to_index(installed_bs_version, latest_moddable, false)?;
-            upload_diff_index()?;
-            update_manifests()?;
-            upload_manifests()?;
+            
+            update_all_repositories(installed_bs_version)?;
         },
         Commands::GetAccessToken { email, password } => {
             let token = oculus_db::get_quest_access_token(&email, &password)?;
             info!("Access token: {token}");
         },
-        Commands::DownloadVersions { access_token, min_version } => {
+        Commands::UpdateReposFromOculusApi { access_token, min_version } => {
             let min_version_semver = match min_version {
                 Some(version_string) => semver::Version::parse(&version_string).context("Failed to parse provided version string")?,
                 None => semver::Version::new(0, 0, 0)
             };
 
-            version_grabber::download_bs_versions(&access_token, BS_VERSIONS_PATH, min_version_semver)?;
+            let latest_bs_version = version_grabber::download_bs_versions(&access_token, BS_VERSIONS_PATH, min_version_semver)?;
+            info!("Latest Beat Saber version is {latest_bs_version}");
+            update_all_repositories(latest_bs_version)?;
+
         }
     }
 

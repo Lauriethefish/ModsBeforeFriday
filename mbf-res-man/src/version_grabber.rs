@@ -8,6 +8,14 @@ use crate::{oculus_db::{self, AndroidBinary}, APK_ID};
 
 const BEATSABER_GRAPH_APP_ID: &str = "2448060205267927";
 
+// Used to hold a Beat Saber version, which follows semver but has a build suffix that is not valid semver.
+// The `non_semver` here is the complete version string with build suffix.
+#[derive(Hash, Eq, PartialEq, Clone)]
+struct SemiSemVer {
+    semver: Version,
+    non_semver: String
+}
+
 // The set of files needed to install a particular Beat Saber build.
 struct BeatSaberBinaries {
     apk_id: String, // APK binary ID
@@ -53,7 +61,7 @@ fn combine_with_obb_id(android_bin: &AndroidBinary, semver: &Version, access_tok
 
 // Fetches all of the live (i.e. publicly accessible) Beat Saber versions newer than (or equal to) the specified minimum version.
 // If a version is invalid semver, it will be skipped.
-fn get_live_bs_versions(access_token: &str, min_version: Version) -> Result<HashMap<String, VersionBinaries>> {
+fn get_live_bs_versions(access_token: &str, min_version: Version) -> Result<HashMap<SemiSemVer, VersionBinaries>> {
     // Each version may potentially have multiple binaries as there may be a quest 1 and quest 2+ binary.
     let mut versions_map: HashMap<String, Vec<AndroidBinary>> = HashMap::new();
 
@@ -74,7 +82,7 @@ fn get_live_bs_versions(access_token: &str, min_version: Version) -> Result<Hash
         }
     }
 
-    let mut ver_binaries_map: HashMap<String, VersionBinaries> = HashMap::new();
+    let mut ver_binaries_map: HashMap<SemiSemVer, VersionBinaries> = HashMap::new();
     for (ver, mut binary_vec) in versions_map {
         binary_vec.sort_by_key(|binary| -(binary.version_code as i32));
 
@@ -106,7 +114,10 @@ fn get_live_bs_versions(access_token: &str, min_version: Version) -> Result<Hash
             older_versions: other_binaries
         };
 
-        ver_binaries_map.insert(ver, ver_binaries);
+        ver_binaries_map.insert(SemiSemVer {
+            semver,
+            non_semver: ver
+        }, ver_binaries);
     }
 
     Ok(ver_binaries_map)
@@ -149,25 +160,34 @@ fn download_binaries(access_token: &str, binaries: BeatSaberBinaries, to: impl A
 
 // Downloads the currently available Beat Saber versions (skipping any that already have been downloaded.)
 // Will skip any versions older than `min_version`
-pub fn download_bs_versions(access_token: &str, output_dir: impl AsRef<Path>, min_version: Version) -> Result<()> {
+// Returns the latest Beat Saber version, as a string with its build suffix (_bignumber)
+pub fn download_bs_versions(access_token: &str, output_dir: impl AsRef<Path>, min_version: Version) -> Result<String> {
     info!("Using graph API to get version data");
+    let mut latest_ver = SemiSemVer {
+        non_semver: String::new(),
+        semver: Version::new(0, 0, 0)
+    };
+
     let versions = get_live_bs_versions(access_token, min_version)?;
     for (ver, binaries) in versions {
-        let ver_path = output_dir.as_ref().join(&ver);
+        if ver.semver > latest_ver.semver {
+            latest_ver = ver.clone();
+        }
+
+        let ver_path = output_dir.as_ref().join(&ver.non_semver);
         if ver_path.exists() {
             continue;
         }
 
         std::fs::create_dir_all(&ver_path)?;
-        info!("Downloading binaries for {ver}");
+        info!("Downloading binaries for {}", ver.non_semver);
         download_binaries(access_token, binaries.main, &ver_path, "")?;
         for other_bin in binaries.older_versions {
             info!("Also downloading quest 1 only binaries");
             let ver_code_str = other_bin.version_code.to_string();
             download_binaries(access_token, other_bin, &ver_path, &ver_code_str)?;
         }
-
     }
 
-    Ok(())
+    Ok(latest_ver.non_semver)
 }
