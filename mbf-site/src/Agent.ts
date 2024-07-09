@@ -60,7 +60,7 @@ export async function overwriteAgent(adb: Adb, eventSink: LogEventSink) {
     await adb.subprocess.spawnAndWait("rm " + AgentPath)
     logInfo(eventSink, "Downloading agent, this might take a minute if it's not cached")
     await saveAgent(sync, eventSink);
-    logInfo(eventSink, "Writing new agent");
+    logInfo(eventSink, "Making agent executable");
     await adb.subprocess.spawnAndWait("chmod +x " + AgentPath);
 
     logInfo(eventSink, "Agent is ready");
@@ -74,6 +74,7 @@ async function saveAgent(sync: AdbSync, eventSink: LogEventSink) {
   const agent: Uint8Array = await downloadAgent(eventSink);
 
   // TODO: properly use readable streams
+  logInfo(eventSink, "Got bytes, converting into readable stream");
   const file: ConsumableReadableStream<Uint8Array> = readableStreamBodge(agent);
 
   const options: AdbSyncWriteOptions = {
@@ -81,6 +82,7 @@ async function saveAgent(sync: AdbSync, eventSink: LogEventSink) {
     file
   };
 
+  logInfo(eventSink, "Writing agent to quest!");
   await sync.write(options);
 }
   
@@ -131,7 +133,7 @@ async function downloadAgent(eventSink: LogEventSink): Promise<Uint8Array> {
         xhr.send();
       })
 
-      logInfo(eventSink, "Download complete!");
+      logInfo(eventSink, "Download complete, getting byte array from response");
       return new Uint8Array(xhr.response);
     } catch(e) {
       logInfo(eventSink, "Failed to fetch agent, status " + e);
