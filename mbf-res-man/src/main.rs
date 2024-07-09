@@ -1,7 +1,7 @@
 // Allow dead code since some functions are only used when this crate is imported by the MBF agent.
 #![allow(unused)]
 
-use std::{ffi::OsStr, io::Write, path::{Path, PathBuf}};
+use std::{collections::HashMap, ffi::OsStr, io::Write, path::{Path, PathBuf}};
 use adb::uninstall_package;
 use anyhow::{anyhow, Context, Result};
 use clap::{arg, command, Parser, Subcommand};
@@ -9,6 +9,7 @@ use const_format::formatcp;
 use log::{info, warn};
 use mbf_zip::ZipFile;
 use models::{DiffIndex, VersionDiffs};
+use oculus_db::{get_obb_binary, AndroidBinary};
 use release_editor::Repo;
 
 mod models;
@@ -16,6 +17,8 @@ mod adb;
 mod diff_builder;
 mod external_res;
 mod release_editor;
+mod oculus_db;
+mod version_grabber;
 
 const APK_ID: &str = "com.beatgames.beatsaber";
 const APK_DATA_DIR: &str = "apk_data";
@@ -350,7 +353,22 @@ enum Commands {
     /// - Uploads the diff to the mbf-diffs repo.
     /// - Extracts the manifest from this version's APK.
     /// - Uploads the manifest to the manifests repo.
-    AcceptNewVersion
+    AcceptNewVersion,
+    /// Obtains a meta access token that can be used to download Beat Saber versions.
+    /// Requires the email and password to log in.
+    GetAccessToken {
+        #[arg(short, long)]
+        email: String,
+        #[arg(short, long)]
+        password: String
+    },
+    /// Fetches Beat Saber versions from the oculus database
+    DownloadVersions {
+        #[arg(short, long)]
+        access_token: String,
+        #[arg(short, long)]
+        min_version: Option<String>
+    }
 }
 
 
@@ -392,6 +410,18 @@ fn main() -> Result<()> {
             update_manifests()?;
             upload_manifests()?;
         },
+        Commands::GetAccessToken { email, password } => {
+            let token = oculus_db::get_quest_access_token(&email, &password)?;
+            info!("Access token: {token}");
+        },
+        Commands::DownloadVersions { access_token, min_version } => {
+            let min_version_semver = match min_version {
+                Some(version_string) => semver::Version::parse(&version_string).context("Failed to parse provided version string")?,
+                None => semver::Version::new(0, 0, 0)
+            };
+
+            version_grabber::download_bs_versions(&access_token, BS_VERSIONS_PATH, min_version_semver)?;
+        }
     }
 
     Ok(())
