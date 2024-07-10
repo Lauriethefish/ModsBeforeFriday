@@ -41,7 +41,7 @@ export async function prepareAgent(adb: Adb, eventSink: LogEventSink) {
   console.log("Existing agent SHA1: " + exsitingSha1);
   existingUpToDate = AGENT_SHA1 == exsitingSha1.trim().toUpperCase();
 
-  if(existingUpToDate) {
+  if(false) {
     logInfo(eventSink, "Agent is up to date");
   } else  {
     await overwriteAgent(adb, eventSink);
@@ -68,6 +68,9 @@ export async function overwriteAgent(adb: Adb, eventSink: LogEventSink) {
 }
 
 async function saveAgent(sync: AdbSync, eventSink: LogEventSink) {
+  // Timeout, in seconds, before the app will treat the agent upload as failed and terminate the connection.
+  const AGENT_UPLOAD_TIMEOUT: number = 30;
+
   const agent: Uint8Array = await downloadAgent(eventSink);
 
   logInfo(eventSink, "Got bytes, converting into readable stream");
@@ -79,7 +82,14 @@ async function saveAgent(sync: AdbSync, eventSink: LogEventSink) {
   };
 
   logInfo(eventSink, "Writing agent to quest!");
-  await sync.write(options);
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error(`Did not finish pushing agent after ${AGENT_UPLOAD_TIMEOUT} seconds.\n`
+        + `In practice, pushing the agent takes less than a second, so this is a bug. Please report this issue including information about `
+        + `which web browser you are using.`
+    )), AGENT_UPLOAD_TIMEOUT * 1000);
+  });
+
+  await Promise.race([timeoutPromise, sync.write(options)])
 }
   
 async function downloadAgent(eventSink: LogEventSink): Promise<Uint8Array> {
