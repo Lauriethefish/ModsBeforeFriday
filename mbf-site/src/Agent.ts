@@ -1,5 +1,5 @@
 import { AdbSync, AdbSyncWriteOptions, Adb, encodeUtf8 } from '@yume-chan/adb';
-import { ConsumableReadableStream, Consumable, ConcatStringStream, DecodeUtf8Stream } from '@yume-chan/stream-extra';
+import { Consumable, ConcatStringStream, TextDecoderStream, MaybeConsumable, ReadableStream } from '@yume-chan/stream-extra';
 import { Request, Response, LogMsg, ModStatus, Mods, FixedPlayerData, ImportResult, DowngradedManifest, Patched } from "./Messages";
 import { Mod } from './Models';
 import { AGENT_SHA1 } from './agent_manifest';
@@ -7,20 +7,17 @@ import { toast } from 'react-toastify';
 
 const AgentPath: string = "/data/local/tmp/mbf-agent";
 
-// Currently, it seems like the ADB implementation deadlocks when 
-// using the constructor of ConsumableReadableStream to properly read data in a streamed manner.
-// As a temporary solution, we will load files into a Uint8Array and then queue this in one go - it seems to fix the problem
-// TODO: Properly diagnose the bug and file a report.
-function readableStreamBodge(array: Uint8Array): ConsumableReadableStream<Uint8Array> {
-  return new ConsumableReadableStream({
+export type LogEventSink = ((event: LogMsg) => void) | null;
+
+// Converts the provided byte array into a ReadableStream that can be fed into ADB.
+function readableStreamFromByteArray(array: Uint8Array): ReadableStream<Uint8Array> {
+  return new ReadableStream({
     start(controller) {
       controller.enqueue(array);
       controller.close();
     },
   });
 }
-
-export type LogEventSink = ((event: LogMsg) => void) | null;
 
 export function logInfo(sink: LogEventSink, msg: string) {
   console.log(msg);
@@ -73,9 +70,8 @@ export async function overwriteAgent(adb: Adb, eventSink: LogEventSink) {
 async function saveAgent(sync: AdbSync, eventSink: LogEventSink) {
   const agent: Uint8Array = await downloadAgent(eventSink);
 
-  // TODO: properly use readable streams
   logInfo(eventSink, "Got bytes, converting into readable stream");
-  const file: ConsumableReadableStream<Uint8Array> = readableStreamBodge(agent);
+  const file: ReadableStream<MaybeConsumable<Uint8Array>> = readableStreamFromByteArray(agent);
 
   const options: AdbSyncWriteOptions = {
     filename: AgentPath,
@@ -186,7 +182,7 @@ async function sendRequest(adb: Adb, request: Request, eventSink: LogEventSink =
   const reader = agentProcess.stdout
     // TODO: Not totally sure if this will handle non-ASCII correctly.
     // Doesn't seem to consider that a chunk might not be valid UTF-8 on its own
-    .pipeThrough(new DecodeUtf8Stream())
+    .pipeThrough(new TextDecoderStream())
     .getReader();
   
   console.group("Agent Request");
@@ -247,7 +243,7 @@ async function sendRequest(adb: Adb, request: Request, eventSink: LogEventSink =
     // Alternatively, the agent might be corrupt.
     throw new Error("Failed to invoke agent: is the executable corrupt?" + 
       await agentProcess.stderr
-        .pipeThrough(new DecodeUtf8Stream())
+        .pipeThrough(new TextDecoderStream())
         .pipeThrough(new ConcatStringStream()))
   }
 }
@@ -297,12 +293,10 @@ export async function importFile(device: Adb,
   try {
     
     console.log("Uploading to " + tempPath);
-    // TODO: Properly use readable streams, see readableStreamBodge
-    const fileStream = readableStreamBodge(new Uint8Array(await file.arrayBuffer()))
 
     await sync.write({
       filename: tempPath,
-      file: fileStream
+      file: readableStreamFromByteArray(new Uint8Array(await file.arrayBuffer()))
     })
 
     const response = await sendRequest(device, {
