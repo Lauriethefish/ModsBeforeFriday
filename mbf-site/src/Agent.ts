@@ -41,7 +41,7 @@ export async function prepareAgent(adb: Adb, eventSink: LogEventSink) {
   console.log("Existing agent SHA1: " + exsitingSha1);
   existingUpToDate = AGENT_SHA1 == exsitingSha1.trim().toUpperCase();
 
-  if(false) {
+  if(existingUpToDate) {
     logInfo(eventSink, "Agent is up to date");
   } else  {
     await overwriteAgent(adb, eventSink);
