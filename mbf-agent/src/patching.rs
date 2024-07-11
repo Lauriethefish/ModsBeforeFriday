@@ -25,7 +25,7 @@ pub fn mod_current_apk(temp_path: &Path, app_info: &AppInfo, manifest_mod: Strin
         save_libunity(temp_path, &app_info.version).context("Failed to save libunity.so")?
     };
 
-    kill_app()?;
+    kill_app().context("Failed to kill Beat Saber")?;
 
     info!("Copying APK to temporary location");
     let temp_apk_path = temp_path.join("mbf-tmp.apk");
