@@ -11,9 +11,10 @@ use self::data::{EndOfCentDir, CentDirHeader, LocalFileHeader};
 mod data;
 pub mod signing;
 
-// Minimum version needed to extract ZIP files made by this module
-const VERSION_NEEDED_TO_EXTRACT: u16 = 0x0002;
+/// Minimum version needed to extract ZIP files made by this module
+pub const VERSION_NEEDED_TO_EXTRACT: u16 = 0x0002;
 
+/// The CRC-32 algorithm used by the ZIP file format.
 pub const ZIP_CRC: Crc<u32> =  Crc::<u32>::new(&Algorithm {
     width: 32,
     poly: 0x04c11db7,
@@ -24,6 +25,29 @@ pub const ZIP_CRC: Crc<u32> =  Crc::<u32>::new(&Algorithm {
     check: 0xcbf43926,
     residue: 0xdebb20e3,
 });
+
+/// Calculates the (ZIP) CRC-32 hash of the data within the given stream.
+/// Will continue reading until the end of the stream.
+pub fn crc_of_stream(mut stream: impl Read) -> Result<u32> {
+    let mut crc = ZIP_CRC.digest();
+    let mut buffer = vec![0u8; 4096];
+
+    loop {
+        let read_bytes = stream.read(&mut buffer)?;
+        if read_bytes == 0 {
+            break Ok(crc.finalize())
+        }
+        
+        crc.update(&buffer[0..read_bytes])
+    }
+}
+
+/// Calculates the CRC-32 hash of a slice. (using the same CRC algorithm as in ZIP files)
+pub fn crc_bytes(bytes: &[u8]) -> u32 {
+    let mut digest = ZIP_CRC.digest();
+    digest.update(bytes);
+    digest.finalize()
+}
 
 // The compression method of a file within the archive, which may be an unsupported method.
 #[derive(Copy, Clone)]

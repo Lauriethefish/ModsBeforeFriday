@@ -5,19 +5,6 @@ use log::info;
 use crate::models::Diff;
 use anyhow::Result;
 
-// The CRC-32 algorithm used by the diff index. (currently the same as the ZIP CRC32)
-pub const ZIP_CRC: Crc<u32> =  Crc::<u32>::new(&Algorithm {
-    width: 32,
-    poly: 0x04c11db7,
-    init: 0xffffffff,
-    refin: true,
-    refout: true,
-    xorout: 0xffffffff,
-    check: 0xcbf43926,
-    residue: 0xdebb20e3,
-});
-
-
 // Reads the contents of a file as a Vec.
 fn read_to_vec(path: impl AsRef<Path>) -> Result<Vec<u8>> {
     let mut reader = BufReader::new(std::fs::File::open(path)?);
@@ -25,13 +12,6 @@ fn read_to_vec(path: impl AsRef<Path>) -> Result<Vec<u8>> {
     reader.read_to_end(&mut buf)?;
 
     Ok(buf)
-}
-
-// Calculates the CRC-32 hash of a slice. (using the same CRC algorithm as in ZIP files)
-fn crc_bytes(bytes: &[u8]) -> u32 {
-    let mut digest = ZIP_CRC.digest();
-    digest.update(bytes);
-    digest.finalize()
 }
 
 // Gets the file name of the given path.
@@ -53,8 +33,8 @@ pub fn generate_diff(
     let to_bytes = read_to_vec(&to_file)?;
 
     info!("Generating checksums");
-    let from_crc = crc_bytes(&from_bytes);
-    let to_crc = crc_bytes(&to_bytes);
+    let from_crc = mbf_zip::crc_bytes(&from_bytes);
+    let to_crc = mbf_zip::crc_bytes(&to_bytes);
 
     info!("Generating diff (this may take several minutes)");
     let mut output = OpenOptions::new()

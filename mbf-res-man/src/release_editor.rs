@@ -104,20 +104,6 @@ pub fn upload_asset_from_reader(release: &Release, file_name: &str, mut content:
     Ok(read_asset_details(&document))
 }
 
-pub fn crc_of_stream(mut stream: impl Read) -> Result<u32> {
-    let mut crc = crate::diff_builder::ZIP_CRC.digest();
-    let mut buffer = vec![0u8; 4096];
-
-    loop {
-        let read_bytes = stream.read(&mut buffer)?;
-        if read_bytes == 0 {
-            break Ok(crc.finalize())
-        }
-        
-        crc.update(&buffer[0..read_bytes])
-    }
-}
-
 pub fn get_asset_crc32(assets: &[ReleaseAsset], file_name: &str, auth_token: &str) -> Result<Option<u32>> {
     let crc32_filename = format!("{file_name}.crc32");
 
@@ -140,7 +126,7 @@ pub fn upload_or_overwrite(file_path: impl AsRef<Path>, assets: &[ReleaseAsset],
         .to_string();
 
     let mut file_handle = std::fs::File::open(file_path)?;
-    let file_crc = crc_of_stream(&mut file_handle)?;
+    let file_crc = mbf_zip::crc_of_stream(&mut file_handle)?;
     info!("CRC32: {file_crc}. Checking if up-to-date in release");
 
     // Only one asset may exist with each file-name
