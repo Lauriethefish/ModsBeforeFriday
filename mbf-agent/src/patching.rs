@@ -34,9 +34,11 @@ pub fn mod_current_apk(temp_path: &Path, app_info: &AppInfo, manifest_mod: Strin
     info!("Saving OBB files");
     let obb_backup = temp_path.join("obbs");
     std::fs::create_dir_all(&obb_backup)?;
-    let obb_backups = save_obbs(Path::new(APP_OBB_PATH), &obb_backup)?;
+    let obb_backups = save_obbs(Path::new(APP_OBB_PATH), &obb_backup)
+        .context("Failed to save OBB files")?;
 
-    patch_and_reinstall(libunity_path, &temp_apk_path, temp_path, obb_backups, manifest_mod, manifest_only)?;
+    patch_and_reinstall(libunity_path, &temp_apk_path, temp_path, obb_backups, manifest_mod, manifest_only)
+        .context("Failed to patch and reinstall APK")?;
     Ok(())
 }
 
@@ -53,20 +55,21 @@ pub fn downgrade_and_mod_apk(temp_path: &Path,
 
     // Download the diff files
     let diffs_path = temp_path.join("diffs");
-    std::fs::create_dir_all(&diffs_path)?;
+    std::fs::create_dir_all(&diffs_path).context("Failed to create diffs directory")?;
     info!("Downloading diffs needed to downgrade Beat Saber (this could take a LONG time, make a cup of tea)");
-    download_diffs(&diffs_path, &diffs)?;
+    download_diffs(&diffs_path, &diffs).context("Failed to download diffs")?;
 
-    kill_app()?;
+    kill_app().context("Failed to kill Beat Saber")?;
 
     // Copy the APK to temp, downgrading it in the process.
     info!("Downgrading APK");
     let temp_apk_path = temp_path.join("mbf-downgraded.apk");
-    apply_diff(Path::new(&app_info.path), &temp_apk_path, &diffs.apk_diff, &diffs_path)?;
+    apply_diff(Path::new(&app_info.path), &temp_apk_path, &diffs.apk_diff, &diffs_path)
+        .context("Failed to apply diff to APK")?;
 
     // Downgrade the obb files, copying them to a temporary directory in the process.
     let obb_backup_dir = temp_path.join("obbs");
-    std::fs::create_dir_all(&obb_backup_dir)?;
+    std::fs::create_dir_all(&obb_backup_dir).context("Failed to create OBB backup directory")?;
     let mut obb_backup_paths = Vec::new();
     for obb_diff in &diffs.obb_diffs {
         let obb_path = Path::new(APP_OBB_PATH).join(&obb_diff.file_name);
@@ -77,7 +80,7 @@ pub fn downgrade_and_mod_apk(temp_path: &Path,
         let obb_backup_path = obb_backup_dir.join(&obb_diff.output_file_name);
 
         info!("Downgrading obb {}", obb_diff.file_name);
-        apply_diff(&obb_path,&obb_backup_path, obb_diff, &diffs_path)?;
+        apply_diff(&obb_path,&obb_backup_path, obb_diff, &diffs_path).context("Failed to apply diff to OBB")?;
         obb_backup_paths.push(obb_backup_path);
     }
 
@@ -86,7 +89,8 @@ pub fn downgrade_and_mod_apk(temp_path: &Path,
     let contains_dlc = has_file_with_no_extension(APP_OBB_PATH)
         .context("Failed to check for DLC")?;
 
-    patch_and_reinstall(libunity_path, &temp_apk_path, temp_path, obb_backup_paths, manifest_mod, false)?;
+    patch_and_reinstall(libunity_path, &temp_apk_path, temp_path, obb_backup_paths, manifest_mod, false)
+        .context("Failed to patch and reinstall APK")?;
     Ok(contains_dlc)
 }
 
@@ -120,7 +124,7 @@ fn patch_and_reinstall(libunity_path: Option<PathBuf>,
     manifest_mod: String,
     manifest_only: bool) -> Result<()> {
     info!("Patching APK at {:?}", temp_path);
-    patch_apk_in_place(&temp_apk_path, libunity_path, manifest_mod, manifest_only)?;
+    patch_apk_in_place(&temp_apk_path, libunity_path, manifest_mod, manifest_only).context("Failed to patch APK")?;
 
     if Path::new(PLAYER_DATA_PATH).exists() {
         info!("Backing up player data");
@@ -137,11 +141,12 @@ fn patch_and_reinstall(libunity_path: Option<PathBuf>,
         }
     }
 
-    reinstall_modded_app(&temp_apk_path)?;
+    reinstall_modded_app(&temp_apk_path).context("Failed to reinstall modded APK")?;
     std::fs::remove_file(temp_apk_path)?;
 
     info!("Restoring OBB files");
-    restore_obb_files(Path::new(APP_OBB_PATH), obb_paths)?;
+    restore_obb_files(Path::new(APP_OBB_PATH), obb_paths)
+        .context("Failed to restore OBB files")?;
 
     // Player data is not restored back to the `files` directory as we cannot correctly set its permissions so that BS can access it.
     // (which causes a black screen that can only be fixed by manually deleting the file)
@@ -210,7 +215,7 @@ fn apply_diff(from_path: &Path,
     let patch = qbsdiff::Bspatch::new(&diff_content)
         .context("Diff file was invalid")?;
 
-    let file_content = read_file_vec(from_path)?;
+    let file_content = read_file_vec(from_path).context("Failed to read diff file")?;
 
     // Verify the CRC32 hash of the file content.
     info!("Verifying installation is unmodified");
@@ -331,7 +336,7 @@ fn patch_apk_in_place(path: impl AsRef<Path>, libunity_path: Option<PathBuf>, ma
         .read(true)
         .write(true)
         .open(path)
-        .expect("Failed to open APK");
+        .context("Failed to open temporary APK in order to patch it")?;
         
     let mut zip = ZipFile::open(file).unwrap();
 
@@ -348,13 +353,13 @@ fn patch_apk_in_place(path: impl AsRef<Path>, libunity_path: Option<PathBuf>, ma
             patcher_name: "ModsBeforeFriday".to_string(),
             patcher_version: Some("0.1.0".to_string()), // TODO: Get this from the frontend maybe?
             modloader_name: "Scotland2".to_string(), // TODO: This should really be Libmainloader because SL2 isn't inside the APK
-            modloader_version: None // Temporary, but this field is universally considered to be option so this should be OK.
+            modloader_version: None // Temporary, but this field is universally considered to be optional so this should be OK.
         })?;
 
         info!("Adding unstripped libunity.so (this may take up to a minute)");
         match libunity_path {
             Some(unity_path) => {
-                let mut unity_stream = File::open(unity_path)?;
+                let mut unity_stream = File::open(unity_path).context("Failed to open unstripped libunity.so")?;
                 zip.write_file(LIB_UNITY_PATH, &mut unity_stream, FileCompression::Deflate)?;
             },
             None => warn!("No unstripped unity added to the APK! This might cause issues later")
@@ -362,7 +367,7 @@ fn patch_apk_in_place(path: impl AsRef<Path>, libunity_path: Option<PathBuf>, ma
     }
 
     info!("Signing");
-    zip.save_and_sign_v2(&cert, &priv_key).context("Failed to save APK")?;
+    zip.save_and_sign_v2(&cert, &priv_key).context("Failed to save/sign APK")?;
 
     Ok(())
 }
