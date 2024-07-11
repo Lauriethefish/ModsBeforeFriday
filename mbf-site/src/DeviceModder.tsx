@@ -224,8 +224,8 @@ function UpdateInfo({ modStatus, device, quit }: { modStatus: ModStatus, device:
                 <li>Reinstall Beat Saber in your headset.</li>
                 <li>Open back up MBF to mod the version you just installed.</li>
             </ol>
-            <button onClick={() => {
-                uninstallBeatSaber(device);
+            <button onClick={async () => {
+                await uninstallBeatSaber(device);
                 quit();
             }}>Uninstall Beat Saber</button>
             <button onClick={() => setUpdateWindowOpen(false)} className="discreetButton">Cancel</button>
