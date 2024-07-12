@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use crate::manifest::ManifestInfo;
 use crate::{axml, data_fix, download_file_with_attempts, DATAKEEPER_PATH, DOWNLOADS_PATH, PLAYER_DATA_BAK_PATH, PLAYER_DATA_PATH, SONGS_PATH, TEMP_PATH};
 use crate::{axml::AxmlReader, patching};
+use mbf_res_man::models::VersionDiffs;
 use mbf_zip::ZipFile;
 use crate::mod_man::ModManager;
 use crate::requests::{AppInfo, CoreModsInfo, ImportResultType, ModModel, Request, Response};
@@ -128,9 +129,12 @@ fn get_core_mods_info(apk_version: &str, mod_manager: &ModManager, override_core
         _minor.parse::<i64>().expect("Invalid version in core mod index") >= 35
     }).collect();
 
-    let downgrade_versions: Vec<String> = mbf_res_man::external_res::get_diff_index()
-        .context("Failed to get downgrading information")?
-        .into_iter()
+    let diff_index = mbf_res_man::external_res::get_diff_index().context("Failed to get downgrading information")?;
+
+    let is_version_supported = supported_versions.iter().any(|ver| ver == apk_version);
+    let newer_than_latest_diff = is_version_newer_than_latest_diff(apk_version, &diff_index);
+
+    let downgrade_versions: Vec<String> = diff_index.into_iter()
         .filter(|diff| diff.from_version == apk_version)
         .map(|diff| diff.to_version)
         .collect();
@@ -138,8 +142,42 @@ fn get_core_mods_info(apk_version: &str, mod_manager: &ModManager, override_core
     Ok(Some(CoreModsInfo {
         supported_versions,
         all_core_mods_installed,
-        downgrade_versions
+        downgrade_versions,
+        is_awaiting_diff: newer_than_latest_diff && !is_version_supported
     }))
+}
+
+fn try_parse_bs_ver_as_semver(version: &str) -> Option<semver::Version> {
+    let version_segment = version.split('_').next().expect("Split iterator always returns at least one string");
+    semver::Version::parse(version_segment).ok()
+}
+
+// Attempts to work out if the provided apk_version is newer than the latest version that has diffs to the latest moddable version
+// Essentially, this returns true iff the diff index is outdated, since the APK version given doesn't have the necessary diff to mod the game.
+// This is used by the frontend to explain that they need to wait for a diff to be generated.
+fn is_version_newer_than_latest_diff(apk_version: &str, diffs: &[VersionDiffs]) -> bool {
+    let sem_apk_ver = match try_parse_bs_ver_as_semver(apk_version) {
+        Some(ver) => ver,
+        None => {
+            warn!("APK version {apk_version} did not have a valid semver section as Beat Saber versions normally do");
+            warn!("Will be unable to check if version is newer than latest diff");
+            return false;
+        }
+    };
+
+    // Iterate through the diffs to check if the APK version is at or below their version
+    for diff in diffs {
+        match try_parse_bs_ver_as_semver(&diff.from_version) {
+            Some(diff_version) => if sem_apk_ver <= diff_version {
+                return false; // If it is, then this is not an "awaiting diff" situation
+            },
+            None => {}
+        }
+    }
+
+    // APK version is not equal to or older than ANY of the versions with diffs
+    // Hence, it is newer than the latest diff
+    true
 }
 
 fn get_app_info() -> Result<Option<AppInfo>> {

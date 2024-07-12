@@ -111,6 +111,10 @@ pub struct CoreModsInfo {
     pub supported_versions: Vec<String>,
     /// The versions of Beat Saber that can be reached by downgrading the game.
     pub downgrade_versions: Vec<String>,
+    /// True only if the Beat Saber version does not support mods, and the latest diff available in the diff index 
+    /// is intended to start with a Beat Saber version older than the current version.
+    /// In these circumstances, the user needs to wait for a diff to be generated.
+    pub is_awaiting_diff: bool,
     pub all_core_mods_installed: bool
 }
 

@@ -95,8 +95,11 @@ export function DeviceModder(props: DeviceModderProps) {
         const downgradeVersions = GetSortedDowngradableVersions(modStatus);
         console.log("Available versions to downgrade: " + downgradeVersions);
         if(downgradeVersions === undefined || downgradeVersions.length === 0) {
-
-            return <NotSupported version={modStatus.app_info.version} device={device} quit={() => quit(undefined)} />
+            if(modStatus.core_mods.is_awaiting_diff) {
+                return <NoDiffAvailable version={modStatus.app_info.version}/>
+            }   else    {
+                return <NotSupported version={modStatus.app_info.version} device={device} quit={() => quit(undefined)} />
+            }
         } else if (modStatus.app_info.loader_installed !== null) {
             // App is already patched, and we COULD in theory downgrade this version normally, but since it has been modified, the diffs will not work.
             // Therefore, they need to reinstall the latest version.
@@ -423,14 +426,22 @@ function NotSupported({ version, quit, device }: { version: string, quit: () => 
         <p>Normally, MBF would attempt to downgrade (un-update) your Beat Saber version to a version with mod support, but this is only possible if you have the latest version of Beat Saber installed.</p>
         <p>Please uninstall Beat Saber using the button below, then reinstall the latest version of Beat Saber using the Meta store.</p>
 
-        <h4>Already have the latest version?</h4>
-        <p>When a new Beat Saber version is added, the developer(s) of MBF must add the new version so you can downgrade. They're probably asleep right now, so give it a few hours.</p>
-
-
         <button onClick={async () => {
             await uninstallBeatSaber(device);
             quit();
         }}>Uninstall Beat Saber</button>
+    </div>
+}
+
+function NoDiffAvailable({ version }: { version: string }) {
+    return <div className="container mainContainer">
+        <h1>Awaiting patch generation</h1>
+        <p className='warning'>You must READ this message IN FULL.</p>
+
+        <p>You have Beat Saber v{trimGameVersion(version)}, which has no support for mods.</p>
+        <p>MBF is designed to downgrade (un-update) your Beat Saber version to a version with mod support <b>but the necessary patches have not yet been generated,</b> as a Beat Saber update has only just been released.</p>
+        <p>Patch generation needs manual input and <b>will happen as soon as the author of MBF is available</b>, which will take from 30 minutes to 24 hours.</p>
+        <p><b>PLEASE WAIT in the meanwhile.</b> You can refresh this page and reconnect to your Quest to check if the patch has been generated.</p>
     </div>
 }
 

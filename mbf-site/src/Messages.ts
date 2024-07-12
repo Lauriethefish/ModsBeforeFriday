@@ -124,6 +124,7 @@ export interface CoreModsInfo {
     supported_versions: string[],
     downgrade_versions: string[],
     all_core_mods_installed: boolean,
+    is_awaiting_diff: boolean
 }
 
 export type ModLoader = "Scotland2" | "QuestLoader" | "Unknown";
