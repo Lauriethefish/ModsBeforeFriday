@@ -53,22 +53,26 @@ export function ModManager(props: ModManagerProps) {
             />
         </div>
         
-        {menu === 'current' && <InstalledModsMenu
-            mods={mods}
-            setMods={setMods}
-            setWorking={working => setWorking(working)}
-            gameVersion={gameVersion}
-            setError={err => setModError(err)}
-            device={device}
-            addLogEvent={addLogEvent}
-        />}
+        <div className={menu === 'current' ? "" : "hidden"}>
+            <InstalledModsMenu
+                mods={mods}
+                setMods={setMods}
+                setWorking={working => setWorking(working)}
+                gameVersion={gameVersion}
+                setError={err => setModError(err)}
+                device={device}
+                addLogEvent={addLogEvent}
+            />
+        </div>
         
-        {menu === 'options' && <OptionsMenu
-            device={device}
-            quit={quit}
-            modStatus={modStatus}
-            setModStatus={setModStatus}
-         />}
+        <div className={menu === 'options' ? "" : "hidden"}>
+            <OptionsMenu
+                device={device}
+                quit={quit}
+                modStatus={modStatus}
+                setModStatus={setModStatus}
+            />    
+        </div>
         
         <ErrorModal isVisible={modError != null}
             title={"Failed to sync mods"}
