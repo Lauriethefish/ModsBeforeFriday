@@ -380,7 +380,8 @@ export async function patchApp(device: Adb,
       core_mods: {
           all_core_mods_installed: true,
           supported_versions: beforePatch.core_mods!.supported_versions,
-          downgrade_versions: []
+          downgrade_versions: [],
+          is_awaiting_diff: false
       },
       modloader_present: true,
       installed_mods: response.installed_mods
@@ -406,7 +407,8 @@ export async function quickFix(device: Adb,
       core_mods: {
           all_core_mods_installed: true,
           supported_versions: beforeFix.core_mods!.supported_versions,
-          downgrade_versions: beforeFix.core_mods!.downgrade_versions
+          downgrade_versions: beforeFix.core_mods!.downgrade_versions,
+          is_awaiting_diff: beforeFix.core_mods!.is_awaiting_diff
       },
       installed_mods: (response as Mods).installed_mods,
       modloader_present: true
