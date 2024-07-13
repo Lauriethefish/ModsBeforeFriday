@@ -301,8 +301,8 @@ impl ModManager {
             }
 
             let m_ref = (**m).borrow();
-            if m_ref.installed && m_ref.manifest.dependencies.iter().any(|dep| &dep.id == id) {
-                info!("Uninstalling dependant mod {}", other_id);
+            if m_ref.installed && m_ref.manifest.dependencies.iter().any(|dep| &dep.id == id && dep.required) {
+                info!("Uninstalling (required) dependant mod {}", other_id);
                 drop(m_ref);
                 self.uninstall_mod(other_id)?;
             }
