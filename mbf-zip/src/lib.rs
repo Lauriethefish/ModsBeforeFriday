@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs::File, io::{Cursor, Read, Seek, SeekFrom, Write}, path::Path};
+use std::{collections::HashMap, fs::File, io::{BufReader, BufWriter, Cursor, Read, Seek, SeekFrom, Write}, path::Path};
 use byteorder::{ReadBytesExt, LE};
 use anyhow::{Result, anyhow, Context};
 use crc::{Crc, Algorithm};
@@ -66,27 +66,29 @@ pub struct ZipFile<T: Read + Seek> {
 impl<T: Read + Seek> ZipFile<T> {
     /// Opens a ZIP archive from a readable stream.
     pub fn open(mut file: T) -> Result<Self> {
-        file.seek(SeekFrom::End(-22))?; // Assuming zero comment, this is the latest position for the EOCD header
+        let mut buf_file = BufReader::new(&mut file);
+
+        buf_file.seek(SeekFrom::End(-22))?; // Assuming zero comment, this is the latest position for the EOCD header
 
         // Read backwards until an EOCD header is found.
-        while file.read_u32::<LE>()? != EndOfCentDir::HEADER {
-            if file.stream_position()? == 4 {
+        while buf_file.read_u32::<LE>()? != EndOfCentDir::HEADER {
+            if buf_file.stream_position()? == 4 {
                 return Err(anyhow!("No EOCD found in APK"));
             }
 
-            file.seek(SeekFrom::Current(-8))?;
+            buf_file.seek(SeekFrom::Current(-8))?;
         }
-        file.seek(SeekFrom::Current(-4))?; // Seek back before the LFH
+        buf_file.seek(SeekFrom::Current(-4))?; // Seek back before the LFH
 
-        let eocd: EndOfCentDir = EndOfCentDir::read(&mut file).context("Invalid EOCD")?;
-        file.seek(SeekFrom::Start(eocd.cent_dir_offset as u64))?;
+        let eocd: EndOfCentDir = EndOfCentDir::read(&mut buf_file).context("Invalid EOCD")?;
+        buf_file.seek(SeekFrom::Start(eocd.cent_dir_offset as u64))?;
 
         // Read the central directory file headers
         let mut entries = HashMap::new();
         let mut last_lfh_offset = 0;
 
         for _ in 0..eocd.cent_dir_records {
-            let cd_record = CentDirHeader::read(&mut file).context("Invalid CD file header")?;
+            let cd_record = CentDirHeader::read(&mut buf_file).context("Invalid CD file header")?;
             last_lfh_offset = last_lfh_offset.max(cd_record.local_header_offset);
 
             entries.insert(cd_record.file_name.clone(), cd_record);
@@ -95,11 +97,11 @@ impl<T: Read + Seek> ZipFile<T> {
         // Read the last LFH to figure out the location of the first byte after the last entry.
         // We could just use the central directory offset here, however this will leave the original signature intact,
         // ... which may not cause any problems but is a waste of space.
-        file.seek(SeekFrom::Start(last_lfh_offset as u64))?;
-        let last_header = LocalFileHeader::read(&mut file)?;
+        buf_file.seek(SeekFrom::Start(last_lfh_offset as u64))?;
+        let last_header = LocalFileHeader::read(&mut buf_file)?;
 
         Ok(Self {
-            end_of_entries_offset: (file.stream_position()? + last_header.compressed_len as u64).try_into().context("ZIP file too large")?,
+            end_of_entries_offset: (buf_file.stream_position()? + last_header.compressed_len as u64).try_into().context("ZIP file too large")?,
             file,
             entries
         })
@@ -131,12 +133,13 @@ impl<T: Read + Seek> ZipFile<T> {
             Some(header) => header,
             None => return Err(anyhow!("File with name {name} did not exist"))
         };
+        let mut buf_reader = BufReader::new(&mut self.file);
 
-        self.file.seek(SeekFrom::Start(cd_header.local_header_offset as u64))?;
-        let _ = LocalFileHeader::read(&mut self.file).context("Invalid local file header")?;
+        buf_reader.seek(SeekFrom::Start(cd_header.local_header_offset as u64))?;
+        let _ = LocalFileHeader::read(&mut buf_reader).context("Invalid local file header")?;
         // TODO: Verify CRC32, file name, and other attributes match?
 
-        let mut compressed_contents = (&mut self.file)
+        let mut compressed_contents = (&mut buf_reader)
             .take(cd_header.compressed_len as u64);
         match cd_header.compression_method {
             FileCompression::Deflate => {
@@ -198,22 +201,31 @@ impl ZipFile<File> {
         contents.seek(SeekFrom::Start(0))?;
         let crc32 = match compression_method {
             FileCompression::Deflate => {
-                let mut encoder = deflate::Encoder::new(&mut self.file);
+                let mut buf_writer = BufWriter::new(&mut self.file);
+
+                let mut encoder = deflate::Encoder::new(&mut buf_writer);
                 let crc = copy_to_with_crc(contents, &mut encoder).context("Failed to write/compress file data")?;
                 encoder.finish().into_result()?;
 
+                // Update the offset for the next file to be written
+                self.end_of_entries_offset = buf_writer.stream_position()?.try_into().context("ZIP file too large")?;
+
                 crc
             },
-            FileCompression::Store => copy_to_with_crc(contents, &mut self.file)
-                .context("Failed to write file data")?,
+            FileCompression::Store => { 
+                let crc = copy_to_with_crc(contents, &mut self.file).context("Failed to write file data")?;
+                // Update the offset for the next file to be written
+                self.end_of_entries_offset = self.file.stream_position()?.try_into().context("ZIP file too large")?;
+
+                crc
+            },
             FileCompression::Unsupported(method) => return Err(anyhow!("Compression method `{method}` is not supported"))
         };
 
-        // Update the offset for the next file to be written
-        self.end_of_entries_offset = self.file.stream_position()?.try_into().context("ZIP file too large")?;
-
-        let compressed_len: u32 = (self.file.stream_position()? - data_start).try_into().context("Compressed file length too big for 32 bit ZIP file")?;
-        let uncompressed_len: u32 = contents.stream_position()?.try_into().context("Uncompressed file length too big for 32 bit ZIP file")?;
+        let compressed_len: u32 = (self.end_of_entries_offset as u64 - data_start)
+            .try_into().context("Compressed file length too big for 32 bit ZIP file")?;
+        let uncompressed_len: u32 = contents.stream_position()?
+            .try_into().context("Uncompressed file length too big for 32 bit ZIP file")?;
 
         let local_header = LocalFileHeader {
             version_needed: VERSION_NEEDED_TO_EXTRACT,
@@ -229,7 +241,7 @@ impl ZipFile<File> {
 
         // Write the local header with the known length/CRC
         self.file.seek(SeekFrom::Start(lfh_offset))?;
-        local_header.write(&mut self.file).context("Failed to write local file header")?;
+        local_header.write(&mut BufWriter::new(&mut self.file)).context("Failed to write local file header")?;
 
 
         let central_dir_header = CentDirHeader {
