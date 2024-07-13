@@ -1,10 +1,10 @@
-use std::{fs::OpenOptions, path::Path};
+use std::{fs::OpenOptions, io::{BufReader, BufWriter}, path::Path};
 use anyhow::{Context, Result, anyhow};
 
 // Fixes issues with player colour schemes from 1.28 loading incorrectly on v1.35.0 or newer.
 pub fn fix_colour_schemes(path: impl AsRef<Path>) -> Result<()> {
     let mut player_data: serde_json::Value = {
-        let mut reader = std::fs::File::open(&path)?;
+        let mut reader = BufReader::new(std::fs::File::open(&path)?);
         serde_json::from_reader(&mut reader).context("Player data was invalid JSON")?
     };
 
@@ -22,10 +22,10 @@ pub fn fix_colour_schemes(path: impl AsRef<Path>) -> Result<()> {
         color_schemes_settings.insert("selectedColorSchemeId".to_string(), "User0".into());
     }
 
-    let mut writer = OpenOptions::new()
+    let mut writer = BufWriter::new(OpenOptions::new()
         .write(true)
         .truncate(true)
-        .open(path).context("Failed to open player data file for writing")?;
+        .open(path).context("Failed to open player data file for writing")?);
 
     serde_json::to_writer(&mut writer, &player_data).context("Failed to write player data")?;
     Ok(())

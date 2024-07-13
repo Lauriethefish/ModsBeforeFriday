@@ -12,7 +12,7 @@ use const_format::formatcp;
 use log::{error, info, warn, Level};
 use requests::Response;
 use serde::{Deserialize, Serialize};
-use std::{fs::OpenOptions, io::{BufRead, BufReader, Read, Write}, panic, path::Path, process::Command, time::Instant};
+use std::{fs::OpenOptions, io::{BufRead, BufReader, BufWriter, Read, Write}, panic, path::Path, process::Command, time::Instant};
 
 // Directories accessed by the agent, in one place so that they can be easily changed.
 pub const APK_ID: &str = "com.beatgames.beatsaber";
@@ -86,11 +86,11 @@ fn download_file_one_attempt(to: impl AsRef<Path>, url: &str) -> Result<Option<S
 
     let mut resp_body = resp.into_reader();
 
-    let mut writer = OpenOptions::new()
+    let mut writer = BufWriter::new(OpenOptions::new()
         .write(true)
         .truncate(true)
         .create(true)
-        .open(to).context("Failed to create destination file")?;
+        .open(to).context("Failed to create destination file")?);
 
     match content_len {
         Some(length) => {

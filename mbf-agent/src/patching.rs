@@ -1,4 +1,4 @@
-use std::{fs::{File, OpenOptions}, io::{BufReader, Cursor, Read, Write}, path::{Path, PathBuf}, process::Command};
+use std::{fs::{File, OpenOptions}, io::{BufReader, BufWriter, Cursor, Read, Write}, path::{Path, PathBuf}, process::Command};
 
 use anyhow::{Context, Result, anyhow};
 use log::{info, warn};
@@ -228,12 +228,12 @@ fn apply_diff(from_path: &Path,
 
     // Carry out the downgrade
     info!("Applying patch (This step may take a few minutes)");
-    let mut output_handle = OpenOptions::new()
+    let mut output_handle = BufWriter::new(OpenOptions::new()
         .truncate(true)
         .create(true)
         .read(true)
         .write(true)
-        .open(to_path)?;
+        .open(to_path)?);
     patch.apply(&file_content, &mut output_handle)?;
 
     // TODO: Verify checksum on the result of downgrading?

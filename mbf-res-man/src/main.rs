@@ -102,11 +102,11 @@ fn save_diff_index(index: DiffIndex) -> Result<()> {
     info!("Saving diff index");
     std::fs::create_dir_all(DIFFS_PATH)?;
 
-    let mut handle = std::fs::OpenOptions::new()
+    let mut handle = std::io::BufWriter::new(std::fs::OpenOptions::new()
         .create(true)
         .write(true)
         .truncate(true)
-        .open(DIFF_INDEX_PATH)?;
+        .open(DIFF_INDEX_PATH)?);
 
     serde_json::to_writer_pretty(&mut handle, &index)?;
     Ok(())

@@ -1,5 +1,5 @@
 
-use std::{fs::OpenOptions, io::{BufReader, Read}, path::Path};
+use std::{fs::OpenOptions, io::{BufReader, BufWriter, Read}, path::Path};
 use crc::{Algorithm, Crc};
 use log::info;
 use crate::models::Diff;
@@ -37,11 +37,11 @@ pub fn generate_diff(
     let to_crc = mbf_zip::crc_bytes(&to_bytes);
 
     info!("Generating diff (this may take several minutes)");
-    let mut output = OpenOptions::new()
+    let mut output = BufWriter::new(OpenOptions::new()
         .create(true)
         .truncate(true)
         .write(true)
-        .open(&output_path)?;
+        .open(&output_path)?);
 
     let _diff_bytes = qbsdiff::Bsdiff::new(&from_bytes, &to_bytes)
         .compression_level(6)
