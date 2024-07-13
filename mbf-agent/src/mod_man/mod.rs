@@ -201,7 +201,7 @@ impl ModManager {
                         info!("Dependency {} is out of date, got version {} but need {}", dep.id, dep_ref.manifest.version, dep.version_range);
                         drop(dep_ref);
                         self.install_dependency(&dep)?;
-                    }   else if !dep_ref.installed {
+                    }   else if !dep_ref.installed && dep.required {
                         // Must install the dependency
                         info!("Dependency {} was not installed, reinstalling", dep.id);
                         drop(dep_ref);
