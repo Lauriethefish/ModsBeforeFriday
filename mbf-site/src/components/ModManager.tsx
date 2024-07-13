@@ -129,7 +129,7 @@ function InstalledModsMenu(props: ModMenuProps) {
     const [changes, setChanges] = useState({} as { [id: string]: boolean });
     const hasChanges = Object.keys(changes).length > 0;
 
-    return <>
+    return <div className="installedModsMenu">
         {hasChanges && <button id="syncButton" onClick={async () => {
             setChanges({});
             console.log("Installing mods, statuses requested: " + JSON.stringify(changes));
@@ -177,7 +177,7 @@ function InstalledModsMenu(props: ModMenuProps) {
 				}}/>
 			)}
 		</div>
-    </>
+    </div>
 }
 
 function UploadButton({ onUploaded }: { onUploaded: (files: File[]) => void}) {

@@ -13,6 +13,12 @@
     gap: 10px;
 }
 
+.installedModsMenu {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
 #modMenuTitle {
     display: flex;
     align-items: center;
