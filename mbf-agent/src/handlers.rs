@@ -102,7 +102,10 @@ fn get_core_mods_info(apk_version: &str, mod_manager: &ModManager, override_core
     info!("Fetching core mod index");
     let core_mods = match mbf_res_man::external_res::fetch_core_mods(override_core_mod_url) {
         Ok(mods) => mods,
-        Err(JsonPullError::FetchError(_)) => return Ok(None),
+        Err(JsonPullError::FetchError(fetch_err)) => {
+            error!("Failed to fetch core mod index: assuming no internet connection: {fetch_err:?}");
+            return Ok(None);
+        },
         Err(JsonPullError::ParseError(err)) => return Err(err)
     };
 
