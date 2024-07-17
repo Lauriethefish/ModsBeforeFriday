@@ -1,5 +1,5 @@
 mod manifest;
-use std::{cell::RefCell, collections::{HashMap, HashSet}, io::Read, path::{Path, PathBuf}, rc::Rc};
+use std::{cell::RefCell, collections::{HashMap, HashSet}, io::{Cursor, Read, Seek}, path::{Path, PathBuf}, rc::Rc};
 
 use jsonschema::JSONSchema;
 use log::{error, info, warn};
@@ -9,7 +9,7 @@ use anyhow::{Context, Result, anyhow};
 use mbf_zip::ZipFile;
 use semver::Version;
 
-use crate::{download_file_with_attempts, EARLY_MODS_DIR, LATE_MODS_DIR, LIBS_DIR, QMODS_DIR};
+use crate::{download_to_vec_with_attempts, EARLY_MODS_DIR, LATE_MODS_DIR, LIBS_DIR, QMODS_DIR};
 
 const QMOD_SCHEMA: &str = include_str!("qmod_schema.json");
 const MAX_SCHEMA_VERSION: Version = Version::new(1, 2, 0);
@@ -325,35 +325,24 @@ impl ModManager {
     }
 
     fn install_dependency(&mut self, dep: &ModDependency) -> Result<()> {
-        // Use a temporary path to save the dependency: it will be extracted later so this file will always be deleted.
-        let save_path = crate::get_temp_file_path()?;
-
-        let result = self.install_dependency_internal(dep, save_path.clone());
-        std::fs::remove_file(save_path)?;
-
-        result
-    }
-
-    fn install_dependency_internal(&mut self, dep: &ModDependency, save_path: impl AsRef<Path>) -> Result<()> {
         let link = match &dep.mod_link {
             Some(link) => link,
             None => return Err(anyhow!("Could not download dependency {}: no link given", dep.id))
         };
 
         info!("Downloading dependency from {}", link);
-        download_file_with_attempts(&save_path, &link)
+        let dependency_bytes = download_to_vec_with_attempts(&link)
             .context("Failed to download dependency")?;
 
-        self.try_load_new_mod(save_path)?;
+        self.try_load_new_mod(Cursor::new(dependency_bytes))?;
         self.install_mod(&dep.id)?;
         Ok(())
     }
 
     /// Loads a new mod from a QMOD file.
     /// Returns the mod ID
-    pub fn try_load_new_mod(&mut self, from: impl AsRef<Path>) -> Result<String> {
-        let mod_file = std::fs::File::open(&from).context("Failed to open mod archive")?;
-        let mut zip = ZipFile::open(mod_file).context("Mod was invalid ZIP archive")?;
+    pub fn try_load_new_mod(&mut self, mod_stream: impl Read + Seek) -> Result<String> {
+        let mut zip = ZipFile::open(mod_stream).context("Mod was invalid ZIP archive")?;
 
         let json_data = zip.read_file("mod.json").context("Mod had no mod.json manifest")?;
         let loaded_mod_manifest = self.load_manifest_from_slice(&json_data)

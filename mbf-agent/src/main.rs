@@ -10,14 +10,13 @@ use crate::requests::Request;
 use anyhow::{Context, Result};
 use const_format::formatcp;
 use log::{error, info, warn, Level};
-use rand::RngCore;
 use requests::Response;
 use serde::{Deserialize, Serialize};
-use std::{fs::OpenOptions, io::{BufRead, BufReader, BufWriter, Read, Write}, panic, path::{Path, PathBuf}, process::Command, time::Instant};
+use std::{fs::OpenOptions, io::{BufRead, BufReader, Cursor, Read, Write}, panic, path::Path, process::Command, time::Instant};
 
 // Directories accessed by the agent, in one place so that they can be easily changed.
 pub const APK_ID: &str = "com.beatgames.beatsaber";
-pub const QMODS_DIR: &str = "/sdcard/ModData/com.beatgames.beatsaber/Packages";
+pub const QMODS_DIR: &str = formatcp!("/sdcard/ModData/{APK_ID}/Packages");
 pub const MODLOADER_DIR: &str = formatcp!("/sdcard/ModData/{APK_ID}/Modloader");
 pub const LATE_MODS_DIR: &str = formatcp!("{MODLOADER_DIR}/mods");
 pub const EARLY_MODS_DIR: &str = formatcp!("{MODLOADER_DIR}/early_mods");
@@ -39,20 +38,6 @@ pub const DOWNLOAD_ATTEMPTS: u32 = 3;
 // The number of seconds between download progress updates.
 pub const PROGRESS_UPDATE_INTERVAL: f32 = 2.0;
 
-/// Gets a free path to create a temporary file at
-pub fn get_temp_file_path() -> Result<PathBuf> {
-    std::fs::create_dir_all(TEMP_PATH).context("Failed to create temporary directory")?;
-
-    loop {
-        let file_id = rand::thread_rng().next_u64();
-        let temp_file_path = Path::new(TEMP_PATH).join(format!("{file_id}.tmp"));
-        if !temp_file_path.exists() {
-            return Ok(temp_file_path)
-        }
-    }
-}
-
-
 pub fn get_apk_path() -> Result<Option<String>> {
     let pm_output = Command::new("pm")
         .args(["path", APK_ID])
@@ -72,9 +57,17 @@ pub fn get_apk_path() -> Result<Option<String>> {
 // Returns the file name if given in the response, otherwise Ok(None)
 fn download_file_with_attempts(to: impl AsRef<Path>, url: &str) -> Result<Option<String>> {
     let mut attempt = 0;
+    let to = to.as_ref();
     loop {
         attempt += 1;
-        match download_file_one_attempt(&to, url) {
+
+        // Recreate the writer with each attempt in order to truncate the file.
+        let writer = OpenOptions::new()
+            .write(true)
+            .truncate(true)
+            .create(true)
+            .open(to).context("Failed to create destination file")?;
+        match download_file_one_attempt(writer, url) {
             Ok(filename) => return Ok(filename),
             Err(err) => if attempt == DOWNLOAD_ATTEMPTS {
                 return Err(err).context("Failed to download file after maximum attempts")
@@ -85,7 +78,25 @@ fn download_file_with_attempts(to: impl AsRef<Path>, url: &str) -> Result<Option
     }
 }
 
-fn download_file_one_attempt(to: impl AsRef<Path>, url: &str) -> Result<Option<String>> {
+// Attempts to download a file to a byte vector with multiple attempts (3 currently)
+fn download_to_vec_with_attempts(url: &str) -> Result<Vec<u8>> {
+    let mut attempt = 0;
+    loop {
+        attempt += 1;
+
+        let mut output = Vec::new();
+        match download_file_one_attempt(Cursor::new(&mut output), url) {
+            Ok(_) => return Ok(output),
+            Err(err) => if attempt == DOWNLOAD_ATTEMPTS {
+                return Err(err).context("Failed to download file after maximum attempts")
+            }   else    {
+                warn!("Failed to download file {url}: {err}. Trying again...")
+            }
+        }
+    }
+}
+
+fn download_file_one_attempt(mut output: impl Write, url: &str) -> Result<Option<String>> {
     let resp = mbf_res_man::external_res::get_agent().get(url)
         .call()
         .context("Failed to request file")?;
@@ -100,18 +111,12 @@ fn download_file_one_attempt(to: impl AsRef<Path>, url: &str) -> Result<Option<S
 
     let mut resp_body = resp.into_reader();
 
-    let mut writer = BufWriter::new(OpenOptions::new()
-        .write(true)
-        .truncate(true)
-        .create(true)
-        .open(to).context("Failed to create destination file")?);
-
     match content_len {
         Some(length) => {
             // Update the frontend with some indication of progress of the download.
             // This will do nothing for small downloads, since they should take less than 5 seconds to complete.
             let mut last_progress_update = Instant::now();
-            copy_stream_progress(&mut resp_body, &mut writer, &mut |bytes_copied| {
+            copy_stream_progress(&mut resp_body, &mut output, &mut |bytes_copied| {
                 let now = Instant::now();
                 if now.duration_since(last_progress_update).as_secs_f32() > PROGRESS_UPDATE_INTERVAL {
                     last_progress_update = now;
@@ -121,7 +126,7 @@ fn download_file_one_attempt(to: impl AsRef<Path>, url: &str) -> Result<Option<S
         },
         None => {
             warn!("No Content-Length header, so cannot report download progress");
-            std::io::copy(&mut resp_body, &mut writer)?;
+            std::io::copy(&mut resp_body, &mut output)?;
         }
     }
    
