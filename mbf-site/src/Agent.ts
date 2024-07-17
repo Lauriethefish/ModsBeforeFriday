@@ -54,7 +54,7 @@ export async function overwriteAgent(adb: Adb, eventSink: LogEventSink) {
   try {
     logInfo(eventSink, "Removing existing agent");
     await adb.subprocess.spawnAndWait("rm " + AgentPath)
-    logInfo(eventSink, "Downloading agent, this might take a minute if it's not cached")
+    logInfo(eventSink, "Downloading agent, this might take a minute")
     await saveAgent(sync, eventSink);
     logInfo(eventSink, "Making agent executable");
     await adb.subprocess.spawnAndWait("chmod +x " + AgentPath);
