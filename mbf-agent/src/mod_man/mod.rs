@@ -191,6 +191,10 @@ impl ModManager {
             .ok_or(anyhow!("Could not install mod with ID {id} as it did not exist"))?.clone();
 
         let to_install = (*mod_rc).borrow();
+        if to_install.installed() {
+            return Ok(());
+        }
+
         info!("Installing {} v{}", to_install.manifest.id, to_install.manifest.version);
 
         for dep in &to_install.manifest.dependencies {
