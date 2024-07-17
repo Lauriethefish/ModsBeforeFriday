@@ -28,6 +28,7 @@ pub const APP_OBB_PATH: &str = formatcp!("/sdcard/Android/obb/{APK_ID}/");
 
 pub const DATAKEEPER_PATH: &str = "/sdcard/ModData/com.beatgames.beatsaber/Mods/datakeeper/PlayerData.dat";
 pub const DATA_BACKUP_PATH: &str = "/sdcard/ModsBeforeFriday/PlayerData.backup.dat";
+pub const OLD_QMODS_DIR: &str = "/sdcard/ModsBeforeFriday/Mods";
 
 pub const SONGS_PATH: &str = formatcp!("/sdcard/ModData/{APK_ID}/Mods/SongCore/CustomLevels");
 pub const DOWNLOADS_PATH: &str = "/data/local/tmp/mbf-downloads";

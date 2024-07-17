@@ -9,7 +9,7 @@ use anyhow::{Context, Result, anyhow};
 use mbf_zip::ZipFile;
 use semver::Version;
 
-use crate::{download_to_vec_with_attempts, EARLY_MODS_DIR, LATE_MODS_DIR, LIBS_DIR, QMODS_DIR};
+use crate::{download_to_vec_with_attempts, EARLY_MODS_DIR, LATE_MODS_DIR, LIBS_DIR, OLD_QMODS_DIR, QMODS_DIR};
 
 const QMOD_SCHEMA: &str = include_str!("qmod_schema.json");
 const MAX_SCHEMA_VERSION: Version = Version::new(1, 2, 0);
@@ -107,7 +107,44 @@ impl ModManager {
             };
         }
 
+        // Load mods in legacy folder.
+        // This is done last as loading the new qmods extracts them to the mods directory,
+        // so the code above would lead to the mods being loaded again.
+        if let Err(err) = self.load_old_qmods() {
+            warn!("Failed to load legacy mods: {err}");
+        }
+
         self.update_mods_status().context("Failed to check if mods installed after loading")?;
+        Ok(())
+    }
+
+    /// Attempts to load QMODs found in the legacy ModsBeforeFriday directory.
+    /// This will extract them in the new mods directory.
+    /// The QMODs and the directory itself are then deleted.
+    /// Will do nothing if the old mods directory does not exist.
+    fn load_old_qmods(&mut self) -> Result<()> {
+        if !Path::new(OLD_QMODS_DIR).exists() {
+            return Ok(());
+        }
+
+        warn!("Migrating mods from legacy folder");
+        for stat_result in std::fs::read_dir(OLD_QMODS_DIR)
+            .context("Failed to read old QMODs directory")? {
+            let stat = stat_result?;
+
+            let mod_stream = std::fs::File::open(stat.path())
+                .context("Failed to open legacy mod")?;
+            // Attempt to load a mod from each file
+            match self.try_load_new_mod(mod_stream) {
+                Ok(new_mod) => info!("Successfully migrated legacy mod {new_mod}"),
+                Err(err) => warn!("Failed to migrate legacy mod at {:?}: {}", stat.path(), err),
+            }
+
+            // Delete the file either way
+            std::fs::remove_file(stat.path()).context("Failed to delete legacy mod")?;
+        }
+        std::fs::remove_dir(OLD_QMODS_DIR)?;
+
         Ok(())
     }
 
