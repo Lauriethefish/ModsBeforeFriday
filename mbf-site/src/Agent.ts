@@ -29,18 +29,17 @@ export function logInfo(sink: LogEventSink, msg: string) {
     })
   }
 }
+
 export async function prepareAgent(adb: Adb, eventSink: LogEventSink) {
   logInfo(eventSink, "Preparing agent: used to communicate with your Quest.");
 
-  let existingUpToDate = false;
   console.log("Latest agent SHA1 " + AGENT_SHA1);
 
-  const exsitingSha1 = (await adb.subprocess.spawnAndWait(`sha1sum ${AgentPath} | cut -f 1 -d " "`)).stdout
+  const existingSha1 = (await adb.subprocess.spawnAndWait(`sha1sum ${AgentPath} | cut -f 1 -d " "`)).stdout
     .trim()
     .toUpperCase();
-  console.log("Existing agent SHA1: " + exsitingSha1);
-  existingUpToDate = AGENT_SHA1 == exsitingSha1.trim().toUpperCase();
-
+  console.log("Existing agent SHA1: " + existingSha1);
+  const existingUpToDate = AGENT_SHA1 == existingSha1.trim().toUpperCase();
   if(existingUpToDate) {
     logInfo(eventSink, "Agent is up to date");
   } else  {
@@ -72,8 +71,6 @@ async function saveAgent(sync: AdbSync, eventSink: LogEventSink) {
   const AGENT_UPLOAD_TIMEOUT: number = 30;
 
   const agent: Uint8Array = await downloadAgent(eventSink);
-
-  logInfo(eventSink, "Got bytes, converting into readable stream");
   const file: ReadableStream<MaybeConsumable<Uint8Array>> = readableStreamFromByteArray(agent);
 
   const options: AdbSyncWriteOptions = {
@@ -139,7 +136,6 @@ async function downloadAgent(eventSink: LogEventSink): Promise<Uint8Array> {
         xhr.send();
       })
 
-      logInfo(eventSink, "Download complete, getting byte array from response");
       return new Uint8Array(xhr.response);
     } catch(e) {
       logInfo(eventSink, "Failed to fetch agent, status " + e);
@@ -249,9 +245,13 @@ async function sendRequest(adb: Adb, request: Request, eventSink: LogEventSink =
       return response;
     }
   } else  {
-    // If the agent exited with a non-zero code then it failed to actually write a response to stdout
-    // Alternatively, the agent might be corrupt.
-    throw new Error("Failed to invoke agent: is the executable corrupt?" + 
+    // If the agent exited with a non-zero code then it failed to actually write a response to stdout: 
+    // Since the agent in its current form catches all panics and other errors it should always return exit code 0
+    // Hence, the agent is most likely corrupt or not executable for some other reason.
+    // We will delete the agent before we quit so it is redownloaded next time MBF is restarted.
+    await adb.subprocess.spawnAndWait("rm " + AgentPath)
+
+    throw new Error("Failed to invoke agent: is the executable corrupt or permissions not properly set?\nThe agent has been deleted automatically: refresh the page and the agent will be redownloaded, hopefully fixing the problem: \n" + 
       await agentProcess.stderr
         .pipeThrough(new TextDecoderStream())
         .pipeThrough(new ConcatStringStream()))
