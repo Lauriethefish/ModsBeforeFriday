@@ -119,23 +119,22 @@ function ChooseDevice() {
                 return;
               } else  {
                 device = result;
+
+                const androidVersion = await getAndroidVersion(device);
+                console.log("Device android version: " + androidVersion);
+                setdevicePreV51(androidVersion < MIN_SUPPORTED_ANDROID_VERSION);
+                setAuthing(false);
+                setChosenDevice(device);
+
+                await device.transport.disconnected;
+                setChosenDevice(null);
               }
 
             } catch(e) {
               console.log("Failed to connect: " + e);
               setConnectError(String(e));
-              return;
-            }
-            
-            if(device !== null) {
-              const androidVersion = await getAndroidVersion(device);
-              console.log("Device android version: " + androidVersion);
-              setdevicePreV51(androidVersion < MIN_SUPPORTED_ANDROID_VERSION);
-              setAuthing(false);
-              setChosenDevice(device);
-
-              await device.transport.disconnected;
               setChosenDevice(null);
+              return;
             }
           }}>Connect to Quest</button>
 
