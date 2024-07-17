@@ -325,18 +325,10 @@ fn handle_import(from_path: impl AsRef<Path> + Debug, override_filename: Option<
 fn handle_import_qmod(mut mod_manager: ModManager, from_path: PathBuf) -> Result<ImportResultType> {
     info!("Loading {from_path:?} as a QMOD");
     let id = mod_manager.try_load_new_mod(from_path.clone())?;
-
-    // A bit of a hack here: when installing mods, 
-    // we don't want to copy the unvalidated mod to the QMODs directory,
-    // so we load it from a temporary directory.
+    std::fs::remove_file(from_path)?; // Delete temporary file.
 
     // If the mod loads successfully, we then need to *unload it* so that the file is not in use, then copy it to the mods directory.
-    let new_path = mod_manager.get_unique_mod_path(&id);
     let installed_mods = get_mod_models(mod_manager); // Drops the mod_manager/the mod file handles
-
-    // Copy to a new patch in the mods directory
-    std::fs::copy(&from_path, new_path)?;
-    std::fs::remove_file(from_path)?;
 
     Ok(ImportResultType::ImportedMod {
         imported_id: id,
@@ -538,11 +530,13 @@ fn install_core_mods(mod_manager: &mut ModManager, app_info: AppInfo, override_c
         }
 
         info!("Downloading {} v{}", core_mod.id, core_mod.version);
-        let save_path = mod_manager.mods_path().as_ref()
-            .join(format!("{}-v{}-CORE.qmod", core_mod.id, core_mod.version));
+        let save_path = crate::get_temp_file_path()?;
 
         download_file_with_attempts(&save_path, &core_mod.download_url).context("Failed to download core mod")?;
-        mod_manager.try_load_new_mod(save_path)?;
+        let result = mod_manager.try_load_new_mod(&save_path);
+        // Delete the temporary file either way
+        std::fs::remove_file(save_path).context("Failed to delete temporary file")?;
+        result?;
         
     }
 

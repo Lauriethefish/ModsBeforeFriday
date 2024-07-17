@@ -10,13 +10,14 @@ use crate::requests::Request;
 use anyhow::{Context, Result};
 use const_format::formatcp;
 use log::{error, info, warn, Level};
+use rand::RngCore;
 use requests::Response;
 use serde::{Deserialize, Serialize};
-use std::{fs::OpenOptions, io::{BufRead, BufReader, BufWriter, Read, Write}, panic, path::Path, process::Command, time::Instant};
+use std::{fs::OpenOptions, io::{BufRead, BufReader, BufWriter, Read, Write}, panic, path::{Path, PathBuf}, process::Command, time::Instant};
 
 // Directories accessed by the agent, in one place so that they can be easily changed.
 pub const APK_ID: &str = "com.beatgames.beatsaber";
-pub const QMODS_DIR: &str = "/sdcard/ModsBeforeFriday/Mods";
+pub const QMODS_DIR: &str = "/sdcard/ModData/com.beatgames.beatsaber/Packages";
 pub const MODLOADER_DIR: &str = formatcp!("/sdcard/ModData/{APK_ID}/Modloader");
 pub const LATE_MODS_DIR: &str = formatcp!("{MODLOADER_DIR}/mods");
 pub const EARLY_MODS_DIR: &str = formatcp!("{MODLOADER_DIR}/early_mods");
@@ -37,6 +38,19 @@ pub const TEMP_PATH: &str = "/data/local/tmp/mbf-tmp";
 pub const DOWNLOAD_ATTEMPTS: u32 = 3;
 // The number of seconds between download progress updates.
 pub const PROGRESS_UPDATE_INTERVAL: f32 = 2.0;
+
+/// Gets a free path to create a temporary file at
+pub fn get_temp_file_path() -> Result<PathBuf> {
+    std::fs::create_dir_all(TEMP_PATH).context("Failed to create temporary directory")?;
+
+    loop {
+        let file_id = rand::thread_rng().next_u64();
+        let temp_file_path = Path::new(TEMP_PATH).join(format!("{file_id}.tmp"));
+        if !temp_file_path.exists() {
+            return Ok(temp_file_path)
+        }
+    }
+}
 
 
 pub fn get_apk_path() -> Result<Option<String>> {

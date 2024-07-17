@@ -122,9 +122,38 @@ impl<T: Read + Seek> ZipFile<T> {
             .create(true)
             .write(true)
             .open(to)
-            .context("Failed to create extracted file at")?;
+            .context("Failed to create extracted file")?;
 
         self.read_file_contents(name, &mut handle)?;
+        Ok(())
+    }
+
+    /// Extracts all of the files in the ZIP file to the given directory.
+    pub fn extract_to_directory(&mut self, to: impl AsRef<Path>) -> Result<()> {
+        let to = to.as_ref();
+
+        // Create a clone of the entry names as a workaround since we need a mutable reference to self in order to extract files
+        // TODO: This will use additional memory although the amount of memory used is not likely to be significant
+        let entries = self.entries.iter()
+            .map(|(key, _)| key.clone())
+            .collect::<Vec<_>>();
+        for entry_name in entries.iter() {
+            let extract_path = to.join(entry_name);
+            if let Some(parent) = extract_path.parent() {
+                std::fs::create_dir_all(parent).context("Failed to create directory to extract ZIP file")?;
+            }
+
+            let mut handle = std::fs::OpenOptions::new()
+                .truncate(true)
+                .create(true)
+                .write(true)
+                .open(extract_path)
+                .context("Failed to create extracted file")?;
+
+            self.read_file_contents(entry_name, &mut handle)
+                .context("Failed to extract file")?;
+        }
+
         Ok(())
     }
 

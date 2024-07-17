@@ -1,5 +1,5 @@
 mod manifest;
-use std::{cell::RefCell, collections::{HashMap, HashSet}, fs::File, path::{Path, PathBuf}, rc::Rc};
+use std::{cell::RefCell, collections::{HashMap, HashSet}, io::Read, path::{Path, PathBuf}, rc::Rc};
 
 use jsonschema::JSONSchema;
 use log::{error, info, warn};
@@ -17,7 +17,6 @@ const MAX_SCHEMA_VERSION: Version = Version::new(1, 2, 0);
 pub struct Mod {
     manifest: ModInfo,
     installed: bool,
-    zip: ZipFile<File>,
     loaded_from: PathBuf
 }
 
@@ -29,7 +28,6 @@ impl Mod {
     pub fn manifest(&self) -> &ModInfo {
         &self.manifest
     }
-
 }
 
 pub struct ModManager {
@@ -45,10 +43,6 @@ impl ModManager {
                 .compile(&serde_json::from_str::<serde_json::Value>(QMOD_SCHEMA).expect("QMOD schema was not valid JSON"))
                 .expect("QMOD schema was not a valid JSON schema")
         }
-    }
-
-    pub fn mods_path(&self) -> impl AsRef<Path> {
-        QMODS_DIR
     }
 
     // Removes a directory and all its files recursively, if that directory already exists.
@@ -92,11 +86,11 @@ impl ModManager {
             };
     
             let mod_path = entry.path();
-            if !entry.file_type()?.is_file() {
+            if !entry.file_type()?.is_dir() {
                 continue;
             }
 
-            match self.load_mod_from(mod_path.clone()) {
+            match self.load_mod_from_directory(mod_path.clone()) {
                 Ok(loaded_mod) =>  if !self.mods.contains_key(&loaded_mod.manifest.id) {
                     self.mods.insert(loaded_mod.manifest.id.clone(), Rc::new(RefCell::new(loaded_mod)));
                 }   else    {
@@ -105,7 +99,7 @@ impl ModManager {
                 Err(err) => {
                     warn!("Failed to load mod from {mod_path:?}: {err}");
                     // Attempt to delete the invalid mod
-                    match std::fs::remove_file(&mod_path) {
+                    match std::fs::remove_dir_all(&mod_path) {
                         Ok(_) => info!("Deleted invalid mod"),
                         Err(err) => warn!("Failed to delete invalid mod at {mod_path:?}: {err}")
                     }
@@ -117,15 +111,19 @@ impl ModManager {
         Ok(())
     }
 
-    fn load_mod_from(&self, from: PathBuf) -> Result<Mod> {
-        let mod_file = std::fs::File::open(&from).context("Failed to open mod archive")?;
-        let mut zip = ZipFile::open(mod_file).context("Mod was invalid ZIP archive")?;
+    fn load_mod_from_directory(&self, from: PathBuf) -> Result<Mod> {
+        let manifest_path = from.join("mod.json");
+        if !manifest_path.exists() {
+            return Err(anyhow!("Mod at {from:?} had no mod.json manifest"));
+        }
 
-        let json_data = zip.read_file("mod.json").context("Mod had no mod.json manifest")?;
+        let mut json_data = Vec::new();
+        std::fs::File::open(manifest_path).context("Failed to open manifest")?
+            .read_to_end(&mut json_data).context("Failed to read manifest")?;
+
         Ok(Mod {
             manifest: self.load_manifest_from_slice(&json_data).context("Failed to parse manifest")?,
             installed: false, // Must call update_mods_status
-            zip,
             loaded_from: from
         })
     }
@@ -227,12 +225,13 @@ impl ModManager {
     /// Installs a mod without handling dependencies
     /// i.e. just copies the necessary files.
     fn install_unchecked(&self, to_install: &mut Mod) -> Result<()> {
-        copy_stated_files(&mut to_install.zip, &to_install.manifest.mod_files, EARLY_MODS_DIR)?;
-        copy_stated_files(&mut to_install.zip, &to_install.manifest.library_files, LIBS_DIR)?;
-        copy_stated_files(&mut to_install.zip, &to_install.manifest.late_mod_files, LATE_MODS_DIR)?;
+        copy_stated_files(&to_install.loaded_from, &to_install.manifest.mod_files, EARLY_MODS_DIR)?;
+        copy_stated_files(&to_install.loaded_from, &to_install.manifest.library_files, LIBS_DIR)?;
+        copy_stated_files(&to_install.loaded_from, &to_install.manifest.late_mod_files, LATE_MODS_DIR)?;
 
         for file_copy in &to_install.manifest.file_copies {
-            if !to_install.zip.contains_file(&file_copy.name) {
+            let file_path_in_mod = to_install.loaded_from.join(&file_copy.name);
+            if !file_path_in_mod.exists() {
                 warn!("Could not install file copy {} as it did not exist in the QMOD", file_copy.name);
                 continue;
             }
@@ -244,8 +243,13 @@ impl ModManager {
                 None => {}
             }
 
-            to_install.zip.extract_file_to(&file_copy.name, &file_copy.destination)
-                .context("Failed to extract file copy")?;
+            if Path::new(&file_copy.destination).exists() {
+                std::fs::remove_file(&file_copy.destination)
+                    .context("Failed to remove existing copied file")?;
+            }
+
+            std::fs::copy(file_path_in_mod, &file_copy.destination)
+                .context("Failed to copy stated file copy")?;
         }
         to_install.installed = true;
 
@@ -295,6 +299,10 @@ impl ModManager {
             .ok_or(anyhow!("Could not uninstall mod with ID {id} as it did not exist"))?
             .clone();
         let to_remove = (*mod_rc).borrow();
+        if !to_remove.installed {
+            return Ok(());
+        }
+
         info!("Uninstalling {} v{}", to_remove.manifest.id, to_remove.manifest.version);
         drop(to_remove); // Avoid other code that needs the mod from panicking
 
@@ -317,84 +325,86 @@ impl ModManager {
     }
 
     fn install_dependency(&mut self, dep: &ModDependency) -> Result<()> {
-        // Find a path to save the dependency
-        let save_path = self.get_unique_mod_path(&dep.id);
+        // Use a temporary path to save the dependency: it will be extracted later so this file will always be deleted.
+        let save_path = crate::get_temp_file_path()?;
 
+        let result = self.install_dependency_internal(dep, save_path.clone());
+        std::fs::remove_file(save_path)?;
+
+        result
+    }
+
+    fn install_dependency_internal(&mut self, dep: &ModDependency, save_path: impl AsRef<Path>) -> Result<()> {
         let link = match &dep.mod_link {
             Some(link) => link,
             None => return Err(anyhow!("Could not download dependency {}: no link given", dep.id))
         };
 
         info!("Downloading dependency from {}", link);
-        download_file_with_attempts(&save_path, &link).context("Failed to download dependency")?;
+        download_file_with_attempts(&save_path, &link)
+            .context("Failed to download dependency")?;
 
-
-        // TODO: check ID matches
-        match self.try_load_new_mod(save_path.clone()) {
-            Ok(_) => {},
-            Err(err) => {
-                // Adding the dependency failed so it has been dropped. Therefore, delete the saved dependancy.
-                std::fs::remove_file(save_path)?;
-
-                return Err(err);
-            }
-        }
-        
+        self.try_load_new_mod(save_path)?;
         self.install_mod(&dep.id)?;
         Ok(())
     }
 
-    pub fn try_load_new_mod(&mut self, from: PathBuf) -> Result<String> {
-        let loaded_mod = self.load_mod_from(from.clone())?;
+    /// Loads a new mod from a QMOD file.
+    /// Returns the mod ID
+    pub fn try_load_new_mod(&mut self, from: impl AsRef<Path>) -> Result<String> {
+        let mod_file = std::fs::File::open(&from).context("Failed to open mod archive")?;
+        let mut zip = ZipFile::open(mod_file).context("Mod was invalid ZIP archive")?;
 
-        // Check that upgrading the mod to the new version is actually safe
-        let id = loaded_mod.manifest.id.clone();
+        let json_data = zip.read_file("mod.json").context("Mod had no mod.json manifest")?;
+        let loaded_mod_manifest = self.load_manifest_from_slice(&json_data)
+            .context("Failed to parse manifest")?;
+
+        // Check that upgrading the mod to the new version is actually safe...
+        let id = loaded_mod_manifest.id.clone();
+        if !self.check_dependency_compatibility(&id, &loaded_mod_manifest.version) {
+            return Err(anyhow!("Could not upgrade {} to v{}", id, loaded_mod_manifest.version))
+        }
+
+        // Remove the existing version of the mod, 
+        // unchecked as we don't want to nuke any dependant mods or any of its dependencies; we have established that the upgrade is safe.
+        // by allowing remove_mod to run a regular uninstall
         if self.mods.contains_key(&id) {
-            if !self.check_dependency_compatibility(&id, &loaded_mod.manifest.version) {
-                return Err(anyhow!("Could not upgrade {} to v{}", id, loaded_mod.manifest.version))
-            }
-
-            // Remove the existing version of the mod, 
-            // unchecked as we don't want to nuke any dependant mods or any of its dependencies; we have established that the upgrade is safe.
-            // by allowing remove_mod to run a regular uninstall
             info!("Removing existing version of mod");
             self.uninstall_unchecked(&id)?;
-            self.remove_mod(&id)?;
         }
-        self.mods.insert(id.clone(), Rc::new(RefCell::new(loaded_mod)));
+        self.remove_mod(&id)?;
 
+        // Extract the mod to the mods folder
+        info!("Extracting {} v{}", loaded_mod_manifest.id, loaded_mod_manifest.version);
+        let extract_path = Self::get_mod_extract_path(&loaded_mod_manifest);
+        std::fs::create_dir_all(&extract_path).context("Failed to create extract path")?;
+        zip.extract_to_directory(&extract_path).context("Failed to extract QMOD file")?;
+
+        // Insert the mod into the HashMap of loaded mods, and now it is ready to be manipulated by the mod manager!
+        let loaded_mod = Mod {
+            installed: false,
+            manifest: loaded_mod_manifest,
+            loaded_from: extract_path
+        };
+        self.mods.insert(id.clone(), Rc::new(RefCell::new(loaded_mod)));
         Ok(id)
     }
 
-    pub fn get_unique_mod_path(&self, id: &str) -> PathBuf {
-        let mut i = 0;
-        loop {
-            let path = self.mods_path()
-                .as_ref()
-                .join(Path::new(&format!("{id}_{i}.qmod")));
-
-            if !path.exists() {
-                break path;
-            }
-
-            i += 1;
-        }
+    fn get_mod_extract_path(manifest: &ModInfo) -> PathBuf {
+        Path::new(QMODS_DIR).join(format!("{}_v{}", manifest.id, manifest.version))
     }
 
     pub fn remove_mod(&mut self, id: &str) -> Result<()> {
         match self.mods.get(id) {
             Some(to_remove) => {
-                let to_remove_ref = (**to_remove).borrow();
+                let to_remove_ref: std::cell::Ref<Mod> = (**to_remove).borrow();
                 let path_to_delete = to_remove_ref.loaded_from.clone();
-                let installed = to_remove_ref.installed;
 
                 drop(to_remove_ref);
-                if installed {
-                    self.uninstall_mod(id)?;
-                }
+                self.uninstall_mod(id)?;
                 self.mods.remove(id);
 
-                std::fs::remove_file(path_to_delete)?;
+                std::fs::remove_dir_all(path_to_delete)?;
                 Ok(())
             },
             None => Ok(())
@@ -458,9 +468,11 @@ fn delete_file_names(file_paths: &[String], exclude: HashSet<String>, within: im
 }
 
 // Copies all of the files with names in `files` to the path `to/{file name not including directory in ZIP}`
-fn copy_stated_files(zip: &mut ZipFile<File>, files: &[String], to: impl AsRef<Path>) -> Result<()> {
+fn copy_stated_files(mod_folder: impl AsRef<Path>, files: &[String], to: impl AsRef<Path>) -> Result<()> {
     for file in files {
-        if !zip.contains_file(file) {
+        let file_location = mod_folder.as_ref().join(file);
+
+        if !file_location.exists() {
             warn!("Could not install file {file} as it wasn't found in the QMOD");
             continue;
         }
@@ -468,7 +480,10 @@ fn copy_stated_files(zip: &mut ZipFile<File>, files: &[String], to: impl AsRef<P
         let file_name = file.split('/').last().unwrap();
         let copy_to = to.as_ref().join(file_name);
 
-        zip.extract_file_to(file, copy_to).context("Failed to extract mod SO")?;
+        if copy_to.exists() {
+            std::fs::remove_file(&copy_to).context("Failed to remove existing mod file")?;
+        }
+        std::fs::copy(file_location, copy_to).context("Failed to copy SO")?;
     }
 
     Ok(())

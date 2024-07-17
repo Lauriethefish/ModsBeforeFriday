@@ -923,6 +923,7 @@ dependencies = [
  "mbf-res-man",
  "mbf-zip",
  "qbsdiff",
+ "rand",
  "rustls 0.22.4",
  "semver",
  "serde",
