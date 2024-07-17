@@ -90,8 +90,14 @@ function ChooseDevice() {
       <h2>Allow connection in headset</h2>
       <p>Put on your headset and click <b>"Always allow from this computer"</b></p>
       <p>(You should only have to do this once.)</p>
-      <h4>Already pressed allow?</h4>
-      <p>Sometimes the connection fails, despite you allowing access in your Quest. <br/>If this happens, try refreshing the page and re-selecting your device.</p>
+      <h4>Prompt doesn't show up?</h4>
+      <ol>
+        <li>Refresh the page.</li>
+        <li>Put your headset <b>on your head</b>.</li>
+        <li>Attempt to connect to your quest again.</li>
+      </ol>
+      <p>(Sometimes the quest only shows the prompt if the headset is on your head.)</p>
+      <p>If these steps do not work, <b>reboot your quest and try once more.</b></p>
     </div>
   } else  {
     return <>
