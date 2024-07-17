@@ -99,11 +99,14 @@ export interface ImportResult {
 
 export type ImportResultType = ImportedMod | ImportedFileCopy | ImportedSong;
 
+// Represents whether a particular part of the modded game is installed and up to date.
+export type InstallStatus = "Ready" | "NeedUpdate" | "Missing";
+
 export interface ModStatus {
     type: 'ModStatus',
     app_info: AppInfo | null,
     core_mods: CoreModsInfo | null,
-    modloader_present: boolean,
+    modloader_install_status: InstallStatus,
     installed_mods: Mod[],
 }
 
@@ -123,7 +126,7 @@ export type Response = LogMsg | ModStatus | Mods | ImportResult | FixedPlayerDat
 export interface CoreModsInfo {
     supported_versions: string[],
     downgrade_versions: string[],
-    all_core_mods_installed: boolean,
+    core_mod_install_status: InstallStatus,
     is_awaiting_diff: boolean
 }
 

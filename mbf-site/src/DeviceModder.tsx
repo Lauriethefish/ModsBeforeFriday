@@ -176,18 +176,24 @@ function InstallStatus(props: InstallStatusProps) {
     const [error, setError] = useState(null as string | null);
     const [fixing, setFixing] = useState(false);
 
+    const modloaderStatus = modStatus.modloader_install_status;
+    const coreModStatus = modStatus.core_mods!.core_mod_install_status;
 
-    if (modStatus.modloader_present && modStatus.core_mods?.all_core_mods_installed) {
+    if (modloaderStatus === "Ready" && coreModStatus === "Ready") {
         return <p>Everything should be ready to go! &#9989;</p>
     } else {
         return <div>
             <h3 className="warning">Problems found with your install:</h3>
-            <p>These must be fixed before custom songs will work!</p>
+            <p>These can be easily fixed by clicking the button below.</p>
             <ul>
-                {!modStatus.modloader_present &&
+                {modloaderStatus === "Missing" &&
                     <li>Modloader not found &#10060;</li>}
-                {!modStatus.core_mods?.all_core_mods_installed &&
-                    <li>Core mods missing or out of date &#10060;</li>}
+                {modloaderStatus === "NeedUpdate" &&
+                    <li>Modloader has an available update</li>}
+                {coreModStatus === "Missing" &&
+                    <li>Not all the core mods are installed &#10060;</li>}
+                {coreModStatus === "NeedUpdate" && 
+                    <li>Core mod updates need to be installed.</li>}
             </ul>
             <button onClick={async () => {
                 try {

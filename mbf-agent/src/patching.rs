@@ -2,13 +2,14 @@ use std::{fs::{File, OpenOptions}, io::{BufReader, BufWriter, Cursor, Read, Writ
 
 use anyhow::{Context, Result, anyhow};
 use log::{info, warn};
-use crate::{axml::{self, AxmlWriter}, data_fix::fix_colour_schemes, download_file_with_attempts, requests::{AppInfo, ModLoader}, ModTag, APK_ID, APP_OBB_PATH, DATAKEEPER_PATH, DATA_BACKUP_PATH, PLAYER_DATA_PATH};
+use crate::{axml::{self, AxmlWriter}, data_fix::fix_colour_schemes, download_file_with_attempts, requests::{AppInfo, InstallStatus, ModLoader}, ModTag, APK_ID, APP_OBB_PATH, DATAKEEPER_PATH, DATA_BACKUP_PATH, PLAYER_DATA_PATH};
 use mbf_zip::{signing, FileCompression, ZipFile, ZIP_CRC};
 use mbf_res_man::{external_res, models::{Diff, VersionDiffs}};
 
 const DEBUG_CERT_PEM: &[u8] = include_bytes!("debug_cert.pem");
 const LIB_MAIN: &[u8] = include_bytes!("../libs/libmain.so");
 const MODLOADER: &[u8] = include_bytes!("../libs/libsl2.so");
+
 const MODLOADER_NAME: &str = "libsl2.so";
 const MOD_TAG_PATH: &str = "modded.json";
 
@@ -329,6 +330,29 @@ pub fn install_modloader() -> Result<()> {
         .open(loader_path)?;
     handle.write_all(MODLOADER)?;
     Ok(())
+}
+
+/// Checks the installed libsl2.so to see if it is present and up to date.
+pub fn get_modloader_status() -> Result<InstallStatus> {
+    let loader_path = get_modloader_path()?;
+
+    info!("Checking if modloader is up to date");
+    if loader_path.exists() {
+        // Load the existing modloader into memory
+        let mut existing_loader_bytes = Vec::<u8>::new();
+        std::fs::File::open(loader_path)
+            .context("Failed to open modloader to check if up to date")?
+            .read_to_end(&mut existing_loader_bytes).context("Failed to read existing modloader")?;
+
+        // Check if it's all up-to-date
+        if existing_loader_bytes == MODLOADER {
+            Ok(InstallStatus::Ready)
+        }   else {
+            Ok(InstallStatus::NeedUpdate)
+        }
+    }   else {
+        Ok(InstallStatus::Missing)
+    }
 }
 
 fn patch_apk_in_place(path: impl AsRef<Path>, libunity_path: Option<PathBuf>, manifest_mod: String, manifest_only: bool) -> Result<()> {

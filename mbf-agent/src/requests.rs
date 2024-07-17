@@ -115,7 +115,18 @@ pub struct CoreModsInfo {
     /// is intended to start with a Beat Saber version older than the current version.
     /// In these circumstances, the user needs to wait for a diff to be generated.
     pub is_awaiting_diff: bool,
-    pub all_core_mods_installed: bool
+    pub core_mod_install_status: InstallStatus
+}
+
+/// An enum that represents whether a particular piece of the modded game is:
+#[derive(Copy, Clone, Serialize)]
+pub enum InstallStatus {
+    /// Installed and up to date
+    Ready,
+    /// Installed but not up to date
+    NeedUpdate,
+    /// Not installed
+    Missing
 }
 
 #[derive(Serialize)]
@@ -148,7 +159,7 @@ pub enum Response {
         // None if an internet connection could not be established.
         core_mods: Option<CoreModsInfo>,
 
-        modloader_present: bool
+        modloader_install_status: InstallStatus
     },
     Mods {
         installed_mods: Vec<ModModel>

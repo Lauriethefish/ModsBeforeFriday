@@ -7,10 +7,10 @@ use std::path::{Path, PathBuf};
 use crate::manifest::ManifestInfo;
 use crate::{axml, data_fix, download_file_with_attempts, DATAKEEPER_PATH, DOWNLOADS_PATH, PLAYER_DATA_BAK_PATH, PLAYER_DATA_PATH, SONGS_PATH, TEMP_PATH};
 use crate::{axml::AxmlReader, patching};
-use mbf_res_man::models::VersionDiffs;
+use mbf_res_man::models::{CoreMod, VersionDiffs};
 use mbf_zip::ZipFile;
 use crate::mod_man::ModManager;
-use crate::requests::{AppInfo, CoreModsInfo, ImportResultType, ModModel, Request, Response};
+use crate::requests::{AppInfo, CoreModsInfo, ImportResultType, InstallStatus, ModModel, Request, Response};
 use anyhow::{anyhow, Context, Result};
 use log::{error, info, warn};
 use mbf_res_man::external_res::JsonPullError;
@@ -86,7 +86,7 @@ fn handle_get_mod_status(override_core_mod_url: Option<String>) -> Result<Respon
     Ok(Response::ModStatus { 
         app_info,
         core_mods,
-        modloader_present: patching::get_modloader_path()?.exists(),
+        modloader_install_status: patching::get_modloader_status()?,
         installed_mods: get_mod_models(mod_manager)
     })
 }
@@ -111,18 +111,9 @@ fn get_core_mods_info(apk_version: &str, mod_manager: &ModManager, override_core
 
     // Check that all core mods are installed with an appropriate version
     let all_core_mods_installed = match core_mods.get(apk_version) {
-        Some(core_mods) => core_mods.mods
-            .iter()
-            .all(|core_mod| match mod_manager.get_mod(&core_mod.id) {
-                None => false,
-                Some(installed_version) => {
-                    let installed_ref = installed_version.borrow();
-                    installed_ref.manifest().version >= core_mod.version && installed_ref.installed()
-                }
-            }),
-        None => false
+        Some(core_mods) => get_core_mods_install_status(&core_mods.mods, mod_manager),
+        None => InstallStatus::Missing
     };
-    info!("All core mods installed: {}", all_core_mods_installed);
 
     let supported_versions: Vec<String> = core_mods.into_keys().filter(|version| {
         let mut iter = version.split('.');
@@ -144,10 +135,47 @@ fn get_core_mods_info(apk_version: &str, mod_manager: &ModManager, override_core
 
     Ok(Some(CoreModsInfo {
         supported_versions,
-        all_core_mods_installed,
+        core_mod_install_status: all_core_mods_installed,
         downgrade_versions,
         is_awaiting_diff: newer_than_latest_diff && !is_version_supported
     }))
+}
+
+// Checks whether all the core mods in the provided slice are present within the mod manager given.
+// Will give InstallStatus::Ready if all core mods are installed and up to date,
+// InstallStatus::NeedUpdate if any core mods are out of date but all are installed, and InstallStatus::Missing if any 
+// of the core mods are not installed or not even present.
+fn get_core_mods_install_status(core_mods: &[CoreMod], mod_man: &ModManager) -> InstallStatus {
+    info!("Checking if core mods installed and up to date");
+
+    let mut missing_core_mods = false;
+    let mut outdated_core_mods = false;
+    for core_mod in core_mods {
+        match mod_man.get_mod(&core_mod.id) {
+            Some(existing_mod) => {
+                let mod_ref = existing_mod.borrow();
+
+                // NB: We consider a core mod "missing" if it is present but not installed.
+                // Technically it's not "missing" in this case but for the user the difference isn't relevant since MBF auto-downloads mods either way.
+                if !mod_ref.installed() {
+                    warn!("Core mod {} was present (ver {}) but is not installed: needs to be installed", core_mod.id, mod_ref.manifest().version);
+                    missing_core_mods = true;
+                }   else if mod_ref.manifest().version < core_mod.version {
+                    warn!("Core mod {} is outdated, latest version: {}, installed version: {}", core_mod.id, core_mod.version, mod_ref.manifest().version);
+                    outdated_core_mods = true;
+                }
+            },
+            None => missing_core_mods = true
+        }
+    }
+
+    if missing_core_mods {
+        InstallStatus::Missing
+    }   else if outdated_core_mods {
+        InstallStatus::NeedUpdate
+    }   else {
+        InstallStatus::Ready
+    }
 }
 
 fn try_parse_bs_ver_as_semver(version: &str) -> Option<semver::Version> {
