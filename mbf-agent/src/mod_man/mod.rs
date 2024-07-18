@@ -60,6 +60,7 @@ impl ModManager {
     pub fn wipe_all_mods(&mut self) -> Result<()> {
         // Wipe absolutely everything: clean slate
         self.mods.clear();
+        Self::remove_dir_if_exists(OLD_QMODS_DIR)?;
         Self::remove_dir_if_exists(LATE_MODS_DIR)?;
         Self::remove_dir_if_exists(EARLY_MODS_DIR)?;
         Self::remove_dir_if_exists(LIBS_DIR)?;
