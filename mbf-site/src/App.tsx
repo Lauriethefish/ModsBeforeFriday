@@ -26,7 +26,7 @@ async function connect(
 
   let connection: AdbDaemonWebUsbConnection;
   try {
-    if(import.meta.env !== undefined) {
+    if(import.meta.env.DEV) {
       console.warn("Developer build detected, attempting to disconnect ADB server before connecting to quest");
       await tryDisconnectAdb();
     }
