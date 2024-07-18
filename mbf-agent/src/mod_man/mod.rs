@@ -9,7 +9,7 @@ use anyhow::{Context, Result, anyhow};
 use mbf_zip::ZipFile;
 use semver::Version;
 
-use crate::{download_to_vec_with_attempts, EARLY_MODS_DIR, LATE_MODS_DIR, LIBS_DIR, OLD_QMODS_DIR, QMODS_DIR};
+use crate::{download_to_vec_with_attempts, EARLY_MODS_DIR, LATE_MODS_DIR, LIBS_DIR, OLD_QMODS_DIR};
 
 const QMOD_SCHEMA: &str = include_str!("qmod_schema.json");
 const MAX_SCHEMA_VERSION: Version = Version::new(1, 2, 0);
@@ -32,16 +32,18 @@ impl Mod {
 
 pub struct ModManager {
     mods: HashMap<String, Rc<RefCell<Mod>>>,
-    schema: JSONSchema
+    schema: JSONSchema,
+    qmods_dir: String
 }
 
 impl ModManager {
-    pub fn new() -> Self {    
+    pub fn new(game_version: &str) -> Self {    
         Self {
             mods: HashMap::new(),
             schema: JSONSchema::options()
                 .compile(&serde_json::from_str::<serde_json::Value>(QMOD_SCHEMA).expect("QMOD schema was not valid JSON"))
-                .expect("QMOD schema was not a valid JSON schema")
+                .expect("QMOD schema was not a valid JSON schema"),
+            qmods_dir: crate::QMODS_DIR.replace('$', game_version) // Each game version stores its QMODs in a different directory.
         }
     }
 
@@ -61,8 +63,8 @@ impl ModManager {
         Self::remove_dir_if_exists(LATE_MODS_DIR)?;
         Self::remove_dir_if_exists(EARLY_MODS_DIR)?;
         Self::remove_dir_if_exists(LIBS_DIR)?;
-        Self::remove_dir_if_exists(QMODS_DIR)?;
-        create_mods_dir()?;
+        Self::remove_dir_if_exists(&self.qmods_dir)?;
+        self.create_mods_dir()?; // Make sure the mods directories exist afterwards
         Ok(())
     }
 
@@ -73,13 +75,24 @@ impl ModManager {
     pub fn get_mod(&self, id: &str) -> Option<&Rc<RefCell<Mod>>> {
         self.mods.get(id)
     }
+
+    /// Creates the mods, libs and early_mods directories, 
+    /// and the Packages directory that stores the extracted QMODs for the current game version.
+    fn create_mods_dir(&self) -> Result<()> {
+        std::fs::create_dir_all(&self.qmods_dir)?;
+        std::fs::create_dir_all(LATE_MODS_DIR)?;
+        std::fs::create_dir_all(EARLY_MODS_DIR)?;
+        std::fs::create_dir_all(LIBS_DIR)?;
+    
+        Ok(())
+    }
     
     /// Loads any mods from the QMODs directory that have not yet been loaded.
     pub fn load_mods(&mut self) -> Result<()> {
-        create_mods_dir()?;
+        self.create_mods_dir()?;
         self.mods.clear();
     
-        for stat in std::fs::read_dir(QMODS_DIR)? {
+        for stat in std::fs::read_dir(&self.qmods_dir)? {
             let entry = match stat {
                 Ok(entry) => entry,
                 Err(_) => continue // Ignore innacessible mods
@@ -402,7 +415,7 @@ impl ModManager {
 
         // Extract the mod to the mods folder
         info!("Extracting {} v{}", loaded_mod_manifest.id, loaded_mod_manifest.version);
-        let extract_path = Self::get_mod_extract_path(&loaded_mod_manifest);
+        let extract_path = self.get_mod_extract_path(&loaded_mod_manifest);
         std::fs::create_dir_all(&extract_path).context("Failed to create extract path")?;
         zip.extract_to_directory(&extract_path).context("Failed to extract QMOD file")?;
 
@@ -416,8 +429,8 @@ impl ModManager {
         Ok(id)
     }
 
-    fn get_mod_extract_path(manifest: &ModInfo) -> PathBuf {
-        Path::new(QMODS_DIR).join(format!("{}_v{}", manifest.id, manifest.version))
+    fn get_mod_extract_path(&self, manifest: &ModInfo) -> PathBuf {
+        Path::new(&self.qmods_dir).join(format!("{}_v{}", manifest.id, manifest.version))
     }
 
     pub fn remove_mod(&mut self, id: &str) -> Result<()> {
@@ -511,15 +524,6 @@ fn copy_stated_files(mod_folder: impl AsRef<Path>, files: &[String], to: impl As
         }
         std::fs::copy(file_location, copy_to).context("Failed to copy SO")?;
     }
-
-    Ok(())
-}
-
-fn create_mods_dir() -> Result<()> {
-    std::fs::create_dir_all(QMODS_DIR)?;
-    std::fs::create_dir_all(LATE_MODS_DIR)?;
-    std::fs::create_dir_all(EARLY_MODS_DIR)?;
-    std::fs::create_dir_all(LIBS_DIR)?;
 
     Ok(())
 }

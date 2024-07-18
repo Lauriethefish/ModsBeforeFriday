@@ -3,9 +3,10 @@ use std::fmt::Debug;
 use std::fs::File;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use crate::manifest::ManifestInfo;
-use crate::{axml, data_fix, download_file_with_attempts, download_to_vec_with_attempts, DATAKEEPER_PATH, DOWNLOADS_PATH, PLAYER_DATA_BAK_PATH, PLAYER_DATA_PATH, SONGS_PATH, TEMP_PATH};
+use crate::{axml, data_fix, download_file_with_attempts, download_to_vec_with_attempts, APK_ID, DATAKEEPER_PATH, DOWNLOADS_PATH, PLAYER_DATA_BAK_PATH, PLAYER_DATA_PATH, SONGS_PATH, TEMP_PATH};
 use crate::{axml::AxmlReader, patching};
 use mbf_res_man::models::{CoreMod, VersionDiffs};
 use mbf_zip::ZipFile;
@@ -35,7 +36,7 @@ pub fn handle_request(request: Request) -> Result<Response> {
 }
 
 fn run_mod_action(statuses: HashMap<String, bool>) -> Result<Response> {
-    let mut mod_manager = ModManager::new();
+    let mut mod_manager = ModManager::new(&get_app_version_only()?);
     mod_manager.load_mods().context("Failed to load installed mods")?;
 
     for (id, new_status) in statuses {
@@ -68,18 +69,23 @@ fn run_mod_action(statuses: HashMap<String, bool>) -> Result<Response> {
 }
 
 fn handle_get_mod_status(override_core_mod_url: Option<String>) -> Result<Response> {
-    info!("Loading installed mods");
-
-    let mut mod_manager = ModManager::new();
-    mod_manager.load_mods().context("Failed to load installed mods")?;
-
     info!("Searching for Beat Saber app");
     let app_info = get_app_info()?;
-    let core_mods = match &app_info {
-        Some(app_info) => get_core_mods_info(&app_info.version, &mod_manager, override_core_mod_url)?,
+
+    let (core_mods, installed_mods) = match &app_info {
+        Some(app_info) => {
+            info!("Loading installed mods");
+            let mut mod_manager = ModManager::new(&app_info.version);
+            mod_manager.load_mods().context("Failed to load installed mods")?;
+
+            (
+                get_core_mods_info(&app_info.version, &mod_manager, override_core_mod_url)?,
+                get_mod_models(mod_manager)
+            )
+        },
         None => {
             warn!("Beat Saber is not installed!");
-            None
+            (None, Vec::new())
         }
     };
 
@@ -87,7 +93,7 @@ fn handle_get_mod_status(override_core_mod_url: Option<String>) -> Result<Respon
         app_info,
         core_mods,
         modloader_install_status: patching::get_modloader_status()?,
-        installed_mods: get_mod_models(mod_manager)
+        installed_mods
     })
 }
 
@@ -231,6 +237,27 @@ fn get_app_info() -> Result<Option<AppInfo>> {
     }))    
 }
 
+// Gets the version of the currently installed Beat Saber app.
+// Gives an Err if the app is not currently installed.
+// Intended as a more lightweight form of get_app_info that doesn't need to read the manifest
+fn get_app_version_only() -> Result<String> {
+    let dumpsys_output = Command::new("dumpsys")
+        .args(["package", APK_ID])
+        .output().context("Failed to invoke dumpsys")?;
+    let dumpsys_stdout = String::from_utf8(dumpsys_output.stdout)
+        .context("Failed to convert dumpsys output to UTF-8")?;
+
+    let version_offset = match dumpsys_stdout.find("versionName=") {
+        Some(offset) => offset,
+        None => return Err(anyhow!("Beat Saber was not installed"))
+    } + 12;
+
+    let newline_offset = version_offset + dumpsys_stdout[version_offset..].find('\n')
+        .ok_or(anyhow!("No newline after version name"))?;
+
+    Ok(dumpsys_stdout[version_offset..newline_offset].trim().to_string())
+}
+
 fn axml_bytes_to_xml_string(bytes: &[u8]) -> Result<String> {
     let mut cursor = Cursor::new(bytes);
     let mut axml_reader = AxmlReader::new(&mut cursor)
@@ -274,7 +301,7 @@ fn handle_import_mod_url(from_url: String) -> Result<Response> {
 
 fn handle_import(from_path: impl AsRef<Path> + Debug, override_filename: Option<String>) -> Result<Response> {
     // Load the installed mods.
-    let mut mod_manager = ModManager::new();
+    let mut mod_manager = ModManager::new(&get_app_version_only()?);
     mod_manager.load_mods()?;
 
     let filename = match override_filename {
@@ -397,7 +424,7 @@ fn attempt_song_import(from_path: PathBuf) -> Result<ImportResultType> {
 }
 
 fn handle_remove_mod(id: String) -> Result<Response> {
-    let mut mod_manager = ModManager::new();
+    let mut mod_manager = ModManager::new(&get_app_version_only()?);
     mod_manager.load_mods()?;
     mod_manager.remove_mod(&id)?;
 
@@ -410,7 +437,7 @@ fn handle_quick_fix(override_core_mod_url: Option<String>, wipe_existing_mods: b
     let app_info = get_app_info()?
         .ok_or(anyhow!("Cannot quick fix when app is not installed"))?;
 
-    let mut mod_manager = ModManager::new();
+    let mut mod_manager = ModManager::new(&app_info.version);
     if wipe_existing_mods {
         info!("Wiping all existing mods");
         mod_manager.wipe_all_mods().context("Failed to wipe existing mods")?;
@@ -465,11 +492,11 @@ fn handle_patch(downgrade_to: Option<String>,
     std::fs::create_dir_all(TEMP_PATH)?;
 
     // Either downgrade or just patch the current APK depending on the caller's choice.
-    let patching_result = if let Some(to_version) = downgrade_to {
+    let patching_result = if let Some(to_version) = &downgrade_to {
         let diff_index = mbf_res_man::external_res::get_diff_index()
             .context("Failed to get diff index to downgrade")?;
         let version_diffs = diff_index.into_iter()
-            .filter(|diff| diff.from_version == app_info.version && diff.to_version == to_version)
+            .filter(|diff| diff.from_version == app_info.version && &diff.to_version == to_version)
             .next()
             .ok_or(anyhow!("No diff existed to go from {} to {}", app_info.version, to_version))?;
 
@@ -487,7 +514,8 @@ fn handle_patch(downgrade_to: Option<String>,
 
     patching::install_modloader().context("Failed to save modloader")?;
 
-    let mut mod_manager = ModManager::new();
+    let new_app_version = downgrade_to.unwrap_or(app_info.version);
+    let mut mod_manager = ModManager::new(&new_app_version);
     
     if !repatch {
         info!("Wiping all existing mods");

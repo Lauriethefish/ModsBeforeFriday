@@ -16,7 +16,8 @@ use std::{fs::OpenOptions, io::{BufRead, BufReader, Cursor, Read, Write}, panic,
 
 // Directories accessed by the agent, in one place so that they can be easily changed.
 pub const APK_ID: &str = "com.beatgames.beatsaber";
-pub const QMODS_DIR: &str = formatcp!("/sdcard/ModData/{APK_ID}/Packages");
+// `$` is replaced with the game version
+pub const QMODS_DIR: &str = formatcp!("/sdcard/ModData/{APK_ID}/Packages/$");
 pub const MODLOADER_DIR: &str = formatcp!("/sdcard/ModData/{APK_ID}/Modloader");
 pub const LATE_MODS_DIR: &str = formatcp!("{MODLOADER_DIR}/mods");
 pub const EARLY_MODS_DIR: &str = formatcp!("{MODLOADER_DIR}/early_mods");
