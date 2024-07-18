@@ -1,0 +1,8 @@
+[package]
+name = "mbf-adb-killer"
+description = "A simple process that will disconnect the ADB server whenever MBF needs access to the Quest."
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.86"

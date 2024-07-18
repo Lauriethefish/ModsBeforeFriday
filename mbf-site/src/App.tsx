@@ -26,6 +26,11 @@ async function connect(
 
   let connection: AdbDaemonWebUsbConnection;
   try {
+    if(import.meta.env !== undefined) {
+      console.warn("Developer build detected, attempting to disconnect ADB server before connecting to quest");
+      await tryDisconnectAdb();
+    }
+
     connection = await quest.connect();
   } catch(err) {
     if(String(err).includes("Unable to claim interface")) {
@@ -45,6 +50,15 @@ async function connect(
   });
 
   return new Adb(transport);
+}
+
+// Attempts to invoke mbf-adb-killer to disconnect the ADB server, avoiding the developer working on MBF having to manually do this.
+async function tryDisconnectAdb() {
+  try {
+    await fetch("http://localhost:25898");
+  } catch {
+    console.warn("ADB killer is not running. ADB will have to be killed manually");
+  }
 }
 
 export async function getAndroidVersion(device: Adb) {

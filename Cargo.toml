@@ -1,7 +1,8 @@
 [workspace]
 resolver = "2"
 
-members = [
+members = [ 
+    "mbf-adb-killer",
     "mbf-agent",
     "mbf-res-man",
     "mbf-zip",    

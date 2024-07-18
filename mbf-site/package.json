@@ -29,7 +29,8 @@
     "web-vitals": "^2.1.0"
   },
   "scripts": {
-    "start": "vite",
+    "start": "concurrently \"yarn run dev\" \"cd .. && cargo run --release --bin mbf-adb-killer\"",
+    "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },
@@ -50,5 +51,8 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
   }
 }
