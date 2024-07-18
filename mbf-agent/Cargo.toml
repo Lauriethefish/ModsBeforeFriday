@@ -17,6 +17,7 @@ log = "0.4.22"
 const_format = "0.2.32"
 jsonschema = "0.18.0"
 xml = "0.8.20"
+fs2 = "0.4.3"
 
 [build-dependencies]
 ureq = "2.9.6"

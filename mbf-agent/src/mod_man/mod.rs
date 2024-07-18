@@ -1,7 +1,10 @@
 mod manifest;
+mod lock;
+
 use std::{cell::RefCell, collections::{HashMap, HashSet}, io::{Cursor, Read, Seek}, path::{Path, PathBuf}, rc::Rc};
 
 use jsonschema::JSONSchema;
+use lock::ModInstallLock;
 use log::{error, info, warn};
 pub use manifest::*;
 
@@ -58,6 +61,8 @@ impl ModManager {
 
     // Removes ALL mod and library files and deletes ALL mods from the current game.
     pub fn wipe_all_mods(&mut self) -> Result<()> {
+        let _lock = ModInstallLock::excl()?;
+
         // Wipe absolutely everything: clean slate
         self.mods.clear();
         Self::remove_dir_if_exists(OLD_QMODS_DIR)?;
@@ -90,6 +95,8 @@ impl ModManager {
     
     /// Loads any mods from the QMODs directory that have not yet been loaded.
     pub fn load_mods(&mut self) -> Result<()> {
+        let _lock = ModInstallLock::shared()?;
+
         self.create_mods_dir()?;
         self.mods.clear();
     
@@ -111,8 +118,10 @@ impl ModManager {
                     warn!("Mod at {mod_path:?} had ID {}, but a mod with this ID already existed", loaded_mod.manifest.id);
                 },
                 Err(err) => {
+
                     warn!("Failed to load mod from {mod_path:?}: {err}");
                     // Attempt to delete the invalid mod
+                    let _excl_lock: ModInstallLock = ModInstallLock::excl()?; // Need an exclusive lock as we are writing to the directory
                     match std::fs::remove_dir_all(&mod_path) {
                         Ok(_) => info!("Deleted invalid mod"),
                         Err(err) => warn!("Failed to delete invalid mod at {mod_path:?}: {err}")
@@ -142,6 +151,8 @@ impl ModManager {
         }
 
         warn!("Migrating mods from legacy folder");
+        // Writing to mods directory so need exclusive lock
+        let _lock = ModInstallLock::excl()?;
         for stat_result in std::fs::read_dir(OLD_QMODS_DIR)
             .context("Failed to read old QMODs directory")? {
             let stat = stat_result?;
@@ -149,7 +160,7 @@ impl ModManager {
             let mod_stream = std::fs::File::open(stat.path())
                 .context("Failed to open legacy mod")?;
             // Attempt to load a mod from each file
-            match self.try_load_new_mod(mod_stream) {
+            match self.try_load_new_mod_internal(mod_stream) {
                 Ok(new_mod) => info!("Successfully migrated legacy mod {new_mod}"),
                 Err(err) => warn!("Failed to migrate legacy mod at {:?}: {}", stat.path(), err),
             }
@@ -213,6 +224,8 @@ impl ModManager {
 
     /// Checks whether or not each loaded mod is installed.
     pub fn update_mods_status(&mut self) -> Result<()> {
+        let _lock = ModInstallLock::shared()?;
+
         let early_mod_files = list_dir_files(EARLY_MODS_DIR)?;
         let late_mod_files = list_dir_files(LATE_MODS_DIR)?;
         let libraries = list_dir_files(LIBS_DIR)?;
@@ -235,6 +248,11 @@ impl ModManager {
     /// Installs the mod with the given ID.
     /// This will install dependencies if necessary.
     pub fn install_mod(&mut self, id: &str) -> Result<()> {
+        let _lock = ModInstallLock::excl()?;
+        self.install_mod_internal(id)
+    }
+
+    fn install_mod_internal(&mut self, id: &str) -> Result<()> {
         // Install the mod's dependencies if applicable
         let mod_rc =  self.mods.get(id)
             .ok_or(anyhow!("Could not install mod with ID {id} as it did not exist"))?.clone();
@@ -258,7 +276,7 @@ impl ModManager {
                         // Must install the dependency
                         info!("Dependency {} was not installed, reinstalling", dep.id);
                         drop(dep_ref);
-                        self.install_mod(&dep.id)?;
+                        self.install_mod_internal(&dep.id)?;
                     }
                 },
                 None => if dep.required {
@@ -344,8 +362,13 @@ impl ModManager {
     }
 
     /// Uninstalls the mod with the given ID.
-    /// This will uninstall dependant mods if necessary
+    /// This will uninstall dependant mods if necessary.
     pub fn uninstall_mod(&self, id: &str) -> Result<()> {
+        let _lock = ModInstallLock::excl()?;
+        self.uninstall_mod_internal(id)
+    }
+
+    fn uninstall_mod_internal(&self, id: &str) -> Result<()> {
         let mod_rc = self.mods.get(id)
             .ok_or(anyhow!("Could not uninstall mod with ID {id} as it did not exist"))?
             .clone();
@@ -367,7 +390,7 @@ impl ModManager {
             if m_ref.installed && m_ref.manifest.dependencies.iter().any(|dep| &dep.id == id && dep.required) {
                 info!("Uninstalling (required) dependant mod {}", other_id);
                 drop(m_ref);
-                self.uninstall_mod(other_id)?;
+                self.uninstall_mod_internal(other_id)?;
             }
         }
 
@@ -385,14 +408,20 @@ impl ModManager {
         let dependency_bytes = download_to_vec_with_attempts(&link)
             .context("Failed to download dependency")?;
 
-        self.try_load_new_mod(Cursor::new(dependency_bytes))?;
-        self.install_mod(&dep.id)?;
+        self.try_load_new_mod_internal(Cursor::new(dependency_bytes))?;
+        self.install_mod_internal(&dep.id)?;
         Ok(())
     }
 
     /// Loads a new mod from a QMOD file.
     /// Returns the mod ID
     pub fn try_load_new_mod(&mut self, mod_stream: impl Read + Seek) -> Result<String> {
+        let _lock = ModInstallLock::excl()?;
+
+        self.try_load_new_mod_internal(mod_stream)
+    }
+
+    fn try_load_new_mod_internal(&mut self, mod_stream: impl Read + Seek) -> Result<String> {
         let mut zip = ZipFile::open(mod_stream).context("Mod was invalid ZIP archive")?;
 
         let json_data = zip.read_file("mod.json").context("Mod had no mod.json manifest")?;
@@ -412,7 +441,7 @@ impl ModManager {
             info!("Removing existing version of mod");
             self.uninstall_unchecked(&id)?;
         }
-        self.remove_mod(&id)?;
+        self.remove_mod_internal(&id)?;
 
         // Extract the mod to the mods folder
         info!("Extracting {} v{}", loaded_mod_manifest.id, loaded_mod_manifest.version);
@@ -454,14 +483,21 @@ impl ModManager {
         }
     }
 
+    // Fully deletes a mod from the Quest (uninstalling it if installed then deleting the extracted QMOD)
     pub fn remove_mod(&mut self, id: &str) -> Result<()> {
+        let _lock = ModInstallLock::excl()?;
+
+        self.remove_mod_internal(id)
+    }
+
+    fn remove_mod_internal(&mut self, id: &str) -> Result<()> {
         match self.mods.get(id) {
             Some(to_remove) => {
                 let to_remove_ref: std::cell::Ref<Mod> = (**to_remove).borrow();
                 let path_to_delete = to_remove_ref.loaded_from.clone();
 
                 drop(to_remove_ref);
-                self.uninstall_mod(id)?;
+                self.uninstall_mod_internal(id)?;
                 self.mods.remove(id);
 
                 std::fs::remove_dir_all(path_to_delete)?;

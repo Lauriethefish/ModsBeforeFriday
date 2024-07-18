@@ -18,6 +18,7 @@ use std::{fs::OpenOptions, io::{BufRead, BufReader, Cursor, Read, Write}, panic,
 pub const APK_ID: &str = "com.beatgames.beatsaber";
 // `$` is replaced with the game version
 pub const QMODS_DIR: &str = formatcp!("/sdcard/ModData/{APK_ID}/Packages/$");
+pub const QMODS_LOCK_PATH: &str = formatcp!("/sdcard/ModData/{APK_ID}/Packages/packages.lock");
 pub const MODLOADER_DIR: &str = formatcp!("/sdcard/ModData/{APK_ID}/Modloader");
 pub const LATE_MODS_DIR: &str = formatcp!("{MODLOADER_DIR}/mods");
 pub const EARLY_MODS_DIR: &str = formatcp!("{MODLOADER_DIR}/early_mods");
