@@ -429,8 +429,28 @@ impl ModManager {
         Ok(id)
     }
 
+    // Finds a path to extract the mod with the given manifest.
+    // This will have folder name {ID}_v{VERSION} unless a folder of this name already exists (which it shouldn't really )
     fn get_mod_extract_path(&self, manifest: &ModInfo) -> PathBuf {
-        Path::new(&self.qmods_dir).join(format!("{}_v{}", manifest.id, manifest.version))
+        let mut i = 1;
+        loop {
+            let mut folder_name = format!("{}_v{}", manifest.id, manifest.version);
+            if i > 1 {
+                warn!("When finding path to extract {} v{}, the folder name {folder_name} was already occupied,
+                    \n... despite no mod existing with the ID and version in the folder name. 
+                    \nThis shouldn't cause anything bad but somebody is naming folders in a way that is very silly indeed!", manifest.id, manifest.version);
+
+                folder_name.push('_');
+                folder_name.push_str(&i.to_string());
+            }
+
+            let extract_path = Path::new(&self.qmods_dir).join(folder_name);
+            if !extract_path.exists() {
+                break extract_path
+            }
+
+            i += 1;
+        }
     }
 
     pub fn remove_mod(&mut self, id: &str) -> Result<()> {
