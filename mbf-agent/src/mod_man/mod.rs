@@ -1,5 +1,5 @@
 mod manifest;
-use std::{cell::RefCell, collections::{HashMap, HashSet}, io::{Cursor, Read, Seek}, path::{Path, PathBuf}, rc::Rc};
+use std::{cell::RefCell, collections::{HashMap, HashSet}, fs::OpenOptions, io::{Cursor, Read, Seek}, path::{Path, PathBuf}, rc::Rc};
 
 use jsonschema::JSONSchema;
 use log::{error, info, warn};
@@ -9,7 +9,7 @@ use anyhow::{Context, Result, anyhow};
 use mbf_zip::ZipFile;
 use semver::Version;
 
-use crate::{download_to_vec_with_attempts, EARLY_MODS_DIR, LATE_MODS_DIR, LIBS_DIR, OLD_QMODS_DIR};
+use crate::{download_to_vec_with_attempts, EARLY_MODS_DIR, LATE_MODS_DIR, LIBS_DIR, NOMEDIA_PATH, OLD_QMODS_DIR};
 
 const QMOD_SCHEMA: &str = include_str!("qmod_schema.json");
 const MAX_SCHEMA_VERSION: Version = Version::new(1, 2, 0);
@@ -84,6 +84,10 @@ impl ModManager {
         std::fs::create_dir_all(LATE_MODS_DIR)?;
         std::fs::create_dir_all(EARLY_MODS_DIR)?;
         std::fs::create_dir_all(LIBS_DIR)?;
+        OpenOptions::new()
+            .create(true)
+            .write(true)
+            .open(NOMEDIA_PATH).context("Failed to create nomedia file")?;
     
         Ok(())
     }
