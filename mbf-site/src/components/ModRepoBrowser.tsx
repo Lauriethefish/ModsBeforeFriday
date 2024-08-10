@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ModRepo, ModRepoMod, loadRepo } from "../ModsRepo";
+import { VersionedModRepo, ModRepoMod, loadRepo } from "../ModsRepo";
 import { ModRepoCard } from "./ModRepoCard";
 import { gt as semverGt } from "semver";
 import { Mod } from "../Models";
@@ -12,13 +12,13 @@ interface ModRepoBrowserProps {
 
 export function ModRepoBrowser(props: ModRepoBrowserProps) {
     const { gameVersion, onDownload } = props;
-    const [modRepo, setModRepo] = useState(null as ModRepo | null);
+    const [modRepo, setModRepo] = useState(null as VersionedModRepo | null);
     const [failedToLoad, setFailedToLoad] = useState(false);
     const [attempt, setAttempt] = useState(0);
 
     useEffect(() => {
         console.log("Loading mods");
-        loadRepo()
+        loadRepo(gameVersion)
             .then(repo => setModRepo(repo))
             .catch(_ => setFailedToLoad(true))
     }, []);
@@ -36,11 +36,10 @@ export function ModRepoBrowser(props: ModRepoBrowserProps) {
         }   else    {
             return <h1>Loading mods...</h1>
         }
-    }
-    else if(gameVersion in modRepo) {
+    }   else {
         return <>
             <div className="mod-list fadeIn">
-                {prepareModRepoForDisplay(latestVersions(modRepo[gameVersion]), props.existingMods).map(displayInfo => 
+                {prepareModRepoForDisplay(latestVersions(modRepo), props.existingMods).map(displayInfo => 
                     <ModRepoCard
                             mod={displayInfo.mod}
                             key={displayInfo.mod.id}
@@ -48,11 +47,6 @@ export function ModRepoBrowser(props: ModRepoBrowserProps) {
                             onInstall={() => onDownload(displayInfo.mod.download)} />
                 )}
             </div>
-        </>
-    }   else    {
-        return <>
-            <h1>Failed to load mods</h1>
-            <p>No mods are available for v{props.gameVersion} of the game!</p>
         </>
     }
 }
@@ -97,19 +91,23 @@ function prepareModRepoForDisplay(mods: ModRepoMod[],
     });
 }
 
-// Makes the `mods` array unique by the mod `id`, extracting only the latest version of each mod.
-function latestVersions(mods: ModRepoMod[]): ModRepoMod[] {
-    const modsById: { [id: string]: ModRepoMod } = {};
-    mods.forEach(mod => {
-        if(mod.id in modsById) {
-            const existing = modsById[mod.id];
-            if(semverGt(mod.version, existing.version)) {
-                modsById[mod.id] = mod;
-            }
-        }   else    {
-            modsById[mod.id] = mod;
-        }
-    });
+// Extracts the latest version of each mod from the provided mods for a given game version.
+function latestVersions(modsById: VersionedModRepo): ModRepoMod[] {
+    const latestVersions: ModRepoMod[] = [];
+    for (const [id, versions] of Object.entries(modsById)) {
+        let latestVer: ModRepoMod | null = null;
 
-    return Object.values(modsById)
+        // Find the latest version of this mod.
+        for (const [version, mod] of Object.entries(versions)) {
+            if(latestVer === null || semverGt(version, latestVer.version)) {
+                latestVer = mod;
+            }
+        }
+
+        if(latestVer !== null) {
+            latestVersions.push(latestVer);
+        }
+    }
+
+    return latestVersions;
 }

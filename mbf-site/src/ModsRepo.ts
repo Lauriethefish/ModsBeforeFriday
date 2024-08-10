@@ -1,4 +1,4 @@
-export type ModRepo = { [version: string]: [ModRepoMod] }
+export type VersionedModRepo = { [id: string]: { [version: string]: ModRepoMod } }
 
 export interface ModRepoMod {
     name: string,
@@ -7,14 +7,14 @@ export interface ModRepoMod {
     download: string,
     source: string,
     author: string,
-    cover: string | null | undefined,
+    cover: string | null,
     modloader: string,
     description: string
 }
 
-const repoUrl: string = "https://raw.githubusercontent.com/ComputerElite/ComputerElite.github.io/main/tools/Beat_Saber/mods.json";
+const repoUrlTemplate: string = "https://mods.bsquest.xyz/{0}.json"
 
-export async function loadRepo(): Promise<ModRepo> {
-    const req = await fetch(repoUrl);
-    return (await req.json()) as ModRepo;
+export async function loadRepo(gameVersion: string): Promise<VersionedModRepo> {
+    const req = await fetch(repoUrlTemplate.replace("{0}", gameVersion));
+    return (await req.json()) as VersionedModRepo;
 }
