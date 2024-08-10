@@ -320,13 +320,18 @@ fn handle_import(from_path: impl AsRef<Path> + Debug, override_filename: Option<
         .rev()
         .next()
         .ok_or(anyhow!("No file extension in filename {filename}"))?
-        .to_string();
+        .to_string()
+        .to_lowercase();
 
     let import_result = if file_ext == "qmod" {
         handle_import_qmod(mod_manager, path.clone())
     }   else if file_ext == "zip" {
         attempt_song_import(path.clone())
-    }   else    {
+    }   else if file_ext == "dll" {
+        // This is a PC mod file, so delete it and return this fact to the importer.
+        std::fs::remove_file(path.clone()).context("Removing temporary upload file")?;
+        Ok(ImportResultType::NonQuestModDetected)
+    }  else  {
         attempt_file_copy(path.clone(), file_ext, mod_manager)
     };
     

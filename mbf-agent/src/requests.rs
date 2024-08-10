@@ -202,6 +202,8 @@ pub enum ImportResultType {
         mod_id: String
     },
     ImportedSong,
+    // A non-quest mod was detected (i.e. `.DLL`) and so the import failed.
+    NonQuestModDetected
 }
 
 /// The trimmed version of the ModInfo type that is sent to the web client.

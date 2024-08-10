@@ -86,6 +86,10 @@ export interface ImportedSong {
     type: 'ImportedSong'
 }
 
+export interface NonQuestModDetected {
+    type: 'NonQuestModDetected'
+}
+
 export interface FixedPlayerData {
     type: 'FixedPlayerData',
     existed: boolean
@@ -97,7 +101,7 @@ export interface ImportResult {
     type: 'ImportResult'
 }
 
-export type ImportResultType = ImportedMod | ImportedFileCopy | ImportedSong;
+export type ImportResultType = ImportedMod | ImportedFileCopy | ImportedSong | NonQuestModDetected;
 
 // Represents whether a particular part of the modded game is installed and up to date.
 export type InstallStatus = "Ready" | "NeedUpdate" | "Missing";

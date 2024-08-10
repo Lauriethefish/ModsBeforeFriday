@@ -257,6 +257,8 @@ function AddModsMenu(props: ModMenuProps) {
             toast.success("Successfully copied " + filename + " to the path specified by " + typedResult.mod_id);
         }   else if(typedResult.type === 'ImportedSong') {
             toast.success("Successfully imported song " + filename);
+        }   else if(typedResult.type === 'NonQuestModDetected')  {
+            toast.error(`${importResult.used_filename} is a PC mod, with the .DLL file extension. You can only install Quest mods with the .QMOD file extension. Get these from the 'Add Mods' tab.`, { autoClose: false })
         }   else    {
             await onModImported(typedResult);
         }
