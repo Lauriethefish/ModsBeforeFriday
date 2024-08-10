@@ -16,13 +16,20 @@ const MAX_SCHEMA_VERSION: Version = Version::new(1, 2, 0);
 
 pub struct Mod {
     manifest: ModInfo,
-    installed: bool,
+    // Whether all mod files exist in their expected destinations
+    // Set immediately after loading a mod.
+    files_exist: bool,
+    // Whether or not the mod is installed, which is only considered `true` if all of its dependencies are also installed.
+    // This is optional as this can only be determined once all mods are loaded. It is None up until this point.
+    installed: Option<bool>,
     loaded_from: PathBuf
 }
 
+
 impl Mod {
     pub fn installed(&self) -> bool {
-        self.installed
+        self.installed.expect("Mod install status should have been checked
+            before mod was made available through public API")
     }
 
     pub fn manifest(&self) -> &ModInfo {
@@ -132,7 +139,7 @@ impl ModManager {
             warn!("Failed to load legacy mods: {err}");
         }
 
-        self.update_mods_status().context("Failed to check if mods installed after loading")?;
+        self.check_mods_installed().context("Failed to check if mods are installed")?;
         Ok(())
     }
 
@@ -176,9 +183,11 @@ impl ModManager {
         std::fs::File::open(manifest_path).context("Failed to open manifest")?
             .read_to_end(&mut json_data).context("Failed to read manifest")?;
 
+        let manifest = self.load_manifest_from_slice(&json_data).context("Failed to parse manifest")?;
         Ok(Mod {
-            manifest: self.load_manifest_from_slice(&json_data).context("Failed to parse manifest")?,
-            installed: false, // Must call update_mods_status
+            files_exist: Self::check_if_mod_files_exist(&manifest).context("Failed to check if mod files exist when loading mod")?,
+            manifest,
+            installed: None, // Must call update_mods_status
             loaded_from: from
         })
     }
@@ -215,25 +224,85 @@ impl ModManager {
             .expect("Failed to parse as QMOD manifest, despite being valid according to schema. This is a bug"))
     }
 
-    /// Checks whether or not each loaded mod is installed.
-    pub fn update_mods_status(&mut self) -> Result<()> {
-        let early_mod_files = list_dir_files(EARLY_MODS_DIR)?;
-        let late_mod_files = list_dir_files(LATE_MODS_DIR)?;
-        let libraries = list_dir_files(LIBS_DIR)?;
-    
-        for r#mod in self.mods.values() {
-            let mut mod_info = (**r#mod).borrow_mut();
-            let manifest = &mod_info.manifest;
-            let mod_files_present = manifest.mod_files.iter().all(|file| early_mod_files.contains(file))
-                && manifest.library_files.iter().all(|file| libraries.contains(file))
-                && manifest.late_mod_files.iter().all(|file| late_mod_files.contains(file))
-                && manifest.file_copies.iter().map(|copy| &copy.destination)
-                    .all(|dest| Path::new(dest).exists());
-
-            mod_info.installed = mod_files_present;
+    /// Checks whether each loaded mod is installed.
+    /// A mod is considered installed if:
+    /// 1 - All mod files, late mod files, lib files and file copies exist in their expected destinations.
+    /// 2 - All of its dependencies are installed and are within the expected version range
+    /// This method uses the existing state of `Mod#files_exist` for each mod.
+    fn check_mods_installed(&mut self) -> Result<()> {
+        for mod_id in self.mods.keys() {
+            let mut checked_in_pass = HashSet::new();
+            self.check_mod_installed(mod_id, &mut checked_in_pass).context("Failed to check if individual mod was installed.")?;
         }
-    
+
         Ok(())
+    }
+
+    // Updates whether the mod with the given ID is currently installed.
+    // This will recursively check whether any dependent mods are installed.
+    // `checked_in_path` is used to detect recursive dependencies - which are not allowed and will trigger an error.
+    // Returns the new state of Mod#installed for the mod.
+    fn check_mod_installed(&self, id: &str, checked_in_pass: &mut HashSet<String>) -> Result<bool> {
+        if !checked_in_pass.insert(id.to_string())   {
+            return Err(anyhow!("Recursive dependency detected. Mod with ID {id} depends on itself, directly or indirectly. This is not permitted"));
+        }
+
+        let mod_rc = self.mods.get(id).ok_or(anyhow!("No mod with ID {id} found"))?;
+
+        let mod_ref = mod_rc.borrow();
+        let installed = self.check_mod_installed_internal(&*mod_ref, checked_in_pass)?;
+
+        drop(mod_ref);
+        mod_rc.borrow_mut().installed = Some(installed);
+        Ok(installed)
+    }
+
+    // Does the actual checking of whether a mod is installed.
+    // Returns whether the mod should be set as installed or not.
+    fn check_mod_installed_internal(&self, mod_ref: &Mod, checked_in_path: &mut HashSet<String>) -> Result<bool> {
+        // If the mod does not have its files in the necessary destinations, then this mod definitely is not installed, so no need to check dependencies.
+        if !mod_ref.files_exist {
+            return Ok(false);
+        }
+
+        for dependency in &mod_ref.manifest.dependencies {
+            match self.get_mod(&dependency.id) {
+                Some(dep_rc) => {
+                    let dep_ref = dep_rc.borrow();
+
+                    // Check if the dependency is within the required version range, if not then the mod definitely isn't installed.
+                    if !dependency.version_range.matches(&dep_ref.manifest.version) {
+                        return Ok(false);
+                    }
+
+                    // If the dependency exists and is within the required range, we need to verify that it is installed also
+                    if !match dep_ref.installed {
+                        None => {
+                            drop(dep_ref);
+                            self.check_mod_installed(&dependency.id, checked_in_path).context("Failed to check if dependency was installed")?
+                        },
+                        Some(installed) => installed
+                    }  {
+                        return Ok(false);
+                    }
+
+                },
+                None => return Ok(false)
+            }
+        }
+
+        Ok(true)
+    }
+
+    /// Checks whether the mod with the provided mod manifest has all of its
+    /// file copies, mod, late_mod and lib files in their expected destinations,
+    /// .. and updates this in the Mod structure.
+    fn check_if_mod_files_exist(manifest: &ModInfo) -> Result<bool> {
+        Ok(files_exist_in_dir(EARLY_MODS_DIR, manifest.mod_files.iter())?
+            && files_exist_in_dir(LATE_MODS_DIR, manifest.late_mod_files.iter())?
+            && files_exist_in_dir(LIBS_DIR, manifest.library_files.iter())?
+            && manifest.file_copies.iter().map(|copy| &copy.destination)
+                .all(|dest| Path::new(dest).exists()))
     }
 
     /// Installs the mod with the given ID.
@@ -258,7 +327,7 @@ impl ModManager {
                         info!("Dependency {} is out of date, got version {} but need {}", dep.id, dep_ref.manifest.version, dep.version_range);
                         drop(dep_ref);
                         self.install_dependency(&dep)?;
-                    }   else if !dep_ref.installed && dep.required {
+                    }   else if !dep_ref.installed() && dep.required {
                         // Must install the dependency
                         info!("Dependency {} was not installed, reinstalling", dep.id);
                         drop(dep_ref);
@@ -306,7 +375,8 @@ impl ModManager {
             std::fs::copy(file_path_in_mod, &file_copy.destination)
                 .context("Failed to copy stated file copy")?;
         }
-        to_install.installed = true;
+        to_install.installed = Some(true);
+        to_install.files_exist = true;
 
         Ok(())
     }
@@ -342,7 +412,8 @@ impl ModManager {
                 std::fs::remove_file(dest_path).context("Failed to delete copied file")?;
             }
         }
-        to_remove.installed = false;
+        to_remove.installed = Some(false);
+        to_remove.files_exist = false;
 
         Ok(())
     }
@@ -354,7 +425,7 @@ impl ModManager {
             .ok_or(anyhow!("Could not uninstall mod with ID {id} as it did not exist"))?
             .clone();
         let to_remove = (*mod_rc).borrow();
-        if !to_remove.installed {
+        if !to_remove.installed() {
             return Ok(());
         }
 
@@ -368,7 +439,7 @@ impl ModManager {
             }
 
             let m_ref = (**m).borrow();
-            if m_ref.installed && m_ref.manifest.dependencies.iter().any(|dep| &dep.id == id && dep.required) {
+            if m_ref.installed() && m_ref.manifest.dependencies.iter().any(|dep| &dep.id == id && dep.required) {
                 info!("Uninstalling (required) dependant mod {}", other_id);
                 drop(m_ref);
                 self.uninstall_mod(other_id)?;
@@ -426,11 +497,15 @@ impl ModManager {
 
         // Insert the mod into the HashMap of loaded mods, and now it is ready to be manipulated by the mod manager!
         let loaded_mod = Mod {
-            installed: false,
+            installed: None,
+            files_exist: Self::check_if_mod_files_exist(&loaded_mod_manifest)?,
             manifest: loaded_mod_manifest,
             loaded_from: extract_path
         };
         self.mods.insert(id.clone(), Rc::new(RefCell::new(loaded_mod)));
+
+        let mut checked_in_pass = HashSet::new();
+        self.check_mod_installed(&id, &mut checked_in_pass).context("Failed to check whether new mod was installed")?;
         Ok(id)
     }
 
@@ -483,7 +558,7 @@ impl ModManager {
         for (_, existing_mod) in &self.mods {
             let mod_ref = (**existing_mod).borrow();
             // We don't care about uninstalled mods, since they have no invariants to preserve.
-            if !mod_ref.installed {
+            if !mod_ref.installed() {
                 continue;
             }
 
@@ -553,9 +628,16 @@ fn copy_stated_files(mod_folder: impl AsRef<Path>, files: &[String], to: impl As
     Ok(())
 }
 
-fn list_dir_files(path: impl AsRef<Path>) -> Result<HashSet<String>> {
-    Ok(std::fs::read_dir(&path)?.filter_map(|file| match file {
-        Ok(file) => file.file_name().into_string().ok(),
-        Err(_) => None
-    }).collect())
+// For each file path in `file_names`:
+// - Gets only the file name of this path if it has a stem.
+// - Appends this file_name to `dir_path`.
+// - Checks if the file exists
+// Returns true iff all of the files in `file_names` exist within `dir_path` as above.
+fn files_exist_in_dir(dir_path: impl AsRef<Path>, mut file_names: impl Iterator<Item = impl AsRef<Path>>) -> Result<bool> {
+    let dir_path = dir_path.as_ref();
+    Ok(file_names.all(|name| 
+        dir_path.join(name.as_ref()
+            .file_name()
+            .expect("Mod file names should not be blank"))
+            .exists()))
 }
