@@ -228,8 +228,15 @@ impl ModManager {
     /// A mod is considered installed if:
     /// 1 - All mod files, late mod files, lib files and file copies exist in their expected destinations.
     /// 2 - All of its dependencies are installed and are within the expected version range
-    /// This method uses the existing state of `Mod#files_exist` for each mod.
-    fn check_mods_installed(&mut self) -> Result<()> {
+    /// This method uses the existing state of `Mod#files_exist` for each mod, i.e. it will not re-check whether the mod files exist for each mod.
+    pub fn check_mods_installed(&mut self) -> Result<()> {
+        // Set all mods to having no known install status
+        // Required so that the recursive descent to check the install status of each mod is guaranteed to happen
+        for mod_rc in self.mods.values() {
+            mod_rc.borrow_mut().installed = None;
+        }
+
+        // Reset each mod to having no known install status
         for mod_id in self.mods.keys() {
             let mut checked_in_pass = HashSet::new();
             self.check_mod_installed(mod_id, &mut checked_in_pass).context("Failed to check if individual mod was installed.")?;
@@ -254,6 +261,7 @@ impl ModManager {
 
         drop(mod_ref);
         mod_rc.borrow_mut().installed = Some(installed);
+
         Ok(installed)
     }
 

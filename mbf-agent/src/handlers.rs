@@ -64,7 +64,7 @@ fn run_mod_action(statuses: HashMap<String, bool>) -> Result<Response> {
     }
 
     Ok(Response::Mods {
-        installed_mods: get_mod_models(mod_manager),
+        installed_mods: get_mod_models(mod_manager)?,
     })
 }
 
@@ -80,7 +80,7 @@ fn handle_get_mod_status(override_core_mod_url: Option<String>) -> Result<Respon
 
             (
                 get_core_mods_info(&app_info.version, &mod_manager, override_core_mod_url)?,
-                get_mod_models(mod_manager)
+                get_mod_models(mod_manager)?
             )
         },
         None => {
@@ -97,10 +97,15 @@ fn handle_get_mod_status(override_core_mod_url: Option<String>) -> Result<Respon
     })
 }
 
-fn get_mod_models(mod_manager: ModManager) -> Vec<ModModel> {
-    mod_manager.get_mods()
+fn get_mod_models(mut mod_manager: ModManager) -> Result<Vec<ModModel>> {
+    // A dependency of one mod may have been installed in the operation
+    // That mod is now therefore considered installed, even though it wasn't when the mods were loaded
+    // Therefore, check dependencies of mods again to double-check which are really installed.
+    mod_manager.check_mods_installed()?;
+
+    Ok(mod_manager.get_mods()
         .map(|mod_info| ModModel::from(&*(**mod_info).borrow()))
-        .collect()
+        .collect())
 }
 
 fn get_core_mods_info(apk_version: &str, mod_manager: &ModManager, override_core_mod_url: Option<String>) -> Result<Option<CoreModsInfo>> {
@@ -360,7 +365,7 @@ fn handle_import_qmod(mut mod_manager: ModManager, from_path: PathBuf) -> Result
     std::fs::remove_file(from_path)?; // Delete temporary file.
 
     // If the mod loads successfully, we then need to *unload it* so that the file is not in use, then copy it to the mods directory.
-    let installed_mods = get_mod_models(mod_manager); // Drops the mod_manager/the mod file handles
+    let installed_mods = get_mod_models(mod_manager)?; // Drops the mod_manager/the mod file handles
 
     Ok(ImportResultType::ImportedMod {
         imported_id: id,
@@ -434,7 +439,7 @@ fn handle_remove_mod(id: String) -> Result<Response> {
     mod_manager.remove_mod(&id)?;
 
     Ok(Response::Mods {
-        installed_mods: get_mod_models(mod_manager)
+        installed_mods: get_mod_models(mod_manager)?
     })
 }
 
@@ -453,7 +458,7 @@ fn handle_quick_fix(override_core_mod_url: Option<String>, wipe_existing_mods: b
     install_core_mods(&mut mod_manager, app_info, override_core_mod_url)?;
     patching::install_modloader()?;
     Ok(Response::Mods {
-        installed_mods: get_mod_models(mod_manager)
+        installed_mods: get_mod_models(mod_manager)?
     })
 }
 
@@ -538,7 +543,7 @@ fn handle_patch(downgrade_to: Option<String>,
             }
     }
     
-    Ok(Response::Patched { installed_mods: get_mod_models(mod_manager), did_remove_dlc: removed_dlc })
+    Ok(Response::Patched { installed_mods: get_mod_models(mod_manager)?, did_remove_dlc: removed_dlc })
 }
 
 fn install_core_mods(mod_manager: &mut ModManager, app_info: AppInfo, override_core_mod_url: Option<String>) -> Result<()> {
