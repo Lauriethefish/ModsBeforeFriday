@@ -66,7 +66,7 @@ function prepareModRepoForDisplay(mods: ModRepoMod[],
 
         return {
             alreadyInstalled: existingInstall !== undefined,
-            needUpdate: existingInstall !== undefined && existingInstall.version !== mod.version,
+            needUpdate: existingInstall !== undefined && semverGt(mod.version, existingInstall.version),
             mod: mod
         };
     }).filter(mod => mod.needUpdate || !mod.alreadyInstalled) // Skip any mods that are already installed and up to date
