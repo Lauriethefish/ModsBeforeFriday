@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::manifest::ManifestInfo;
-use crate::{axml, data_fix, download_file_with_attempts, download_to_vec_with_attempts, APK_ID, DATAKEEPER_PATH, DOWNLOADS_PATH, PLAYER_DATA_BAK_PATH, PLAYER_DATA_PATH, SONGS_PATH, TEMP_PATH};
+use crate::{axml, data_fix, downloads, APK_ID, DATAKEEPER_PATH, DOWNLOADS_PATH, PLAYER_DATA_BAK_PATH, PLAYER_DATA_PATH, SONGS_PATH, TEMP_PATH};
 use crate::{axml::AxmlReader, patching};
 use mbf_res_man::models::{CoreMod, VersionDiffs};
 use mbf_zip::ZipFile;
@@ -298,7 +298,7 @@ fn handle_import_mod_url(from_url: String) -> Result<Response> {
     let download_path = Path::new(DOWNLOADS_PATH).join("import_from_url");
 
     info!("Downloading {}", from_url);
-    let filename: Option<String> = download_file_with_attempts(&download_path, &from_url)?;
+    let filename: Option<String> = downloads::download_file_with_attempts(&crate::get_dl_cfg(), &download_path, &from_url)?;
     
     // Attempt to import the downloaded file as a qmod, removing the temporary file if this fails.
     handle_import(&download_path, filename)
@@ -569,7 +569,7 @@ fn install_core_mods(mod_manager: &mut ModManager, app_info: AppInfo, override_c
 
         info!("Downloading {} v{}", core_mod.id, core_mod.version);
 
-        let core_mod_vec = download_to_vec_with_attempts(&core_mod.download_url)
+        let core_mod_vec = downloads::download_to_vec_with_attempts(&crate::get_dl_cfg(), &core_mod.download_url)
             .context("Failed to download core mod")?;
         let result = mod_manager.try_load_new_mod(Cursor::new(core_mod_vec));
         // Delete the temporary file either way

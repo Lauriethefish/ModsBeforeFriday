@@ -9,7 +9,7 @@ use anyhow::{Context, Result, anyhow};
 use mbf_zip::ZipFile;
 use semver::Version;
 
-use crate::{download_to_vec_with_attempts, EARLY_MODS_DIR, LATE_MODS_DIR, LIBS_DIR, NOMEDIA_PATH, OLD_QMODS_DIR};
+use crate::{downloads, EARLY_MODS_DIR, LATE_MODS_DIR, LIBS_DIR, NOMEDIA_PATH, OLD_QMODS_DIR};
 
 const QMOD_SCHEMA: &str = include_str!("qmod_schema.json");
 const MAX_SCHEMA_VERSION: Version = Version::new(1, 2, 0);
@@ -465,7 +465,7 @@ impl ModManager {
         };
 
         info!("Downloading dependency from {}", link);
-        let dependency_bytes = download_to_vec_with_attempts(&link)
+        let dependency_bytes = downloads::download_to_vec_with_attempts(&crate::get_dl_cfg(), &link)
             .context("Failed to download dependency")?;
 
         self.try_load_new_mod(Cursor::new(dependency_bytes))?;

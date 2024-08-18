@@ -2,7 +2,7 @@ use std::{fs::{File, OpenOptions}, io::{BufReader, BufWriter, Cursor, Read, Writ
 
 use anyhow::{Context, Result, anyhow};
 use log::{info, warn};
-use crate::{axml::{self, AxmlWriter}, data_fix::fix_colour_schemes, download_file_with_attempts, requests::{AppInfo, InstallStatus, ModLoader}, ModTag, APK_ID, APP_OBB_PATH, DATAKEEPER_PATH, DATA_BACKUP_PATH, PLAYER_DATA_PATH};
+use crate::{axml::{self, AxmlWriter}, data_fix::fix_colour_schemes, downloads, requests::{AppInfo, InstallStatus, ModLoader}, ModTag, APK_ID, APP_OBB_PATH, DATAKEEPER_PATH, DATA_BACKUP_PATH, PLAYER_DATA_PATH};
 use mbf_zip::{signing, FileCompression, ZipFile, ZIP_CRC};
 use mbf_res_man::{external_res, models::{Diff, VersionDiffs}};
 
@@ -263,7 +263,8 @@ fn download_diff_retry(diff: &Diff, to_dir: impl AsRef<Path>) -> Result<()> {
     let url = external_res::get_diff_url(diff);
     let output_path = to_dir.as_ref().join(&diff.diff_name);
 
-    download_file_with_attempts(&output_path, &url).context("Failed to download diff file")?;
+    downloads::download_file_with_attempts(&crate::get_dl_cfg(), &output_path, &url)
+        .context("Failed to download diff file")?;
     Ok(())
 }
 
@@ -274,7 +275,8 @@ fn save_libunity(temp_path: impl AsRef<Path>, version: &str) -> Result<Option<Pa
     };
 
     let libunity_path = temp_path.as_ref().join("libunity.so");
-    download_file_with_attempts(&libunity_path, &url).context("Failed to download unstripped libunity.so")?;
+    downloads::download_file_with_attempts(&crate::get_dl_cfg(), &libunity_path, &url)
+        .context("Failed to download unstripped libunity.so")?;
 
     Ok(Some(libunity_path))
 }
