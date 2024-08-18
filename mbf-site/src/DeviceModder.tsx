@@ -354,7 +354,7 @@ function PatchingMenu(props: PatchingMenuProps) {
     } else {
         return <div className='container mainContainer'>
             <h1>App is being patched</h1>
-            <p>This should only take a few minutes, but might take up to 10 on a very slow internet connection.</p>
+            <p>This should only take a few minutes, but could take much, much longer if your internet connection is slow.</p>
             <p className='warning'>You must not disconnect your device during this process.</p>
             <LogWindow events={logEvents} />
         </div>
