@@ -14,6 +14,9 @@ pub struct DownloadConfig<'a> {
     /// The number of times the connection can fail before the downloader will give up.
     /// NB: If an unsuccessful status code is returned, the downloader will of course stop the request immediately instead of spamming the server.
     pub max_disconnections: u32,
+    /// If specified, the number of disconnections recorded thus far will be reset to 0
+    /// if data is downloaded successfully for the provided period of time. 
+    pub disconnection_reset_time: Option<std::time::Duration>,
     /// When the connection is lost, the downloader will wait for this specified period of time before trying again.
     pub disconnect_wait_time: std::time::Duration,
     /// The amount of time between download progress updates. Set to None to disable.
@@ -148,6 +151,7 @@ pub fn download_with_attempts(cfg: &DownloadConfig, mut to: impl Write + Seek, u
         to.seek(io::SeekFrom::Start(bytes_valid as u64))?;
         let bytes_valid_before_req = bytes_valid;
 
+        let request_time = Instant::now();
         let mut last_progress_update = Instant::now();
         let result = download_file_to_stream(cfg,
             bytes_valid,
@@ -157,9 +161,18 @@ pub fn download_with_attempts(cfg: &DownloadConfig, mut to: impl Write + Seek, u
             |bytes_written, total_bytes| {
                 bytes_valid = bytes_valid_before_req + bytes_written;
 
+                let now = Instant::now();
+
+                // Reset the number of failed attempts if downloading successfully for last X seconds.
+                if let Some(reset_time) = cfg.disconnection_reset_time {
+                    if (now - request_time) > reset_time && failed_attempts > 0 {
+                        info!("Resetting failed attempts as download appears to be completing successfully");
+                        failed_attempts = 0;
+                    }
+                }
+
                 match (cfg.progress_update_interval, total_bytes) {
                     (Some(interval), Some(length)) => {
-                        let now = Instant::now();
                         if now.duration_since(last_progress_update) > interval {
                             last_progress_update = now;
                             info!("Progress: {:.2}%", ((bytes_written + bytes_valid_before_req) as f32 

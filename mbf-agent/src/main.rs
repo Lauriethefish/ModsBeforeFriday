@@ -45,6 +45,8 @@ pub fn get_dl_cfg() -> &'static DownloadConfig<'static> {
     DOWNLOAD_CFG.get_or_init(|| {
         DownloadConfig {
             max_disconnections: 10,
+            // If downloads data successfully for 10 seconds, reset disconnection attempts
+            disconnection_reset_time: Some(std::time::Duration::from_secs_f32(10.0)),
             disconnect_wait_time: std::time::Duration::from_secs_f32(5.0),
             progress_update_interval: Some(std::time::Duration::from_secs_f32(2.0)),
             ureq_agent: mbf_res_man::external_res::get_agent(),
