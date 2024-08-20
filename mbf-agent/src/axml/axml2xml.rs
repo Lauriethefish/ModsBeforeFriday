@@ -116,7 +116,7 @@ pub fn axml_to_xml<W: std::io::Write,R: std::io::Read + std::io::Seek>
 }
 
 pub fn xml_to_axml<W: std::io::Write,
-R: std::io::Read + std::io::Seek>
+R: std::io::Read>
     (writer: &mut AxmlWriter<W>, reader: &mut xml::EventReader<R>) -> Result<()> {
     use xml::reader::XmlEvent;
     let res_ids = ResourceIds::load().context("Failed to load resource IDs")?;
