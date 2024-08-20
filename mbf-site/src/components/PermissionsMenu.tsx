@@ -13,24 +13,36 @@ import { toast } from "react-toastify";
 interface ManifestOptionInfo {
     name: string, // Human readable
     features: string[]
-    permissions: string[]
+    permissions: string[],
+    // A dictionary of metadata element name attributes to value attributes
+    // These are added within the `application` element when the option is toggled on.
+    app_metadata?: { [name: string]: string },
 }
 
 const displayedOptions: ManifestOptionInfo[] = [
     {
         name: "Microphone Access",
         permissions: ["android.permission.RECORD_AUDIO"],
-        features: []
+        features: [],
     },
     {
         name: "Passthrough to headset cameras",
         permissions: [],
-        features: ["com.oculus.feature.PASSTHROUGH"]
+        features: ["com.oculus.feature.PASSTHROUGH"],
     },
     {
         name: "Body tracking",
         permissions: ["com.oculus.permission.BODY_TRACKING"],
         features: ["com.oculus.software.body_tracking"]
+    },
+    {
+        name: "Hand tracking",
+        permissions: ["com.oculus.permission.HAND_TRACKING"],
+        features: ["oculus.software.handtracking"],
+        app_metadata: {
+            "com.oculus.handtracking.frequency": "MAX",
+            "com.oculus.handtracking.version": "V2.0"
+        }
     },
     {
         name: "Bluetooth",
@@ -42,7 +54,8 @@ const displayedOptions: ManifestOptionInfo[] = [
 // The current state of the manifest permissions/features.
 interface ManifestState {
     permissions: string[],
-    features: string[]
+    features: string[],
+    metadata: { [name: string]: string }
 }
 
 interface ManifestStateProps {
@@ -58,13 +71,15 @@ export function PermissionsMenu({ manifest }: { manifest: AndroidManifest }) {
     const [editXml, setEditXml] = useState(false);
     const [manifestState, setManifestState] = useState({
         permissions: manifest.getPermissions(),
-        features: manifest.getFeatures()
+        features: manifest.getFeatures(),
+        metadata: manifest.getMetadata(),
     });
 
     function updateState() {
         setManifestState({
             permissions: manifest.getPermissions(),
-            features: manifest.getFeatures()
+            features: manifest.getFeatures(),
+            metadata: manifest.getMetadata(),
         })
     }
 
@@ -97,7 +112,9 @@ function ToggleMenu({ state, manifest, updateState }: ManifestStateProps) {
         .map(permInfo => {
             // The option is enabled if all permissions/features are in the current manifest mod.
             const enabled = permInfo.features.every(feature => state.features.includes(feature)) &&
-                permInfo.permissions.every(feature => state.permissions.includes(feature));
+                permInfo.permissions.every(feature => state.permissions.includes(feature)) &&
+                (permInfo.app_metadata === undefined || Object.entries(permInfo.app_metadata)
+                    .every(entry => state.metadata[entry[0]] == entry[1]));
 
             return <span id="namedSlider" key={permInfo.name}>
                 <Slider on={enabled}
@@ -105,10 +122,18 @@ function ToggleMenu({ state, manifest, updateState }: ManifestStateProps) {
                         if(nowEnabled) {
                             permInfo.permissions.forEach(perm => manifest.addPermission(perm));
                             permInfo.features.forEach(feat => manifest.addFeature(feat));
+                            if(permInfo.app_metadata) {
+                                Object.entries(permInfo.app_metadata).forEach(pair => manifest.setMetadata(pair[0], pair[1]))
+                            }
+                            
                         }   else    {
                             permInfo.permissions.forEach(feat => manifest.removePermission(feat));
                             permInfo.features.forEach(perm => manifest.removeFeature(perm));
+                            if(permInfo.app_metadata) {
+                                Object.keys(permInfo.app_metadata).forEach(name => manifest.removeMetadata(name))
+                            }
                         }
+
                         updateState();
                     }} />
 

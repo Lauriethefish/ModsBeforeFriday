@@ -4,8 +4,10 @@ const ANDROID_NS_URI: string = "http://schemas.android.com/apk/res/android";
 export class AndroidManifest {
     private features: string[] = [];
     private permissions: string[] = [];
+    private metadata: { [name: string]: string } = {};
     private document!: XMLDocument;
     private manifestEl!: Node;
+    private applicationEl!: Node;
 
     // Initialises the manifest, loading it from the given XML.
     constructor(manifest_xml: string) {
@@ -28,6 +30,7 @@ export class AndroidManifest {
 
         this.document = tentativeDoc;
         this.manifestEl = this.document.getElementsByTagName("manifest")[0];
+        this.applicationEl = this.document.getElementsByTagName("application")[0];
         this.permissions = [];
         this.features = [];
         // Load the permissions and features already within the manifest.
@@ -41,6 +44,24 @@ export class AndroidManifest {
             const featName = permNode.getAttribute("android:name");
             if(featName !== null) {
                 this.features.push(featName);
+            }
+        })
+        Array.from(this.applicationEl.childNodes).forEach(appChild => {
+            if(appChild.nodeType == Node.ELEMENT_NODE && appChild.nodeName == "meta-data") {
+                const metadataName = (appChild as Element).getAttribute("android:name");
+                const metadataValue = (appChild as Element).getAttribute("android:value");
+
+                if(metadataName !== null && metadataValue !== null) {
+                    if(metadataName in this.metadata) {
+                        console.warn("Duplicate metadata key found: " + metadataName + " ..removing");
+                        // Safe as we've used Array.from, so we're not modifying the array while iterating it.
+                        this.applicationEl.removeChild(appChild);
+                    }   else    {
+                        this.metadata[metadataName] = metadataValue;
+                    }
+                }   else    {
+                    console.warn("Invalid metadata node: missing name or value: " + appChild);
+                }
             }
         })
     }
@@ -58,6 +79,11 @@ export class AndroidManifest {
     // Gets an array of the current features within the APK.
     public getFeatures(): string[] {
         return this.features;
+    }
+
+    // Gets a map of metadata element names to metadata values within the application element of the manifest.
+    public getMetadata(): { [name: string]: string } {
+        return this.metadata;
     }
 
     // Performs the default modifications to the manifest that every modded game should have, i.e:
@@ -98,6 +124,35 @@ export class AndroidManifest {
         featureElement.setAttributeNS(ANDROID_NS_URI, "android:required", "false");
         this.manifestEl.appendChild(featureElement);
         this.features.push(feat);
+    }
+
+    // Adds or updates a <meta-data> tag to set the metadata with the given name to the provided value.
+    public setMetadata(name: string, value: string) {
+        const matchingMetadata = Array.from(this.document.getElementsByTagName("meta-data"))
+            .filter(element => element.getAttribute("android:name") == name);
+
+        if(matchingMetadata.length == 0) {
+            // No existing element, so cannot update existing: create a new meta-data element
+            const newMetaElement = this.document.createElement("meta-data");
+            newMetaElement.setAttributeNS(ANDROID_NS_URI, "android:name", name);
+            newMetaElement.setAttributeNS(ANDROID_NS_URI, "android:value", value);
+            this.applicationEl.appendChild(newMetaElement);
+        }   else    {
+            matchingMetadata[0].setAttributeNS(ANDROID_NS_URI, "android:value", value);
+
+            // When loading the manifest, any duplicate metadata keys get automatically removed.
+        }
+
+        this.metadata[name] = value;
+    }
+
+    // Removes any <meta-data> tag with the given name from the document, if one exists.
+    public removeMetadata(name: string) {
+        Array.from(this.document.getElementsByTagName("meta-data"))
+            .filter(element => element.getAttribute("android:name") == name)
+            .forEach(element => element.parentElement?.removeChild(element))
+
+        delete this.metadata[name];
     }
 
     // Removes the <uses-permission> element for the specified permission, if it exists.
