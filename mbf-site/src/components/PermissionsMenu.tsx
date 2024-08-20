@@ -90,7 +90,6 @@ export function PermissionsMenu({ manifest }: { manifest: AndroidManifest }) {
 
     function updateState() {
         setManifestState(getStateFromManifest(manifest));
-        console.log(manifest.toString());
     }
 
     return <>
