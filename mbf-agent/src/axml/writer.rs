@@ -77,7 +77,7 @@ impl<'w, W: Write> AxmlWriter<'w, W> {
     
         // The string pool must be padded to a multiple of 4 bytes
         let str_pool_len = self.get_total_str_pool_len() as u32;
-        let str_pool_padding = (4 - str_pool_len % 4) % 4;
+        let str_pool_padding = 4 - str_pool_len % 4;
         let res_pool_len = self.linear_res_map.len() as u32 * 4;
 
         // The "XML" chunk is the parent chunk of the entire file
