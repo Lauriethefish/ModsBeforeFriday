@@ -17,6 +17,7 @@ interface ManifestOptionInfo {
     // A dictionary of metadata element name attributes to value attributes
     // These are added within the `application` element when the option is toggled on.
     app_metadata?: { [name: string]: string },
+    native_libraries?: string[]
 }
 
 const displayedOptions: ManifestOptionInfo[] = [
@@ -48,6 +49,12 @@ const displayedOptions: ManifestOptionInfo[] = [
         name: "Bluetooth",
         permissions: ["android.permission.BLUETOOTH", "android.permission.BLUETOOTH_CONNECT"],
         features: []
+    },
+    {
+        name: "MRC workaround",
+        permissions: [],
+        features: [],
+        native_libraries: ["libOVRMrcLib.oculus.so"]
     }
 ]
 
@@ -55,7 +62,8 @@ const displayedOptions: ManifestOptionInfo[] = [
 interface ManifestState {
     permissions: string[],
     features: string[],
-    metadata: { [name: string]: string }
+    metadata: { [name: string]: string },
+    nativeLibraries: string[]
 }
 
 interface ManifestStateProps {
@@ -66,21 +74,23 @@ interface ManifestStateProps {
     updateState: () => void
 }
 
-export function PermissionsMenu({ manifest }: { manifest: AndroidManifest }) {
-    const [advanced, setAdvanced] = useState(false);
-    const [editXml, setEditXml] = useState(false);
-    const [manifestState, setManifestState] = useState({
+function getStateFromManifest(manifest: AndroidManifest): ManifestState {
+    return {
         permissions: manifest.getPermissions(),
         features: manifest.getFeatures(),
         metadata: manifest.getMetadata(),
-    });
+        nativeLibraries: manifest.getNativeLibraries()
+    };
+}
+
+export function PermissionsMenu({ manifest }: { manifest: AndroidManifest }) {
+    const [advanced, setAdvanced] = useState(false);
+    const [editXml, setEditXml] = useState(false);
+    const [manifestState, setManifestState] = useState(getStateFromManifest(manifest));
 
     function updateState() {
-        setManifestState({
-            permissions: manifest.getPermissions(),
-            features: manifest.getFeatures(),
-            metadata: manifest.getMetadata(),
-        })
+        setManifestState(getStateFromManifest(manifest));
+        console.log(manifest.toString());
     }
 
     return <>
@@ -114,7 +124,8 @@ function ToggleMenu({ state, manifest, updateState }: ManifestStateProps) {
             const enabled = permInfo.features.every(feature => state.features.includes(feature)) &&
                 permInfo.permissions.every(feature => state.permissions.includes(feature)) &&
                 (permInfo.app_metadata === undefined || Object.entries(permInfo.app_metadata)
-                    .every(entry => state.metadata[entry[0]] == entry[1]));
+                    .every(entry => state.metadata[entry[0]] == entry[1])) &&
+                (permInfo.native_libraries === undefined || permInfo.native_libraries.every(lib => state.nativeLibraries.includes(lib)))
 
             return <span id="namedSlider" key={permInfo.name}>
                 <Slider on={enabled}
@@ -125,10 +136,12 @@ function ToggleMenu({ state, manifest, updateState }: ManifestStateProps) {
                             if(permInfo.app_metadata) {
                                 Object.entries(permInfo.app_metadata).forEach(pair => manifest.setMetadata(pair[0], pair[1]))
                             }
-                            
+                            permInfo.native_libraries?.forEach(lib => manifest.addNativeLibrary(lib));
+    
                         }   else    {
                             permInfo.permissions.forEach(feat => manifest.removePermission(feat));
                             permInfo.features.forEach(perm => manifest.removeFeature(perm));
+                            permInfo.native_libraries?.forEach(lib => manifest.removeNativeLibrary(lib));
                             if(permInfo.app_metadata) {
                                 Object.keys(permInfo.app_metadata).forEach(name => manifest.removeMetadata(name))
                             }

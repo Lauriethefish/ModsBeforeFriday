@@ -4,6 +4,7 @@ const ANDROID_NS_URI: string = "http://schemas.android.com/apk/res/android";
 export class AndroidManifest {
     private features: string[] = [];
     private permissions: string[] = [];
+    private nativeLibraries: string[] = [];
     private metadata: { [name: string]: string } = {};
     private document!: XMLDocument;
     private manifestEl!: Node;
@@ -46,6 +47,12 @@ export class AndroidManifest {
                 this.features.push(featName);
             }
         })
+        Array.from(this.document.getElementsByTagName("uses-native-library")).forEach(libNode => {
+            const libName = libNode.getAttribute("android:name");
+            if(libName !== null) {
+                this.nativeLibraries.push(libName);
+            }
+        })
         Array.from(this.applicationEl.childNodes).forEach(appChild => {
             if(appChild.nodeType == Node.ELEMENT_NODE && appChild.nodeName == "meta-data") {
                 const metadataName = (appChild as Element).getAttribute("android:name");
@@ -86,6 +93,12 @@ export class AndroidManifest {
         return this.metadata;
     }
 
+    // Gets an array of the library file names that have
+    // a `uses-native-library` element within the <application> element.
+    public getNativeLibraries(): string[] {
+        return this.nativeLibraries;
+    }
+
     // Performs the default modifications to the manifest that every modded game should have, i.e:
     // - Enable MANAGE_EXTERNAL_STORAGE permission.
     // - Make app debuggable
@@ -124,6 +137,20 @@ export class AndroidManifest {
         featureElement.setAttributeNS(ANDROID_NS_URI, "android:required", "false");
         this.manifestEl.appendChild(featureElement);
         this.features.push(feat);
+    }
+
+    // Adds a <uses-native-library> element for the specified library underneath the application tag.
+    // If the native library is already specified, this does nothing.
+    public addNativeLibrary(fileName: string) {
+        if(this.nativeLibraries.includes(fileName)) {
+            return;
+        }
+
+        const nativeLibElement = this.document.createElement("uses-native-library");
+        nativeLibElement.setAttributeNS(ANDROID_NS_URI, "android:name", fileName);
+        nativeLibElement.setAttributeNS(ANDROID_NS_URI, "android:required", "false");
+        this.applicationEl.appendChild(nativeLibElement);
+        this.nativeLibraries.push(fileName);
     }
 
     // Adds or updates a <meta-data> tag to set the metadata with the given name to the provided value.
@@ -177,6 +204,20 @@ export class AndroidManifest {
             const permIdx = this.features.indexOf(feat);
             if(permIdx != -1) {
                 this.features.splice(permIdx, 1);
+            }
+        }
+    }
+
+    // Removes the <uses-native-library> element with the specified name
+    public removeNativeLibrary(fileName: string) {
+        const libTag = Array.from(this.document.getElementsByTagName("uses-native-library"))
+            .find(tag => tag.getAttribute("android:name") === fileName);
+        if(libTag !== undefined) {
+            this.applicationEl.removeChild(libTag);
+
+            const libIdx = this.nativeLibraries.indexOf(fileName);
+            if(libIdx != -1) {
+                this.nativeLibraries.splice(libIdx, 1);
             }
         }
     }
