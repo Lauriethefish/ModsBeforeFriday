@@ -1,13 +1,33 @@
 #logWindow {
-    padding: 10px;
-
+    padding: 0;
     height: 30rem;
     overflow: auto;
     width: auto;
 }
 
 .logItem {
+    padding-left: 10px;
+    padding-right: 10px;
+    border-radius: 5px;
     margin: 0;
-    padding: 0;
     word-break: break-word;
+}
+
+.logWithIcon {
+    display: flex;
+    gap: 10px;
+    padding-bottom: 2px;
+    padding-top: 2px;
+}
+
+.logWarning {
+    background-color: rgba(255, 166, 0, 0.6);
+}
+
+.logError {
+    background-color: rgba(253, 11, 11, 0.5);
+}
+
+.logDebug {
+    opacity: 50%;
 }
