@@ -13,6 +13,7 @@ import { ImportResult, ImportedMod, ModStatus } from "../Messages";
 import { OptionsMenu } from "./OptionsMenu";
 import useFileDropper from "../hooks/useFileDropper";
 import { Log } from "../Logging";
+import { useSetWorking, useSyncStore } from "../SyncStore";
 
 interface ModManagerProps {
     gameVersion: string,
@@ -29,9 +30,9 @@ export function ModManager(props: ModManagerProps) {
     const { modStatus, setModStatus, setMods, device, gameVersion, quit } = props;
     const mods = modStatus.installed_mods;
 
-    const [isWorking, setWorking] = useState(false);
     const [modError, setModError] = useState(null as string | null);
     const [menu, setMenu] = useState('add' as SelectedMenu);
+    const { currentOperation } = useSyncStore();
 
     sortByIdAndIfCore(mods);
 
@@ -44,7 +45,6 @@ export function ModManager(props: ModManagerProps) {
             <AddModsMenu
                 mods={mods}
                 setMods={setMods}
-                setWorking={working => setWorking(working)}
                 gameVersion={gameVersion}
                 setError={err => setModError(err)}
                 device={device}
@@ -55,7 +55,6 @@ export function ModManager(props: ModManagerProps) {
             <InstalledModsMenu
                 mods={mods}
                 setMods={setMods}
-                setWorking={working => setWorking(working)}
                 gameVersion={gameVersion}
                 setError={err => setModError(err)}
                 device={device}
@@ -75,7 +74,8 @@ export function ModManager(props: ModManagerProps) {
             title={"Failed to sync mods"}
             description={modError!}
             onClose={() => setModError(null)} />
-        <SyncingModal isVisible={isWorking} title="Syncing Mods..." />
+
+        <SyncingModal isVisible={currentOperation !== null} title={currentOperation ?? ""} />
     </>
 }
 
@@ -107,7 +107,6 @@ interface ModMenuProps {
     mods: Mod[],
     setMods: (mods: Mod[]) => void,
     gameVersion: string,
-    setWorking: (working: boolean) => void,
     setError: (err: string) => void,
     device: Adb
 }
@@ -116,7 +115,6 @@ function InstalledModsMenu(props: ModMenuProps) {
     const { mods,
         setMods,
         gameVersion,
-        setWorking,
         setError,
         device
     } = props;
@@ -128,6 +126,7 @@ function InstalledModsMenu(props: ModMenuProps) {
         {hasChanges && <button id="syncButton" onClick={async () => {
             setChanges({});
             console.log("Installing mods, statuses requested: " + JSON.stringify(changes));
+            const setWorking = useSetWorking("Syncing mods");
             try {
                 setWorking(true);
                 const modSyncResult = await setModStatuses(device, changes);
@@ -149,6 +148,7 @@ function InstalledModsMenu(props: ModMenuProps) {
 				mod={mod}
 				key={mod.id}
 				onRemoved={async () => {
+                    const setWorking = useSetWorking("Removing mod");
 					setWorking(true);
 					try {
 						setMods(await removeMod(device, mod.id));
@@ -213,7 +213,6 @@ function AddModsMenu(props: ModMenuProps) {
         mods,
         setMods,
         gameVersion,
-        setWorking,
         setError,
         device
     } = props;
@@ -300,6 +299,7 @@ function AddModsMenu(props: ModMenuProps) {
 
         let disconnected = false;
         device.disconnected.then(() => disconnected = true);
+        const setWorking = useSetWorking("Importing . . .");
         setWorking(true);
         while(importQueue.length > 0 && !disconnected) {
             // Process the next import, depending on if it is a URL or file

@@ -3,12 +3,13 @@ import { uninstallBeatSaber } from '../DeviceModder';
 import { useEffect, useRef, useState } from 'react';
 import { fixPlayerData, patchApp, quickFix } from '../Agent';
 import { toast } from 'react-toastify';
-import { ErrorModal, SyncingModal } from './Modal';
+import { ErrorModal } from './Modal';
 import { PermissionsMenu } from './PermissionsMenu';
 import '../css/OptionsMenu.css'
 import { Collapsible } from './Collapsible';
 import { ModStatus } from '../Messages';
 import { AndroidManifest } from '../AndroidManifest';
+import { useSetWorking } from '../SyncStore';
 
 export function OptionsMenu({ device, quit, modStatus, setModStatus }: {
     device: Adb,
@@ -35,7 +36,7 @@ function ModTools({ device, quit, modStatus, setModStatus }: {
     modStatus: ModStatus,
     setModStatus: (status: ModStatus) => void}) {
     const [err, setErr] = useState(null as string | null);
-    const [isWorking, setWorking] = useState(false);
+    const setReinstallingCores = useSetWorking("Reinstalling only core mods");
 
     return <div id="modTools">
         <button onClick={async () => {
@@ -51,13 +52,13 @@ function ModTools({ device, quit, modStatus, setModStatus }: {
         <br />
         <button onClick={async () => {
             try {
-                setWorking(true);
+                setReinstallingCores(true);
                 setModStatus(await quickFix(device, modStatus, true));
                 toast.success("All non-core mods removed!");
             }   catch(e) {
                 setErr("Failed to uninstall all mods " + e);
             }   finally {
-                setWorking(false);
+                setReinstallingCores(false);
             }
 
         }}>Reinstall only core mods</button>
@@ -96,8 +97,6 @@ function ModTools({ device, quit, modStatus, setModStatus }: {
             isVisible={err !== null}
             onClose={() => setErr(null)}
         />
-
-        <SyncingModal title="Reinstalling only core mods" isVisible={isWorking}/>
     </div>
 }
 
@@ -111,7 +110,7 @@ function RepatchMenu({ device, modStatus, quit }: {
         manifest.current.applyPatchingManifestMod();
     }, []);
 
-    const [isPatching, setPatching] = useState(false);
+    const setPatching = useSetWorking("Repatching Beat Saber");
 
     return <>
         <p>Certain mods require particular Android permissions to be enabled in order to work. 
@@ -133,8 +132,6 @@ function RepatchMenu({ device, modStatus, quit }: {
                 setPatching(false);
             }
         }}>Repatch game</button>
-
-        <SyncingModal title="Repatching Beat Saber" isVisible={isPatching} />
     </>
 }
 

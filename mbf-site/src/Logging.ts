@@ -7,7 +7,7 @@ export interface LogEventStore {
 }
 
 // Used to globally distribute the MBF log messages.
-export const useLogStore = create<LogEventStore>((set) => ({
+export const useLogStore = create<LogEventStore>(set => ({
     logEvents: [],
     addLogEvent: (msg: LogMsg) => set((state) => ({ logEvents: [...state.logEvents, msg]} ))
 }))

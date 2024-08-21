@@ -4,13 +4,14 @@ import { ReactNode, useEffect, useState } from 'react';
 import { ModLoader, ModStatus } from './Messages';
 import './css/DeviceModder.css';
 import { LogWindow } from './components/LogWindow';
-import { ErrorModal, Modal, SyncingModal } from './components/Modal';
+import { ErrorModal, Modal } from './components/Modal';
 import { ModManager } from './components/ModManager';
 import { trimGameVersion } from './Models';
 import { PermissionsMenu } from './components/PermissionsMenu';
 import { SelectableList } from './components/SelectableList';
 import { AndroidManifest } from './AndroidManifest';
 import { useLogStore } from './Logging';
+import { useSetWorking } from './SyncStore';
 
 interface DeviceModderProps {
     device: Adb,
@@ -185,7 +186,7 @@ function InstallStatus(props: InstallStatusProps) {
     const { modStatus, onFixed, device } = props;
 
     const [error, setError] = useState(null as string | null);
-    const [fixing, setFixing] = useState(false);
+    const setFixing = useSetWorking("Fixing issues");
 
     const modloaderStatus = modStatus.modloader_install_status;
     const coreModStatus = modStatus.core_mods!.core_mod_install_status;
@@ -216,12 +217,6 @@ function InstallStatus(props: InstallStatusProps) {
                     setFixing(false);
                 }
             }}>Fix issues</button>
-
-            <SyncingModal isVisible={fixing} title="Fixing issues" />
-            <ErrorModal title="Failed to fix issues"
-                description={error!}
-                isVisible={error != null}
-                onClose={() => setError(null)} />
         </div>
     }
 }
