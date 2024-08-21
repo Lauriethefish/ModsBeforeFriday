@@ -1,4 +1,10 @@
-$Release = $args[0]
+Param(
+    [Parameter(Mandatory=$false)]
+    [Switch] $release,
+
+    [Parameter(Mandatory=$false)]
+    [Switch] $timing
+)
 
 $TARGET = "aarch64-linux-android"
 $OutputDirectory = "$PSScriptRoot/mbf-site/public"
@@ -6,16 +12,24 @@ $AgentDetailsOutputPath = "$PSScriptRoot/mbf-site/src/agent_manifest.ts"
 $OutputPath = "$OutputDirectory/mbf-agent"
 $CargoManifestPath = "$PSScriptRoot/mbf-agent/Cargo.toml"
 
-if ( $Release.Length -ne 0 )
+$Command = "cargo build --manifest-path $CargoManifestPath --target $TARGET"
+if ( $release -eq $true )
 {
-    cargo build --manifest-path $CargoManifestPath --target $TARGET --release
+    $Command += " --release"
     $Configuration = "release"
 }   
 else
 {
-    cargo build --manifest-path $CargoManifestPath --target $TARGET
     $Configuration = "debug"
 }
+
+if( $timing -eq $true )
+{
+    $Command += " --features request_timing"
+}
+
+Invoke-Expression $Command
+
 $ExecutablePath = "$PSScriptRoot/target/$TARGET/$Configuration/mbf-agent"
 
 Copy-Item $ExecutablePath $OutputPath

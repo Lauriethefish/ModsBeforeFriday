@@ -3,6 +3,9 @@ name = "mbf-agent"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+request_timing = []
+
 [dependencies]
 mbf-res-man = { path = "../mbf-res-man" }
 mbf-zip = { path = "../mbf-zip" }

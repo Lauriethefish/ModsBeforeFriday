@@ -16,6 +16,11 @@ use requests::Response;
 use serde::{Deserialize, Serialize};
 use std::{io::{BufRead, BufReader, Write}, panic, process::Command, sync};
 
+#[cfg(feature = "request_timing")]
+use log::info;
+#[cfg(feature = "request_timing")]
+use std::time::Instant;
+
 // Directories accessed by the agent, in one place so that they can be easily changed.
 pub const APK_ID: &str = "com.beatgames.beatsaber";
 // `$` is replaced with the game version
@@ -114,6 +119,9 @@ fn write_response(response: Response) -> Result<()> {
 static LOGGER: ResponseLogger = ResponseLogger {};
 
 fn main() -> Result<()> {
+    #[cfg(feature = "request_timing")]
+    let start_time = Instant::now();
+
     log::set_logger(&LOGGER).expect("Failed to set up logging");
     log::set_max_level(log::LevelFilter::Info);
 
@@ -128,7 +136,15 @@ fn main() -> Result<()> {
 
     match std::panic::catch_unwind(|| handlers::handle_request(req)) {
         Ok(resp) => match resp {
-            Ok(resp) => write_response(resp)?,
+            Ok(resp) => {
+                #[cfg(feature = "request_timing")]
+                {
+                    let req_time = Instant::now() - start_time;
+                    info!("Request complete in {}ms", req_time.as_millis());
+                }
+
+                write_response(resp)?;
+            },
             Err(err) => error!("{err:?}")
         },
         Err(_) => {} // Panic will be outputted above
