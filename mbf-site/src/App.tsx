@@ -75,7 +75,7 @@ function ChooseDevice() {
   const [deviceInUse, setDeviceInUse] = useState(false);
 
   if(chosenDevice !== null) {
-    Log.info("Device model: " + chosenDevice.banner.model);
+    Log.debug("Device model: " + chosenDevice.banner.model);
     if(chosenDevice.banner.model === "Quest") { // "Quest" not "Quest 2/3"
       return <div className='container mainContainer'>
         <h1>Quest 1 Not Supported</h1>
