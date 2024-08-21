@@ -11,6 +11,7 @@ import { Bounce, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { CornerSourceLink, SmallSourceLink } from './components/SourceLink';
 import { setCoreModOverrideUrl } from './Agent';
+import { Log } from './Logging';
 
 type NoDeviceCause = "NoDeviceSelected" | "DeviceInUse";
 
@@ -27,7 +28,7 @@ async function connect(
   let connection: AdbDaemonWebUsbConnection;
   try {
     if(import.meta.env.DEV) {
-      console.warn("Developer build detected, attempting to disconnect ADB server before connecting to quest");
+      Log.warn("Developer build detected, attempting to disconnect ADB server before connecting to quest");
       await tryDisconnectAdb();
     }
 
@@ -57,7 +58,7 @@ async function tryDisconnectAdb() {
   try {
     await fetch("http://localhost:25898");
   } catch {
-    console.warn("ADB killer is not running. ADB will have to be killed manually");
+    Log.warn("ADB killer is not running. ADB will have to be killed manually");
   }
 }
 
@@ -74,7 +75,7 @@ function ChooseDevice() {
   const [deviceInUse, setDeviceInUse] = useState(false);
 
   if(chosenDevice !== null) {
-    console.log("Device model: " + chosenDevice.banner.model);
+    Log.info("Device model: " + chosenDevice.banner.model);
     if(chosenDevice.banner.model === "Quest") { // "Quest" not "Quest 2/3"
       return <div className='container mainContainer'>
         <h1>Quest 1 Not Supported</h1>
@@ -94,7 +95,7 @@ function ChooseDevice() {
           if(err != null) {
             setConnectError(String(err));
           }
-          chosenDevice.close().catch(err => console.warn("Failed to close device " + err));
+          chosenDevice.close().catch(err => Log.warn("Failed to close device " + err));
           setChosenDevice(null);
         }} />
       </>
@@ -135,7 +136,7 @@ function ChooseDevice() {
                 device = result;
 
                 const androidVersion = await getAndroidVersion(device);
-                console.log("Device android version: " + androidVersion);
+                Log.debug("Device android version: " + androidVersion);
                 setdevicePreV51(androidVersion < MIN_SUPPORTED_ANDROID_VERSION);
                 setAuthing(false);
                 setChosenDevice(device);
@@ -144,9 +145,9 @@ function ChooseDevice() {
                 setChosenDevice(null);
               }
 
-            } catch(e) {
-              console.log("Failed to connect: " + e);
-              setConnectError(String(e));
+            } catch(error) {
+              Log.error("Failed to connect: " + error);
+              setConnectError(String(error));
               setChosenDevice(null);
               return;
             }
@@ -208,7 +209,7 @@ function ChooseCoreModUrl({ setSpecifiedCoreMods } : { setSpecifiedCoreMods: () 
     <button onClick={() => {
       if(inputFieldRef.current !== null) {
         const inputField = inputFieldRef.current;
-        console.warn("Overriding core mods URL to " + inputField.value)
+        Log.warn("Overriding core mods URL to " + inputField.value)
         setCoreModOverrideUrl(inputField.value);
         const searchParams = new URLSearchParams(window.location.search);
         searchParams.set("setcores", inputField.value);
@@ -229,12 +230,12 @@ function AppContents() {
   let mustEnterUrl = false;
   if(overrideQueryParam !== "prompt" && overrideQueryParam !== null) {
     if(!hasSetCoreUrl) {
-      console.warn("Setting core mod URL to " + overrideQueryParam);
+      Log.warn("Setting core mod URL to " + overrideQueryParam);
       setCoreModOverrideUrl(overrideQueryParam);
       setSetCoreUrl(true);
     }
   } else if(overrideQueryParam !== null) {
-    console.log("Prompting user to specify core mod URL");
+    Log.debug("Prompting user to specify core mod URL");
     mustEnterUrl = true;
   }
 

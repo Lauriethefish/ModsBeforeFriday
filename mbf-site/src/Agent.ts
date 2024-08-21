@@ -20,12 +20,12 @@ function readableStreamFromByteArray(array: Uint8Array): ReadableStream<Uint8Arr
 export async function prepareAgent(adb: Adb) {
   Log.info("Preparing agent: used to communicate with your Quest.");
 
-  console.log("Latest agent SHA1 " + AGENT_SHA1);
+  Log.debug("Latest agent SHA1 " + AGENT_SHA1);
 
   const existingSha1 = (await adb.subprocess.spawnAndWait(`sha1sum ${AgentPath} | cut -f 1 -d " "`)).stdout
     .trim()
     .toUpperCase();
-  console.log("Existing agent SHA1: " + existingSha1);
+  Log.debug("Existing agent SHA1: " + existingSha1);
   const existingUpToDate = AGENT_SHA1 == existingSha1.trim().toUpperCase();
   if(existingUpToDate) {
     Log.info("Agent is up to date");
@@ -38,11 +38,11 @@ export async function overwriteAgent(adb: Adb) {
   const sync = await adb.sync();
   console.group("Downloading and overwriting agent on Quest");
   try {
-    Log.info("Removing existing agent");
+    Log.debug("Removing existing agent");
     await adb.subprocess.spawnAndWait("rm " + AgentPath)
-    Log.info("Downloading agent, this might take a minute")
+    Log.debug("Downloading agent, this might take a minute")
     await saveAgent(sync);
-    Log.info("Making agent executable");
+    Log.debug("Making agent executable");
     await adb.subprocess.spawnAndWait("chmod +x " + AgentPath);
 
     Log.info("Agent is ready");
@@ -264,7 +264,7 @@ export async function importFile(device: Adb,
   const tempPath = "/data/local/tmp/mbf-uploads/" + file.name;
   try {
     
-    console.log("Uploading to " + tempPath);
+    Log.debug("Uploading to " + tempPath);
 
     await sync.write({
       filename: tempPath,
@@ -311,7 +311,7 @@ export async function patchApp(device: Adb,
   manifestMod: string,
   remodding: boolean,
   allow_no_core_mods: boolean): Promise<ModStatus> {
-  console.log("Patching with manifest", manifestMod);
+  Log.debug("Patching with manifest: " + manifestMod);
 
   let response = await sendRequest(device, {
       type: 'Patch',

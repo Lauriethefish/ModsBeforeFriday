@@ -1,4 +1,5 @@
 import { DragEvent, useEffect, useRef, useState } from 'react';
+import { Log } from '../Logging';
 
 interface Props {
     onFilesDropped?: (e: File[]) => Promise<void>;
@@ -60,7 +61,7 @@ export default function useFileDropper(props: Props) {
                     }
                 }
             } catch (e) {
-                console.error(e);
+                Log.error("Failure in ondrop: " + e);
             }
         }
 

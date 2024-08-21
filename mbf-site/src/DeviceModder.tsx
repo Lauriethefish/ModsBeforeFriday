@@ -10,7 +10,7 @@ import { trimGameVersion } from './Models';
 import { PermissionsMenu } from './components/PermissionsMenu';
 import { SelectableList } from './components/SelectableList';
 import { AndroidManifest } from './AndroidManifest';
-import { useLogStore } from './Logging';
+import { Log } from './Logging';
 import { useSetWorking } from './SyncStore';
 
 interface DeviceModderProps {
@@ -94,7 +94,7 @@ export function DeviceModder(props: DeviceModderProps) {
     } else if (!(modStatus.core_mods.supported_versions.includes(modStatus.app_info.version)) && !isDeveloperUrl) {
         // Check if we can downgrade to a supported version
         const downgradeVersions = GetSortedDowngradableVersions(modStatus);
-        console.log("Available versions to downgrade: " + downgradeVersions);
+        Log.debug("Available versions to downgrade: " + downgradeVersions);
         if(downgradeVersions === undefined || downgradeVersions.length === 0) {
             if(modStatus.core_mods.is_awaiting_diff) {
                 return <NoDiffAvailable version={modStatus.app_info.version}/>
@@ -284,10 +284,10 @@ function PatchingMenu(props: PatchingMenuProps) {
         }   else    {
             getDowngradedManifest(device, downgradingTo)
                 .then(manifest_xml => setManifest(new AndroidManifest(manifest_xml)))
-                .catch(e => {
+                .catch(error => {
                     // TODO: Perhaps revert to "not downgrading" if this error comes up (but only if the latest version is moddable)
                     // This is low priority as this error message should only show up very rarely - there is already a previous check for internet access.
-                    console.error("Failed to fetch older manifest: " + e);
+                    Log.error("Failed to fetch older manifest: " + error);
                     props.quit("Failed to fetch AndroidManifest.xml for the selected downgrade version. Did your quest lose its internet connection suddenly?");
                 });
         }

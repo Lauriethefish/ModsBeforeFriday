@@ -124,7 +124,7 @@ function InstalledModsMenu(props: ModMenuProps) {
     return <div className="installedModsMenu">
         {hasChanges && <button id="syncButton" onClick={async () => {
             setChanges({});
-            console.log("Installing mods, statuses requested: " + JSON.stringify(changes));
+            Log.debug("Installing mods, statuses requested: " + JSON.stringify(changes));
             await wrapOperation("Syncing mods", "Failed to sync mods", async () => {
                 const modSyncResult = await setModStatuses(device, changes);
                 setMods(modSyncResult.installed_mods);
@@ -282,7 +282,7 @@ function AddModsMenu(props: ModMenuProps) {
         }
         
         // Otherwise, we must stop being lazy and process the queue ourselves.
-        console.log("Now processing import queue");
+        Log.debug("Now processing import queue");
         isProcessingQueue = true;
 
         let disconnected = false;

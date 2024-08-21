@@ -3,6 +3,7 @@ import { VersionedModRepo, ModRepoMod, loadRepo } from "../ModsRepo";
 import { ModRepoCard } from "./ModRepoCard";
 import { gt as semverGt } from "semver";
 import { Mod } from "../Models";
+import { Log } from "../Logging";
 
 interface ModRepoBrowserProps {
     gameVersion: string,
@@ -17,7 +18,7 @@ export function ModRepoBrowser(props: ModRepoBrowserProps) {
     const [attempt, setAttempt] = useState(0);
 
     useEffect(() => {
-        console.log("Loading mods");
+        Log.debug("Loading mods");
         loadRepo(gameVersion)
             .then(repo => setModRepo(repo))
             .catch(_ => setFailedToLoad(true))

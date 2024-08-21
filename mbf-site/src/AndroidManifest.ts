@@ -1,3 +1,5 @@
+import { Log } from "./Logging";
+
 const ANDROID_NS_URI: string = "http://schemas.android.com/apk/res/android";
 
 // Class that allows convenient modification of an APK manifest.
@@ -60,14 +62,14 @@ export class AndroidManifest {
 
                 if(metadataName !== null && metadataValue !== null) {
                     if(metadataName in this.metadata) {
-                        console.warn("Duplicate metadata key found: " + metadataName + " ..removing");
+                        Log.warn("Duplicate metadata key found: " + metadataName + " ..removing");
                         // Safe as we've used Array.from, so we're not modifying the array while iterating it.
                         this.applicationEl.removeChild(appChild);
                     }   else    {
                         this.metadata[metadataName] = metadataValue;
                     }
                 }   else    {
-                    console.warn("Invalid metadata node: missing name or value: " + appChild);
+                    Log.warn("Invalid metadata node: missing name or value: " + appChild);
                 }
             }
         })

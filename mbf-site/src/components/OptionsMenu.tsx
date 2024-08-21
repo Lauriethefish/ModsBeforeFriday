@@ -9,6 +9,7 @@ import { Collapsible } from './Collapsible';
 import { ModStatus } from '../Messages';
 import { AndroidManifest } from '../AndroidManifest';
 import { useSetError, wrapOperation } from '../SyncStore';
+import { Log } from '../Logging';
 
 export function OptionsMenu({ device, quit, modStatus, setModStatus }: {
     device: Adb,
@@ -116,7 +117,7 @@ function RepatchMenu({ device, modStatus, quit }: {
 // Starts recording log messages from `adb logcat`. The promise returned will not complete until `getCancelled` returns a `true` value.
 // Returns a blob containing the logcat messages recorded.
 async function logcatToBlob(device: Adb, getCancelled: () => boolean): Promise<Blob> {
-    console.log("Starting `logcat` process");
+    Log.debug("Starting `logcat` process");
 
     // First clear the logcat buffer - we only want logs from events happening after the "start logcat" button is pressed.
     await device.subprocess.spawnAndWait("logcat -c");
@@ -124,7 +125,7 @@ async function logcatToBlob(device: Adb, getCancelled: () => boolean): Promise<B
     const process = await device.subprocess.spawn("logcat");
     let killed = false;
 
-    console.log("Generating logs");
+    Log.debug("Generating logs");
     const stdout = process.stdout.getReader();
     const logs = [];
 
@@ -139,13 +140,13 @@ async function logcatToBlob(device: Adb, getCancelled: () => boolean): Promise<B
         // NB: It is vital that, after we kill logcat, we read any messages that have not yet been read
         // before returning. Otherwise, the unread messages cause the ADB implementation to hang on all future requests!
         if(getCancelled() && !killed) {
-            console.log("Killing `logcat` process");
+            Log.debug("Killing `logcat` process");
             await process.kill();
             killed = true;
         }
     }
 
-    console.log("Providing blob of logs");
+    Log.debug("Providing blob of logs");
     return new Blob(logs, { type: 'text/plain' })
 }
 
@@ -168,7 +169,7 @@ function AdbLogger({ device }: { device: Adb }) {
                 setLogFile(log);
                 setWaitingForLog(false);
             })
-            .catch(e => console.error("Failed to get ADB log " + e));
+            .catch(e => Log.error("Failed to get ADB log " + e));
         
         // When the value of `logging` changes to false, use the cleanup function to tell the `log` function to stop getting logs as soon as it can.
         return () => {
