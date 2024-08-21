@@ -66,7 +66,10 @@ function prepareModRepoForDisplay(mods: ModRepoMod[],
 
         return {
             alreadyInstalled: existingInstall !== undefined,
-            needUpdate: existingInstall !== undefined && semverGt(mod.version, existingInstall.version),
+            needUpdate: existingInstall !== undefined && semverGt(mod.version, existingInstall.version)
+                // Core mod updates are handled by the core mod index - do not prompt the user to update a core mod
+                // when the update is yet to be pushed to the core mod index.
+                && !existingInstall.is_core,
             mod: mod
         };
     }).filter(mod => mod.needUpdate || !mod.alreadyInstalled) // Skip any mods that are already installed and up to date
