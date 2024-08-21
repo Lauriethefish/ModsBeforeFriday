@@ -597,10 +597,10 @@ fn install_core_mods(mod_manager: &mut ModManager, app_info: AppInfo, override_c
 
     info!("Installing core mods");
     mod_manager.load_mods().context("Failed to load core mods - is one invalid? If so, this is a BIG problem")?;
-    mark_all_core_mods(&mod_manager, &core_mods.mods);
     for core_mod in &core_mods.mods {
         mod_manager.install_mod(&core_mod.id)?;
     }
+    mark_all_core_mods(&mod_manager, &core_mods.mods);
     
     Ok(())
 }
