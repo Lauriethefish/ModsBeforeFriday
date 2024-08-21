@@ -27,7 +27,8 @@ const isDeveloperUrl: boolean = new URLSearchParams(window.location.search).get(
 // Sorts them with the newest versions first.
 export function GetSortedDowngradableVersions(modStatus: ModStatus): string[] | undefined {
     return modStatus.core_mods?.downgrade_versions
-        .filter(version => modStatus.core_mods?.supported_versions.includes(version))
+        .filter(version => modStatus.core_mods?.supported_versions !== undefined &&
+                version in modStatus.core_mods.supported_versions)
         .sort(CompareBeatSaberVersions)
 }
 
@@ -90,7 +91,7 @@ export function DeviceModder(props: DeviceModderProps) {
             <p>To mod Beat Saber, MBF needs to download files such as a mod loader and several essential mods.
                 <br />This occurs on your Quest's connection. Please make sure that WiFi is enabled, then refresh the page.</p>
         </div>
-    } else if (!(modStatus.core_mods.supported_versions.includes(modStatus.app_info.version)) && !isDeveloperUrl) {
+    } else if (!(modStatus.app_info.version in modStatus.core_mods.supported_versions) && !isDeveloperUrl) {
         // Check if we can downgrade to a supported version
         const downgradeVersions = GetSortedDowngradableVersions(modStatus);
         console.log("Available versions to downgrade: " + downgradeVersions);
@@ -216,7 +217,7 @@ function InstallStatus(props: InstallStatusProps) {
 }
 
 function UpdateInfo({ modStatus, device, quit }: { modStatus: ModStatus, device: Adb, quit: () => void }) {
-    const sortedModdableVersions = modStatus.core_mods?.supported_versions.sort(CompareBeatSaberVersions)!;
+    const sortedModdableVersions = Object.keys(modStatus.core_mods!.supported_versions).sort(CompareBeatSaberVersions);
     const newerUpdateExists = modStatus.app_info?.version !== sortedModdableVersions[0];
 
     const [updateWindowOpen, setUpdateWindowOpen] = useState(false);

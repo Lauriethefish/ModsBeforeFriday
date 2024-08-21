@@ -136,17 +136,26 @@ fn get_core_mods_info(apk_version: &str, mod_manager: &ModManager, override_core
         None => InstallStatus::Missing
     };
 
-    let supported_versions: Vec<String> = core_mods.into_keys().filter(|version| {
+    let mut supported_versions = HashMap::new();
+    for (version, core_mods) in core_mods.into_iter() {
         let mut iter = version.split('.');
         let _major = iter.next().unwrap();
-        let _minor = iter.next().unwrap();
+        let minor = iter.next().unwrap();
 
-        _minor.parse::<i64>().expect("Invalid version in core mod index") >= 35
-    }).collect();
+        // Skip QuestLoader versions (i.e. pre-1.35)
+        if minor.parse::<i64>().expect("Invalid version in core mod index") >= 35 {
+            let core_mod_ids = core_mods.mods
+                .into_iter()
+                .map(|core_mod| core_mod.id)
+                .collect();
+
+            supported_versions.insert(version, core_mod_ids);
+        }
+    }
 
     let diff_index = mbf_res_man::external_res::get_diff_index().context("Failed to get downgrading information")?;
 
-    let is_version_supported = supported_versions.iter().any(|ver| ver == apk_version);
+    let is_version_supported = supported_versions.keys().any(|ver| ver == apk_version);
     let newer_than_latest_diff = is_version_newer_than_latest_diff(apk_version, &diff_index);
 
     let downgrade_versions: Vec<String> = diff_index.into_iter()

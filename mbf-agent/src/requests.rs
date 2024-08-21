@@ -107,8 +107,10 @@ pub enum Request {
 
 #[derive(Serialize)]
 pub struct CoreModsInfo {
-    /// All of the Beat Saber versions with core mods using Scotland2
-    pub supported_versions: Vec<String>,
+    /// All of the Beat Saber versions with core mods using Scotland2 are keys in this HashMap
+    /// The values are a list of the mod IDs of the core mods for each version. 
+    /// This is needed by the frontend to display the "do not uninstall, this is a core mod" message around each core mod.
+    pub supported_versions: HashMap<String, Vec<String>>,
     /// The versions of Beat Saber that can be reached by downgrading the game.
     pub downgrade_versions: Vec<String>,
     /// True only if the Beat Saber version does not support mods, and the latest diff available in the diff index 
