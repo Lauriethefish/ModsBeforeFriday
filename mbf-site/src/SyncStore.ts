@@ -68,6 +68,7 @@ export async function wrapOperation(operationName: string,
     try {
         await operation();
     }   catch(error) {
+        Log.error(errorModalTitle + ": " + error);
         setError(error);
     }   finally {
         setWorking(false);
