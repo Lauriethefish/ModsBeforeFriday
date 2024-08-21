@@ -344,14 +344,11 @@ function AddModsMenu(props: ModMenuProps) {
             }))} />
 
         <ModRepoBrowser existingMods={mods} gameVersion={gameVersion} onDownload={async url => {
-            setWorking(true);
-            try {
-                await onImportResult(await importUrl(device, url));
-            }   catch(e) { 
-                setError("Failed to install mod " + e);
-            }   finally {
-                setWorking(false);
-            }
+            const urlImport: QueuedUrlImport = {
+                type: "Url",
+                url: url
+            };
+            enqueueImports([urlImport]);
         }} />
     </div>
 }
