@@ -3,13 +3,12 @@ import { uninstallBeatSaber } from '../DeviceModder';
 import { useEffect, useRef, useState } from 'react';
 import { fixPlayerData, patchApp, quickFix } from '../Agent';
 import { toast } from 'react-toastify';
-import { ErrorModal, Modal, SyncingModal } from './Modal';
+import { ErrorModal, SyncingModal } from './Modal';
 import { PermissionsMenu } from './PermissionsMenu';
 import '../css/OptionsMenu.css'
 import { Collapsible } from './Collapsible';
 import { ModStatus } from '../Messages';
 import { AndroidManifest } from '../AndroidManifest';
-import { useLogStore } from '../Logging';
 
 export function OptionsMenu({ device, quit, modStatus, setModStatus }: {
     device: Adb,
@@ -37,7 +36,6 @@ function ModTools({ device, quit, modStatus, setModStatus }: {
     setModStatus: (status: ModStatus) => void}) {
     const [err, setErr] = useState(null as string | null);
     const [isWorking, setWorking] = useState(false);
-    const { addLogEvent } = useLogStore();
 
     return <div id="modTools">
         <button onClick={async () => {
@@ -54,7 +52,7 @@ function ModTools({ device, quit, modStatus, setModStatus }: {
         <button onClick={async () => {
             try {
                 setWorking(true);
-                setModStatus(await quickFix(device, modStatus, true, addLogEvent));
+                setModStatus(await quickFix(device, modStatus, true));
                 toast.success("All non-core mods removed!");
             }   catch(e) {
                 setErr("Failed to uninstall all mods " + e);
@@ -113,7 +111,6 @@ function RepatchMenu({ device, modStatus, quit }: {
         manifest.current.applyPatchingManifestMod();
     }, []);
 
-    const { addLogEvent } = useLogStore();
     const [isPatching, setPatching] = useState(false);
 
     return <>
@@ -127,7 +124,7 @@ function RepatchMenu({ device, modStatus, quit }: {
                 // TODO: Right now we do not set the mod status back to the DeviceModder state for it.
                 // This is fine at the moment since repatching does not update this state in any important way,
                 // but would be a problem if repatching did update it!
-                await patchApp(device, modStatus, null, manifest.current.toString(), true, false, addLogEvent);
+                await patchApp(device, modStatus, null, manifest.current.toString(), true, false);
                 toast.success("Successfully applied permissions");
             }   catch(e) {
                 // Force a quit so the app rechecks the state of the install is correct.

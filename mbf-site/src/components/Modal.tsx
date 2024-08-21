@@ -1,10 +1,8 @@
-import { ReactNode, useContext } from "react";
+import { ReactNode } from "react";
 import AlertIcon from '../icons/alert-triangle.svg'
 
 import '../css/Modal.css';
-import { LogMsg } from "../Messages";
 import { LogWindow } from "./LogWindow";
-import { LogContext } from "../Logging";
 
 interface ModalProps {
     children: ReactNode,

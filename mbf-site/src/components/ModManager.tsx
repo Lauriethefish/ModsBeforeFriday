@@ -12,8 +12,7 @@ import { ModRepoBrowser } from "./ModRepoBrowser";
 import { ImportResult, ImportedMod, ModStatus } from "../Messages";
 import { OptionsMenu } from "./OptionsMenu";
 import useFileDropper from "../hooks/useFileDropper";
-import { LogEventSink, logInfo } from "../Agent";
-import { useLogStore } from "../Logging";
+import { Log } from "../Logging";
 
 interface ModManagerProps {
     gameVersion: string,
@@ -124,7 +123,6 @@ function InstalledModsMenu(props: ModMenuProps) {
 
     const [changes, setChanges] = useState({} as { [id: string]: boolean });
     const hasChanges = Object.keys(changes).length > 0;
-    const { addLogEvent } = useLogStore();
 
     return <div className="installedModsMenu">
         {hasChanges && <button id="syncButton" onClick={async () => {
@@ -132,7 +130,7 @@ function InstalledModsMenu(props: ModMenuProps) {
             console.log("Installing mods, statuses requested: " + JSON.stringify(changes));
             try {
                 setWorking(true);
-                const modSyncResult = await setModStatuses(device, changes, addLogEvent);
+                const modSyncResult = await setModStatuses(device, changes);
                 setMods(modSyncResult.installed_mods);
 
                 if(modSyncResult.failures !== null) {
@@ -153,7 +151,7 @@ function InstalledModsMenu(props: ModMenuProps) {
 				onRemoved={async () => {
 					setWorking(true);
 					try {
-						setMods(await removeMod(device, mod.id, addLogEvent));
+						setMods(await removeMod(device, mod.id));
 					}   catch(e) {
 						setError(String(e));
 					}   finally {
@@ -220,8 +218,6 @@ function AddModsMenu(props: ModMenuProps) {
         device
     } = props;
 
-    const { addLogEvent } = useLogStore();
-
     // Automatically installs a mod when it is imported, or warns the user if it isn't designed for the current game version.
     // Gives appropriate toasts/reports errors in each case.
     async function onModImported(result: ImportedMod) {
@@ -235,7 +231,7 @@ function AddModsMenu(props: ModMenuProps) {
             setError("The mod `" + imported_id + "` was not enabled automatically as it is not designed for game version v" + trimGameVersion(gameVersion) + ".");
         }   else    {
             try {
-                const result = await setModStatuses(device, { [imported_id]: true }, addLogEvent);
+                const result = await setModStatuses(device, { [imported_id]: true });
                 setMods(result.installed_mods);
 
                 // This is where typical mod install failures occur
@@ -257,7 +253,7 @@ function AddModsMenu(props: ModMenuProps) {
         const filename = importResult.used_filename;
         const typedResult = importResult.result;
         if(typedResult.type === 'ImportedFileCopy') {
-            logInfo(addLogEvent, "Successfully copied " + filename + " to " + typedResult.copied_to + " due to request from " + typedResult.mod_id);
+            Log.info("Successfully copied " + filename + " to " + typedResult.copied_to + " due to request from " + typedResult.mod_id);
             toast.success("Successfully copied " + filename + " to the path specified by " + typedResult.mod_id);
         }   else if(typedResult.type === 'ImportedSong') {
             toast.success("Successfully imported song " + filename);
@@ -270,7 +266,7 @@ function AddModsMenu(props: ModMenuProps) {
 
     async function handleFileImport(file: File) {
         try {
-            const importResult = await importFile(device, file, addLogEvent);
+            const importResult = await importFile(device, file);
             await onImportResult(importResult);
         }   catch(e)   {
             toast.error("Failed to import file: " + e);
@@ -283,7 +279,7 @@ function AddModsMenu(props: ModMenuProps) {
             return;
         }
         try {
-            const importResult = await importUrl(device, url, addLogEvent)
+            const importResult = await importUrl(device, url)
             await onImportResult(importResult);
         }   catch(e)   {
             toast.error(`Failed to import file: ${e}`);
@@ -350,7 +346,7 @@ function AddModsMenu(props: ModMenuProps) {
         <ModRepoBrowser existingMods={mods} gameVersion={gameVersion} onDownload={async url => {
             setWorking(true);
             try {
-                await onImportResult(await importUrl(device, url, addLogEvent));
+                await onImportResult(await importUrl(device, url));
             }   catch(e) { 
                 setError("Failed to install mod " + e);
             }   finally {

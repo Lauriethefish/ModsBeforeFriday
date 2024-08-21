@@ -1,13 +1,11 @@
 import { AdbSync, AdbSyncWriteOptions, Adb, encodeUtf8 } from '@yume-chan/adb';
 import { Consumable, ConcatStringStream, TextDecoderStream, MaybeConsumable, ReadableStream } from '@yume-chan/stream-extra';
 import { Request, Response, LogMsg, ModStatus, Mods, FixedPlayerData, ImportResult, DowngradedManifest, Patched, ModSyncResult } from "./Messages";
-import { Mod } from './Models';
 import { AGENT_SHA1 } from './agent_manifest';
 import { toast } from 'react-toastify';
+import { Log } from './Logging';
 
 const AgentPath: string = "/data/local/tmp/mbf-agent";
-
-export type LogEventSink = ((event: LogMsg) => void) | null;
 
 // Converts the provided byte array into a ReadableStream that can be fed into ADB.
 function readableStreamFromByteArray(array: Uint8Array): ReadableStream<Uint8Array> {
@@ -19,19 +17,8 @@ function readableStreamFromByteArray(array: Uint8Array): ReadableStream<Uint8Arr
   });
 }
 
-export function logInfo(sink: LogEventSink, msg: string) {
-  console.log(msg);
-  if(sink !== null) {
-    sink({
-      type: "LogMsg",
-      level: "Info",
-      message: msg
-    })
-  }
-}
-
-export async function prepareAgent(adb: Adb, eventSink: LogEventSink) {
-  logInfo(eventSink, "Preparing agent: used to communicate with your Quest.");
+export async function prepareAgent(adb: Adb) {
+  Log.info("Preparing agent: used to communicate with your Quest.");
 
   console.log("Latest agent SHA1 " + AGENT_SHA1);
 
@@ -41,36 +28,35 @@ export async function prepareAgent(adb: Adb, eventSink: LogEventSink) {
   console.log("Existing agent SHA1: " + existingSha1);
   const existingUpToDate = AGENT_SHA1 == existingSha1.trim().toUpperCase();
   if(existingUpToDate) {
-    logInfo(eventSink, "Agent is up to date");
+    Log.info("Agent is up to date");
   } else  {
-    await overwriteAgent(adb, eventSink);
+    await overwriteAgent(adb);
   }
-
 }
 
-export async function overwriteAgent(adb: Adb, eventSink: LogEventSink) {
+export async function overwriteAgent(adb: Adb) {
   const sync = await adb.sync();
   console.group("Downloading and overwriting agent on Quest");
   try {
-    logInfo(eventSink, "Removing existing agent");
+    Log.info("Removing existing agent");
     await adb.subprocess.spawnAndWait("rm " + AgentPath)
-    logInfo(eventSink, "Downloading agent, this might take a minute")
-    await saveAgent(sync, eventSink);
-    logInfo(eventSink, "Making agent executable");
+    Log.info("Downloading agent, this might take a minute")
+    await saveAgent(sync);
+    Log.info("Making agent executable");
     await adb.subprocess.spawnAndWait("chmod +x " + AgentPath);
 
-    logInfo(eventSink, "Agent is ready");
+    Log.info("Agent is ready");
   } finally {
     sync.dispose();
     console.groupEnd();
   }
 }
 
-async function saveAgent(sync: AdbSync, eventSink: LogEventSink) {
+async function saveAgent(sync: AdbSync) {
   // Timeout, in seconds, before the app will treat the agent upload as failed and terminate the connection.
   const AGENT_UPLOAD_TIMEOUT: number = 30;
 
-  const agent: Uint8Array = await downloadAgent(eventSink);
+  const agent: Uint8Array = await downloadAgent();
   const file: ReadableStream<MaybeConsumable<Uint8Array>> = readableStreamFromByteArray(agent);
 
   const options: AdbSyncWriteOptions = {
@@ -78,7 +64,7 @@ async function saveAgent(sync: AdbSync, eventSink: LogEventSink) {
     file
   };
 
-  logInfo(eventSink, "Writing agent to quest!");
+  Log.info("Writing agent to quest!");
   const timeoutPromise = new Promise((_, reject) => {
     setTimeout(() => reject(new Error(`Did not finish pushing agent after ${AGENT_UPLOAD_TIMEOUT} seconds.\n`
         + `In practice, pushing the agent takes less than a second, so this is a bug. Please report this issue including information about `
@@ -89,7 +75,7 @@ async function saveAgent(sync: AdbSync, eventSink: LogEventSink) {
   await Promise.race([timeoutPromise, sync.write(options)])
 }
   
-async function downloadAgent(eventSink: LogEventSink): Promise<Uint8Array> {
+async function downloadAgent(): Promise<Uint8Array> {
   const MAX_ATTEMPTS: number = 3;
   const PROGRESS_UPDATE_INTERVAL = 1000; // Time between download progress updates, in milliseconds
 
@@ -129,7 +115,7 @@ async function downloadAgent(eventSink: LogEventSink): Promise<Uint8Array> {
             // Calculate the percentage of the download that has completed
             const percentComplete = (event.loaded / event.total) * 100.0;
             lastReadTime = timeNow;
-            logInfo(eventSink, `Download ${Math.round(percentComplete * 10) / 10}% complete`);
+            Log.info(`Download ${Math.round(percentComplete * 10) / 10}% complete`);
           }
         }
 
@@ -138,38 +124,19 @@ async function downloadAgent(eventSink: LogEventSink): Promise<Uint8Array> {
 
       return new Uint8Array(xhr.response);
     } catch(e) {
-      logInfo(eventSink, "Failed to fetch agent, status " + e);
+      Log.info("Failed to fetch agent, status " + e);
     }
 
     attempt++;
     if(attempt <= MAX_ATTEMPTS) {
-      logInfo(eventSink, `Failed to download agent, trying again... (attempt ${attempt}/${MAX_ATTEMPTS})`);
+      Log.info(`Failed to download agent, trying again... (attempt ${attempt}/${MAX_ATTEMPTS})`);
     }
   } while(!ok && attempt <= MAX_ATTEMPTS);
 
   throw new Error("Failed to fetch agent after multiple attempts.\nDid you lose internet connection just after you loaded the site?\n\nIf not, then please report this issue, including a screenshot of the browser console window!");
 }
 
-function logFromAgent(log: LogMsg) {
-  switch(log.level) {
-    case 'Error':
-      console.error(log.message);
-      break;
-    case 'Warn':
-      console.warn(log.message);
-      break;
-    case 'Debug':
-      console.debug(log.message);
-      break;
-    case 'Info':
-      console.info(log.message);
-      break;
-    case 'Trace':
-      console.trace(log.message);
-  }
-}
-
-async function sendRequest(adb: Adb, request: Request, eventSink: LogEventSink = null): Promise<Response> {
+async function sendRequest(adb: Adb, request: Request): Promise<Response> {
   let command_buffer = encodeUtf8(JSON.stringify(request) + "\n");
 
   let agentProcess = await adb.subprocess.spawn(AgentPath);
@@ -217,10 +184,7 @@ async function sendRequest(adb: Adb, request: Request, eventSink: LogEventSink =
       }
       if(msg_obj.type === "LogMsg") {
         const log_obj = msg_obj as LogMsg;
-        logFromAgent(log_obj);
-        if(eventSink != null) {
-          eventSink(log_obj);
-        }
+        Log.emitEvent(log_obj);
 
         // Errors need to be thrown later in the function
         if(msg_obj.level === 'Error') {
@@ -264,40 +228,38 @@ export function setCoreModOverrideUrl(core_mod_override_url: string | null) {
 }
 
 // Gets the status of mods from the quest, i.e. whether the app is patched, and what mods are currently installed.
-export async function loadModStatus(device: Adb, eventSink: LogEventSink = null): Promise<ModStatus> {
-  await prepareAgent(device, eventSink);
+export async function loadModStatus(device: Adb): Promise<ModStatus> {
+  await prepareAgent(device);
 
   return await sendRequest(device, {
       type: 'GetModStatus',
       override_core_mod_url: CORE_MOD_OVERRIDE_URL,
-  }, eventSink) as ModStatus;
+  }) as ModStatus;
 }
 
 // Tells the backend to attempt to uninstall/install the given mods, depending on the new install status provided in `changesRequested`.
 export async function setModStatuses(device: Adb,
-  changesRequested: { [id: string]: boolean },
-  eventSink: LogEventSink = null): Promise<ModSyncResult> {
+  changesRequested: { [id: string]: boolean }): Promise<ModSyncResult> {
   let response = await sendRequest(device, {
       type: 'SetModsEnabled',
       statuses: changesRequested
-  }, eventSink);
+  });
 
   return response as ModSyncResult;
 }
 
 // Gets the AndroidManifest.xml file for the given Beat Saber APK version, converted from AXML to XML.
-export async function getDowngradedManifest(device: Adb, gameVersion: string, eventSink: LogEventSink = null): Promise<string> {
+export async function getDowngradedManifest(device: Adb, gameVersion: string): Promise<string> {
   let response = await sendRequest(device, {
     type: 'GetDowngradedManifest',
     version: gameVersion
-  }, eventSink);
+  });
 
   return (response as DowngradedManifest).manifest_xml;
 }
 
 export async function importFile(device: Adb,
-    file: File,
-    eventSink: LogEventSink = null): Promise<ImportResult> {
+    file: File): Promise<ImportResult> {
   const sync = await device.sync();
   const tempPath = "/data/local/tmp/mbf-uploads/" + file.name;
   try {
@@ -312,7 +274,7 @@ export async function importFile(device: Adb,
     const response = await sendRequest(device, {
       'type': 'Import',
       from_path: tempPath
-    }, eventSink);
+    });
 
     return response as ImportResult;
   } finally {
@@ -321,23 +283,21 @@ export async function importFile(device: Adb,
 }
 
 export async function importUrl(device: Adb,
-url: string,
-eventSink: LogEventSink = null) {
+url: string) {
   const response = await sendRequest(device, {
     type: 'ImportUrl',
     from_url: url
-  }, eventSink);
+  });
 
   return response as ImportResult;
 }
 
 export async function removeMod(device: Adb,
-  mod_id: string,
-  eventSink: LogEventSink = null) {
+  mod_id: string) {
   let response = await sendRequest(device, {
       type: 'RemoveMod',
       id: mod_id
-  }, eventSink);
+  });
 
   return (response as Mods).installed_mods;
 }
@@ -350,8 +310,7 @@ export async function patchApp(device: Adb,
   downgradeToVersion: string | null,
   manifestMod: string,
   remodding: boolean,
-  allow_no_core_mods: boolean,
-  eventSink: LogEventSink = null): Promise<ModStatus> {
+  allow_no_core_mods: boolean): Promise<ModStatus> {
   console.log("Patching with manifest", manifestMod);
 
   let response = await sendRequest(device, {
@@ -361,7 +320,7 @@ export async function patchApp(device: Adb,
       allow_no_core_mods: allow_no_core_mods,
       override_core_mod_url: CORE_MOD_OVERRIDE_URL,
       remodding
-  }, eventSink) as Patched;
+  }) as Patched;
 
   if(response.did_remove_dlc) {
     toast.warning("MBF (temporarily) deleted installed DLC while downgrading your game. To get them back, FIRST restart your headset THEN download the DLC in-game.",
@@ -392,13 +351,12 @@ export async function patchApp(device: Adb,
 // Should fix many common issues with an install.
 export async function quickFix(device: Adb,
   beforeFix: ModStatus,
-  wipe_existing_mods: boolean,
-  eventSink: LogEventSink = null): Promise<ModStatus> {
+  wipe_existing_mods: boolean): Promise<ModStatus> {
   let response = await sendRequest(device, {
       type: 'QuickFix',
       override_core_mod_url: CORE_MOD_OVERRIDE_URL,
       wipe_existing_mods
-  }, eventSink);
+  });
 
   // Update the mod status to reflect the fixed installation
   return {
@@ -416,9 +374,8 @@ export async function quickFix(device: Adb,
 }
 
 // Attempts to fix the black screen issue on Quest 3.
-export async function fixPlayerData(device: Adb,
-  eventSink: LogEventSink = null): Promise<boolean> {
-  let response = await sendRequest(device, { type: 'FixPlayerData' }, eventSink);
+export async function fixPlayerData(device: Adb): Promise<boolean> {
+  let response = await sendRequest(device, { type: 'FixPlayerData' });
 
   return (response as FixedPlayerData).existed
 }

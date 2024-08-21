@@ -64,10 +64,9 @@ export function CompareBeatSaberVersions(a: string, b: string): number {
 export function DeviceModder(props: DeviceModderProps) {
     const [modStatus, setModStatus] = useState(null as ModStatus | null);
     const { device, quit } = props;
-    const { addLogEvent } = useLogStore();
 
     useEffect(() => {
-        loadModStatus(device, addLogEvent)
+        loadModStatus(device)
             .then(loadedModStatus => setModStatus(loadedModStatus))
             .catch(err => quit(err));
     }, [device, quit]);
@@ -185,7 +184,6 @@ interface InstallStatusProps {
 function InstallStatus(props: InstallStatusProps) {
     const { modStatus, onFixed, device } = props;
 
-    const { addLogEvent } = useLogStore();
     const [error, setError] = useState(null as string | null);
     const [fixing, setFixing] = useState(false);
 
@@ -211,7 +209,7 @@ function InstallStatus(props: InstallStatusProps) {
             <button onClick={async () => {
                 try {
                     setFixing(true);
-                    onFixed(await quickFix(device, modStatus, false, addLogEvent));
+                    onFixed(await quickFix(device, modStatus, false));
                 } catch (e) {
                     setError(String(e));
                 } finally {
@@ -272,7 +270,6 @@ interface PatchingMenuProps {
 
 function PatchingMenu(props: PatchingMenuProps) {
     const [isPatching, setIsPatching] = useState(false);
-    const { addLogEvent } = useLogStore();
     const [patchingError, setPatchingError] = useState(null as string | null);
     const [selectingPerms, setSelectingPerms] = useState(false);
     const [versionSelectOpen, setVersionSelectOpen] = useState(false);
@@ -290,7 +287,7 @@ function PatchingMenu(props: PatchingMenuProps) {
         if(downgradingTo === null) {
             setManifest(new AndroidManifest(props.modStatus.app_info!.manifest_xml));
         }   else    {
-            getDowngradedManifest(device, downgradingTo, addLogEvent)
+            getDowngradedManifest(device, downgradingTo)
                 .then(manifest_xml => setManifest(new AndroidManifest(manifest_xml)))
                 .catch(e => {
                     // TODO: Perhaps revert to "not downgrading" if this error comes up (but only if the latest version is moddable)
@@ -341,7 +338,7 @@ function PatchingMenu(props: PatchingMenuProps) {
                 <button className="largeCenteredButton" onClick={async () => {
                     setIsPatching(true);
                     try {
-                        onCompleted(await patchApp(device, modStatus, downgradingTo, manifest.toString(), false, isDeveloperUrl, addLogEvent));
+                        onCompleted(await patchApp(device, modStatus, downgradingTo, manifest.toString(), false, isDeveloperUrl));
                     } catch (e) {
                         setPatchingError(String(e));
                         setIsPatching(false);
