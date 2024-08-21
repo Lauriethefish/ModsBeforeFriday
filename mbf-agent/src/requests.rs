@@ -33,7 +33,7 @@ pub enum Request {
     /// This will also attempt to download and install dependencies, upgrade dependencies and will uninstall any
     /// depending mods of mods that have been disabled.
     /// 
-    /// Returns a `Mods` response.
+    /// Returns a `ModSyncResult` response.
     SetModsEnabled {
         statuses: HashMap<String, bool>
     },
@@ -163,6 +163,13 @@ pub enum Response {
     },
     Mods {
         installed_mods: Vec<ModModel>
+    },
+    ModSyncResult {
+        // The new state of the installed mods after the operation
+        installed_mods: Vec<ModModel>,
+        // If any of the mods failed to install/uninstall, this will be Some with a string
+        // containing a list of the errors generated.
+        failures: Option<String>
     },
     Patched {
         installed_mods: Vec<ModModel>,

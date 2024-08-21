@@ -64,6 +64,12 @@ export interface Mods {
     installed_mods: Mod[]
 }
 
+export interface ModSyncResult {
+    type: 'ModSyncResult',
+    installed_mods: Mod[],
+    failures: string | null
+}
+
 export interface Patched {
     type: 'Patched',
     installed_mods: Mod[],
@@ -125,7 +131,7 @@ export interface DowngradedManifest {
     manifest_xml: string
 }
 
-export type Response = LogMsg | ModStatus | Mods | ImportResult | FixedPlayerData | DowngradedManifest | Patched;
+export type Response = LogMsg | ModStatus | Mods | ImportResult | FixedPlayerData | DowngradedManifest | Patched | ModSyncResult;
 
 export interface CoreModsInfo {
     supported_versions: string[],

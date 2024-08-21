@@ -1,6 +1,6 @@
 import { AdbSync, AdbSyncWriteOptions, Adb, encodeUtf8 } from '@yume-chan/adb';
 import { Consumable, ConcatStringStream, TextDecoderStream, MaybeConsumable, ReadableStream } from '@yume-chan/stream-extra';
-import { Request, Response, LogMsg, ModStatus, Mods, FixedPlayerData, ImportResult, DowngradedManifest, Patched } from "./Messages";
+import { Request, Response, LogMsg, ModStatus, Mods, FixedPlayerData, ImportResult, DowngradedManifest, Patched, ModSyncResult } from "./Messages";
 import { Mod } from './Models';
 import { AGENT_SHA1 } from './agent_manifest';
 import { toast } from 'react-toastify';
@@ -276,13 +276,13 @@ export async function loadModStatus(device: Adb, eventSink: LogEventSink = null)
 // Tells the backend to attempt to uninstall/install the given mods, depending on the new install status provided in `changesRequested`.
 export async function setModStatuses(device: Adb,
   changesRequested: { [id: string]: boolean },
-  eventSink: LogEventSink = null): Promise<Mod[]> {
+  eventSink: LogEventSink = null): Promise<ModSyncResult> {
   let response = await sendRequest(device, {
       type: 'SetModsEnabled',
       statuses: changesRequested
   }, eventSink);
 
-  return (response as Mods).installed_mods;
+  return response as ModSyncResult;
 }
 
 // Gets the AndroidManifest.xml file for the given Beat Saber APK version, converted from AXML to XML.

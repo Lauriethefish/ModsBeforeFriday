@@ -135,18 +135,11 @@ function InstalledModsMenu(props: ModMenuProps) {
             console.log("Installing mods, statuses requested: " + JSON.stringify(changes));
             try {
                 setWorking(true);
-                const updatedMods = await setModStatuses(device, changes, addLogEvent);
-                let allSuccesful = true;
-                updatedMods.forEach(m => {
-                    if(m.id in changes && m.is_enabled !== changes[m.id]) {
-                        allSuccesful = false;
-                    }
-                })
-                setMods(updatedMods);
+                const modSyncResult = await setModStatuses(device, changes, addLogEvent);
+                setMods(modSyncResult.installed_mods);
 
-                if(!allSuccesful) {
-                    setError("Not all the selected mods were successfully installed/uninstalled."
-                    + "\nThis happens when two changes are made that conflict, e.g. trying to install a mod but uninstall one of its dependencies.");
+                if(modSyncResult.failures !== null) {
+                    setError(modSyncResult.failures);
                 }
             }   catch(e) {
                 setError(String(e));
@@ -243,8 +236,21 @@ function AddModsMenu(props: ModMenuProps) {
             // Don't install a mod by default if its version mismatches: we want the user to understand the consequences
             setError("The mod `" + imported_id + "` was not enabled automatically as it is not designed for game version v" + trimGameVersion(gameVersion) + ".");
         }   else    {
-            setMods(await setModStatuses(device, { [imported_id]: true }, addLogEvent));
-            toast.success("Successfully downloaded and installed " + imported_id + " v" + imported_mod.version)
+            try {
+                const result = await setModStatuses(device, { [imported_id]: true }, addLogEvent);
+                setMods(result.installed_mods);
+
+                // This is where typical mod install failures occur
+                if (result.failures !== null) {
+                    setError(result.failures);
+                }   else    {
+                    toast.success("Successfully downloaded and installed " + imported_id + " v" + imported_mod.version)
+                }
+
+            }   catch(err) {
+                // If this occurs, it's a panic i.e. bug in the agent
+                setError(`Failed to install ${imported_id} after importing due to an internal error: ${err}`);
+            }
         }
     }
 
