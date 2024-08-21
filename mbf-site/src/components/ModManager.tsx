@@ -1,5 +1,4 @@
 import { useRef, useState } from "react";
-import { useLog } from "./LogWindow";
 import { Mod, trimGameVersion } from "../Models";
 import { ErrorModal, Modal, SyncingModal } from "./Modal";
 import { Adb } from '@yume-chan/adb';
@@ -14,6 +13,7 @@ import { ImportResult, ImportedMod, ModStatus } from "../Messages";
 import { OptionsMenu } from "./OptionsMenu";
 import useFileDropper from "../hooks/useFileDropper";
 import { LogEventSink, logInfo } from "../Agent";
+import { useLogStore } from "../Logging";
 
 interface ModManagerProps {
     gameVersion: string,
@@ -31,7 +31,6 @@ export function ModManager(props: ModManagerProps) {
     const mods = modStatus.installed_mods;
 
     const [isWorking, setWorking] = useState(false);
-    const [logEvents, addLogEvent] = useLog();
     const [modError, setModError] = useState(null as string | null);
     const [menu, setMenu] = useState('add' as SelectedMenu);
 
@@ -50,7 +49,6 @@ export function ModManager(props: ModManagerProps) {
                 gameVersion={gameVersion}
                 setError={err => setModError(err)}
                 device={device}
-                addLogEvent={addLogEvent}
             />
         </div>
         
@@ -62,7 +60,6 @@ export function ModManager(props: ModManagerProps) {
                 gameVersion={gameVersion}
                 setError={err => setModError(err)}
                 device={device}
-                addLogEvent={addLogEvent}
             />
         </div>
         
@@ -79,7 +76,7 @@ export function ModManager(props: ModManagerProps) {
             title={"Failed to sync mods"}
             description={modError!}
             onClose={() => setModError(null)} />
-        <SyncingModal isVisible={isWorking} title="Syncing Mods..." logEvents={logEvents} />
+        <SyncingModal isVisible={isWorking} title="Syncing Mods..." />
     </>
 }
 
@@ -113,7 +110,6 @@ interface ModMenuProps {
     gameVersion: string,
     setWorking: (working: boolean) => void,
     setError: (err: string) => void,
-    addLogEvent: LogEventSink,
     device: Adb
 }
 
@@ -123,12 +119,12 @@ function InstalledModsMenu(props: ModMenuProps) {
         gameVersion,
         setWorking,
         setError,
-        addLogEvent,
         device
     } = props;
 
     const [changes, setChanges] = useState({} as { [id: string]: boolean });
     const hasChanges = Object.keys(changes).length > 0;
+    const { addLogEvent } = useLogStore();
 
     return <div className="installedModsMenu">
         {hasChanges && <button id="syncButton" onClick={async () => {
@@ -221,9 +217,10 @@ function AddModsMenu(props: ModMenuProps) {
         gameVersion,
         setWorking,
         setError,
-        addLogEvent,
         device
     } = props;
+
+    const { addLogEvent } = useLogStore();
 
     // Automatically installs a mod when it is imported, or warns the user if it isn't designed for the current game version.
     // Gives appropriate toasts/reports errors in each case.

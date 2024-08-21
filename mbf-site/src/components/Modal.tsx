@@ -1,9 +1,10 @@
-import { ReactNode } from "react";
+import { ReactNode, useContext } from "react";
 import AlertIcon from '../icons/alert-triangle.svg'
 
 import '../css/Modal.css';
 import { LogMsg } from "../Messages";
 import { LogWindow } from "./LogWindow";
+import { LogContext } from "../Logging";
 
 interface ModalProps {
     children: ReactNode,
@@ -71,7 +72,6 @@ export function YesNoModal(props: YesNoModalProps) {
 interface SyncingModalProps {
     isVisible: boolean,
     title: string,
-    logEvents: LogMsg[]
 }
 
 export function SyncingModal(props: SyncingModalProps) {
@@ -80,7 +80,7 @@ export function SyncingModal(props: SyncingModalProps) {
             <div className="modal container screenWidth">
                 <div className="syncingWindow">
                     <h1>{props.title}</h1>
-                    <LogWindow events={props.logEvents} />
+                    <LogWindow />
                 </div>
             </div>
         </div>

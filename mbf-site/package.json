@@ -26,7 +26,8 @@
     "vite": "^5.2.8",
     "vite-plugin-mkcert": "^1.17.5",
     "vite-tsconfig-paths": "^4.3.2",
-    "web-vitals": "^2.1.0"
+    "web-vitals": "^2.1.0",
+    "zustand": "^4.5.5"
   },
   "scripts": {
     "start": "concurrently \"yarn run dev\" \"cd .. && cargo run --release --bin mbf-adb-killer\"",

@@ -3,13 +3,14 @@ import { getDowngradedManifest, loadModStatus, patchApp, quickFix } from "./Agen
 import { ReactNode, useEffect, useState } from 'react';
 import { ModLoader, ModStatus } from './Messages';
 import './css/DeviceModder.css';
-import { LogWindow, useLog } from './components/LogWindow';
+import { LogWindow } from './components/LogWindow';
 import { ErrorModal, Modal, SyncingModal } from './components/Modal';
 import { ModManager } from './components/ModManager';
 import { trimGameVersion } from './Models';
 import { PermissionsMenu } from './components/PermissionsMenu';
 import { SelectableList } from './components/SelectableList';
 import { AndroidManifest } from './AndroidManifest';
+import { useLogStore } from './Logging';
 
 interface DeviceModderProps {
     device: Adb,
@@ -63,7 +64,7 @@ export function CompareBeatSaberVersions(a: string, b: string): number {
 export function DeviceModder(props: DeviceModderProps) {
     const [modStatus, setModStatus] = useState(null as ModStatus | null);
     const { device, quit } = props;
-    const [logEvents, addLogEvent] = useLog();
+    const { addLogEvent } = useLogStore();
 
     useEffect(() => {
         loadModStatus(device, addLogEvent)
@@ -76,7 +77,7 @@ export function DeviceModder(props: DeviceModderProps) {
         return <div className='container mainContainer fadeIn'>
             <h2>Checking Beat Saber installation</h2>
             <p>This might take a minute or so the first few times.</p>
-            <LogWindow events={logEvents} />
+            <LogWindow />
         </div>
     } else if (modStatus.app_info === null) {
         return <div className='container mainContainer'>
@@ -184,7 +185,7 @@ interface InstallStatusProps {
 function InstallStatus(props: InstallStatusProps) {
     const { modStatus, onFixed, device } = props;
 
-    const [logEvents, addLogEvent] = useLog();
+    const { addLogEvent } = useLogStore();
     const [error, setError] = useState(null as string | null);
     const [fixing, setFixing] = useState(false);
 
@@ -218,7 +219,7 @@ function InstallStatus(props: InstallStatusProps) {
                 }
             }}>Fix issues</button>
 
-            <SyncingModal isVisible={fixing} title="Fixing issues" logEvents={logEvents} />
+            <SyncingModal isVisible={fixing} title="Fixing issues" />
             <ErrorModal title="Failed to fix issues"
                 description={error!}
                 isVisible={error != null}
@@ -271,7 +272,7 @@ interface PatchingMenuProps {
 
 function PatchingMenu(props: PatchingMenuProps) {
     const [isPatching, setIsPatching] = useState(false);
-    const [logEvents, addLogEvent] = useLog();
+    const { addLogEvent } = useLogStore();
     const [patchingError, setPatchingError] = useState(null as string | null);
     const [selectingPerms, setSelectingPerms] = useState(false);
     const [versionSelectOpen, setVersionSelectOpen] = useState(false);
@@ -368,7 +369,7 @@ function PatchingMenu(props: PatchingMenuProps) {
             <h1>App is being patched</h1>
             <p>This should only take a few minutes, but could take much, much longer if your internet connection is slow.</p>
             <p className='warning'>You must not disconnect your device during this process.</p>
-            <LogWindow events={logEvents} />
+            <LogWindow />
         </div>
     }
 }

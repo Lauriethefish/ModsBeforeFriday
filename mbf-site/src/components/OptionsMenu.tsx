@@ -7,9 +7,9 @@ import { ErrorModal, Modal, SyncingModal } from './Modal';
 import { PermissionsMenu } from './PermissionsMenu';
 import '../css/OptionsMenu.css'
 import { Collapsible } from './Collapsible';
-import { useLog } from './LogWindow';
 import { ModStatus } from '../Messages';
 import { AndroidManifest } from '../AndroidManifest';
+import { useLogStore } from '../Logging';
 
 export function OptionsMenu({ device, quit, modStatus, setModStatus }: {
     device: Adb,
@@ -37,7 +37,7 @@ function ModTools({ device, quit, modStatus, setModStatus }: {
     setModStatus: (status: ModStatus) => void}) {
     const [err, setErr] = useState(null as string | null);
     const [isWorking, setWorking] = useState(false);
-    const [logEvents, addLogEvent] = useLog();
+    const { addLogEvent } = useLogStore();
 
     return <div id="modTools">
         <button onClick={async () => {
@@ -99,7 +99,7 @@ function ModTools({ device, quit, modStatus, setModStatus }: {
             onClose={() => setErr(null)}
         />
 
-        <SyncingModal title="Reinstalling only core mods" logEvents={logEvents} isVisible={isWorking}/>
+        <SyncingModal title="Reinstalling only core mods" isVisible={isWorking}/>
     </div>
 }
 
@@ -113,7 +113,7 @@ function RepatchMenu({ device, modStatus, quit }: {
         manifest.current.applyPatchingManifestMod();
     }, []);
 
-    const [logs, addLogEvent] = useLog();
+    const { addLogEvent } = useLogStore();
     const [isPatching, setPatching] = useState(false);
 
     return <>
@@ -137,7 +137,7 @@ function RepatchMenu({ device, modStatus, quit }: {
             }
         }}>Repatch game</button>
 
-        <SyncingModal title="Repatching Beat Saber" isVisible={isPatching} logEvents={logs} />
+        <SyncingModal title="Repatching Beat Saber" isVisible={isPatching} />
     </>
 }
 
