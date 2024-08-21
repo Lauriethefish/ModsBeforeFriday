@@ -484,8 +484,8 @@ impl ModManager {
 
         // Check that upgrading the mod to the new version is actually safe...
         let id = loaded_mod_manifest.id.clone();
-        if !self.check_dependency_compatibility(&id, &loaded_mod_manifest.version) {
-            return Err(anyhow!("Could not upgrade {} to v{}", id, loaded_mod_manifest.version))
+        if let Err(msg) = self.check_dependency_compatibility(&id, &loaded_mod_manifest.version) {
+            return Err(anyhow!("Could not upgrade {} to v{}: {}", id, loaded_mod_manifest.version, msg))
         }
 
         // Remove the existing version of the mod, 
@@ -559,9 +559,11 @@ impl ModManager {
     }
 
     // Checks that upgrading the dependency with ID dep_id to new_version will not result in an incompatibility with an existing installed mod.
-    // Returns false if any mod has an incompatibility
-    // Logs any issues discovered.
-    fn check_dependency_compatibility(&self, dep_id: &str, new_version: &Version) -> bool {
+    // Gives Err with a string containing the list of incompatibilities found, if any.
+    // Gives Ok if no incompatibilities are found.
+    // Also logs any issues discovered.
+    fn check_dependency_compatibility(&self, dep_id: &str, new_version: &Version) -> Result<(), String> {
+        let mut incompatibilities = String::new();
         let mut all_compatible = true;
         for (_, existing_mod) in &self.mods {
             let mod_ref = (**existing_mod).borrow();
@@ -578,16 +580,26 @@ impl ModManager {
                 Some(existing_dep) => 
                 if !existing_dep.version_range.matches(new_version) {
                     all_compatible = false;
-                    error!("Cannot upgrade {dep_id} to {new_version}: Mod {} depends on range {}", 
+                    let incompat_msg = format!("Mod {} depends on range {}", 
                         mod_ref.manifest.id,
                         existing_dep.version_range
-                    )
+                    );
+
+                    error!("Cannot upgrade {dep_id} to {new_version}: {incompat_msg}");
+                    // Append each message to the overall error.
+                    incompatibilities.push_str(&incompat_msg);
+                    incompatibilities.push('\n');
                 },
                 None => {}
             }
         }
 
-        all_compatible
+        if all_compatible {
+            Ok(())
+        }   else {
+            incompatibilities.pop();
+            Err(incompatibilities)
+        }
     }
 }
 
