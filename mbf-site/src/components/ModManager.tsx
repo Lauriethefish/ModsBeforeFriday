@@ -13,7 +13,7 @@ import { ImportResult, ImportedMod, ModStatus } from "../Messages";
 import { OptionsMenu } from "./OptionsMenu";
 import useFileDropper from "../hooks/useFileDropper";
 import { Log } from "../Logging";
-import { useSetWorking, useSyncStore } from "../SyncStore";
+import { useSetWorking, useSyncStore, wrapOperation } from "../SyncStore";
 
 interface ModManagerProps {
     gameVersion: string,
@@ -32,7 +32,7 @@ export function ModManager(props: ModManagerProps) {
 
     const [modError, setModError] = useState(null as string | null);
     const [menu, setMenu] = useState('add' as SelectedMenu);
-    const { currentOperation } = useSyncStore();
+    const { currentOperation, currentError, setError } = useSyncStore();
 
     sortByIdAndIfCore(mods);
 
@@ -46,7 +46,6 @@ export function ModManager(props: ModManagerProps) {
                 mods={mods}
                 setMods={setMods}
                 gameVersion={gameVersion}
-                setError={err => setModError(err)}
                 device={device}
             />
         </div>
@@ -56,7 +55,6 @@ export function ModManager(props: ModManagerProps) {
                 mods={mods}
                 setMods={setMods}
                 gameVersion={gameVersion}
-                setError={err => setModError(err)}
                 device={device}
             />
         </div>
@@ -76,6 +74,9 @@ export function ModManager(props: ModManagerProps) {
             onClose={() => setModError(null)} />
 
         <SyncingModal isVisible={currentOperation !== null} title={currentOperation ?? ""} />
+        <ErrorModal isVisible={currentError !== null} title={currentError?.title ?? ""} onClose={() => setError(null)}>
+            {currentError?.error ?? ""}
+        </ErrorModal>
     </>
 }
 
@@ -107,7 +108,6 @@ interface ModMenuProps {
     mods: Mod[],
     setMods: (mods: Mod[]) => void,
     gameVersion: string,
-    setError: (err: string) => void,
     device: Adb
 }
 
@@ -115,7 +115,6 @@ function InstalledModsMenu(props: ModMenuProps) {
     const { mods,
         setMods,
         gameVersion,
-        setError,
         device
     } = props;
 
@@ -126,20 +125,15 @@ function InstalledModsMenu(props: ModMenuProps) {
         {hasChanges && <button id="syncButton" onClick={async () => {
             setChanges({});
             console.log("Installing mods, statuses requested: " + JSON.stringify(changes));
-            const setWorking = useSetWorking("Syncing mods");
-            try {
-                setWorking(true);
+            await wrapOperation("Syncing mods", "Failed to sync mods", async () => {
                 const modSyncResult = await setModStatuses(device, changes);
                 setMods(modSyncResult.installed_mods);
 
                 if(modSyncResult.failures !== null) {
-                    setError(modSyncResult.failures);
+                    throw modSyncResult.failures;
                 }
-            }   catch(e) {
-                setError(String(e));
-            }  finally {
-                setWorking(false);
-            }
+            });
+
         }}>Sync Changes</button>}
 
 		<div className="mod-list">
@@ -148,15 +142,9 @@ function InstalledModsMenu(props: ModMenuProps) {
 				mod={mod}
 				key={mod.id}
 				onRemoved={async () => {
-                    const setWorking = useSetWorking("Removing mod");
-					setWorking(true);
-					try {
+                    await wrapOperation("Removing mod", "Failed to remove mod", async () => {
 						setMods(await removeMod(device, mod.id));
-					}   catch(e) {
-						setError(String(e));
-					}   finally {
-						setWorking(false);
-					}
+                    });
 				}}
 				onEnabledChanged={enabled => {
 					const newChanges = { ...changes };
@@ -213,7 +201,6 @@ function AddModsMenu(props: ModMenuProps) {
         mods,
         setMods,
         gameVersion,
-        setError,
         device
     } = props;
 
@@ -227,7 +214,8 @@ function AddModsMenu(props: ModMenuProps) {
         const versionMismatch = imported_mod.game_version !== null &&gameVersion !== imported_mod.game_version;
         if(versionMismatch) {
             // Don't install a mod by default if its version mismatches: we want the user to understand the consequences
-            setError("The mod `" + imported_id + "` was not enabled automatically as it is not designed for game version v" + trimGameVersion(gameVersion) + ".");
+            toast.error("The mod `" + imported_id + "` was not enabled automatically as it is not designed for game version v" 
+                + trimGameVersion(gameVersion) + ".", { autoClose: false });
         }   else    {
             try {
                 const result = await setModStatuses(device, { [imported_id]: true });
@@ -235,14 +223,14 @@ function AddModsMenu(props: ModMenuProps) {
 
                 // This is where typical mod install failures occur
                 if (result.failures !== null) {
-                    setError(result.failures);
+                    toast.error(result.failures, { autoClose: false });
                 }   else    {
                     toast.success("Successfully downloaded and installed " + imported_id + " v" + imported_mod.version)
                 }
 
             }   catch(err) {
                 // If this occurs, it's a panic i.e. bug in the agent
-                setError(`Failed to install ${imported_id} after importing due to an internal error: ${err}`);
+                toast.error(`Failed to install ${imported_id} after importing due to an internal error: ${err}`, { autoClose: false} );
             }
         }
     }

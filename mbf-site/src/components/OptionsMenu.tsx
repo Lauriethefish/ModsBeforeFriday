@@ -3,13 +3,12 @@ import { uninstallBeatSaber } from '../DeviceModder';
 import { useEffect, useRef, useState } from 'react';
 import { fixPlayerData, patchApp, quickFix } from '../Agent';
 import { toast } from 'react-toastify';
-import { ErrorModal } from './Modal';
 import { PermissionsMenu } from './PermissionsMenu';
 import '../css/OptionsMenu.css'
 import { Collapsible } from './Collapsible';
 import { ModStatus } from '../Messages';
 import { AndroidManifest } from '../AndroidManifest';
-import { useSetWorking } from '../SyncStore';
+import { useSetError, wrapOperation } from '../SyncStore';
 
 export function OptionsMenu({ device, quit, modStatus, setModStatus }: {
     device: Adb,
@@ -35,48 +34,42 @@ function ModTools({ device, quit, modStatus, setModStatus }: {
     quit: () => void,
     modStatus: ModStatus,
     setModStatus: (status: ModStatus) => void}) {
-    const [err, setErr] = useState(null as string | null);
-    const setReinstallingCores = useSetWorking("Reinstalling only core mods");
-
     return <div id="modTools">
         <button onClick={async () => {
+            const setError = useSetError("Failed to kill Beat Saber process");
             try {
                 await device.subprocess.spawnAndWait("am force-stop com.beatgames.beatsaber");
                 toast.success("Successfully killed Beat Saber");
             }   catch(e) {
-                setErr("Failed to kill Beat Saber process " + e);
+                setError(e);
             }
         }}>Kill Beat Saber</button>
         Immediately closes the game.
 
         <br />
         <button onClick={async () => {
-            try {
-                setReinstallingCores(true);
+            await wrapOperation("Reinstalling only core mods", "Failed to reinstall only core mods", async () => {
                 setModStatus(await quickFix(device, modStatus, true));
                 toast.success("All non-core mods removed!");
-            }   catch(e) {
-                setErr("Failed to uninstall all mods " + e);
-            }   finally {
-                setReinstallingCores(false);
-            }
-
+            });
         }}>Reinstall only core mods</button>
         Deletes all installed mods, then installs only the core mods.
         <br/>
 
         <button onClick={async () => {
+            const setError = useSetError("Failed to uninstall Beat Saber");
             try {
                 await uninstallBeatSaber(device);
                 quit();
             }   catch(e)   {
-                setErr("Failed to uninstall Beat Saber " + e)
+                setError(e)
             }
         }}>Uninstall Beat Saber</button>
         Uninstalls the game: this will remove all mods and quit MBF.
         <br/>
 
         <button onClick={async () => {
+            const setError = useSetError("Failed to fix player data");
             try {
                 if(await fixPlayerData(device)) {
                     toast.success("Successfully fixed player data issues");
@@ -84,19 +77,12 @@ function ModTools({ device, quit, modStatus, setModStatus }: {
                     toast.error("No player data file found to fix");
                 }
             }   catch(e) {
-                setErr("Failed to fix player data " + e);
+                setError(e);
             }
         }}>Fix Player Data</button>
         Fixes an issue with player data permissions.
         
         <br/>
-
-        <ErrorModal
-            title="Operation failed"
-            description={err!}
-            isVisible={err !== null}
-            onClose={() => setErr(null)}
-        />
     </div>
 }
 
@@ -110,27 +96,19 @@ function RepatchMenu({ device, modStatus, quit }: {
         manifest.current.applyPatchingManifestMod();
     }, []);
 
-    const setPatching = useSetWorking("Repatching Beat Saber");
-
     return <>
         <p>Certain mods require particular Android permissions to be enabled in order to work. 
             To change the permisions, you will need to re-patch your game, which can be done automatically with the button below.</p>
         <PermissionsMenu manifest={manifest.current} />
         <br/>
         <button onClick={async () => {
-            setPatching(true);
-            try {
+            await wrapOperation("Repatching Beat Saber", "Failed to repatch", async () => {
                 // TODO: Right now we do not set the mod status back to the DeviceModder state for it.
                 // This is fine at the moment since repatching does not update this state in any important way,
                 // but would be a problem if repatching did update it!
                 await patchApp(device, modStatus, null, manifest.current.toString(), true, false);
                 toast.success("Successfully applied permissions");
-            }   catch(e) {
-                // Force a quit so the app rechecks the state of the install is correct.
-                quit("Failed to remod Beat Saber: the install is now likely in an invalid state!: " + e);
-            }   finally {
-                setPatching(false);
-            }
+            })
         }}>Repatch game</button>
     </>
 }
