@@ -2,14 +2,23 @@ import '../css/ModCard.css';
 import { Mod, trimGameVersion } from '../Models'
 import { Slider } from './Slider';
 import TrashCan from '../icons/trash.svg';
+import Code from '../icons/code.svg';
 import { YesNoModal } from './Modal';
 import { useState } from 'react';
 
 interface ModCardProps {
     mod: Mod,
+    isCore: boolean,
     gameVersion: string,
     onEnabledChanged: (enabled: boolean) => void,
     onRemoved: () => void
+}
+
+function CoreModBadge() {
+    return <div className="coreBadge">
+        <img src={Code} alt="Code symbol"/>
+        <p>CORE</p>
+    </div>
 }
 
 export function ModCard(props: ModCardProps) {
@@ -22,7 +31,10 @@ export function ModCard(props: ModCardProps) {
 
     return <div className="container modCard">
         <div className='modName'>
-            <p className='nameText'>{props.mod.name}</p>
+            <span className="nameSpan">
+                <p className='nameText'>{props.mod.name}</p>
+                {props.isCore && <CoreModBadge />}
+            </span>
             <p className='idVersionText'>{props.mod.id} v{props.mod.version}</p>
         </div>
 

@@ -6,6 +6,37 @@
     padding: 13px;
 }
 
+.coreBadge {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 5px;
+    background-color: rgba(0, 89, 255, 0.5);
+    transition-duration: 200ms;
+    transition-property: background-color;
+    
+    border-radius: 10px;
+    padding-left: 5px;
+    padding-right: 7px;
+}
+
+.coreBadge:hover {
+    background-color: rgba(0, 89, 255, 0.8);
+}
+
+.coreBadge > p {
+    margin: 0;
+    font-size: small;
+    font-weight: bold;
+}
+
+.nameSpan {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+}
+
 .modName {
     margin: 0px;
     display: flex;
