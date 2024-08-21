@@ -22,7 +22,9 @@ pub struct Mod {
     // Whether or not the mod is installed, which is only considered `true` if all of its dependencies are also installed.
     // This is optional as this can only be determined once all mods are loaded. It is None up until this point.
     installed: Option<bool>,
-    loaded_from: PathBuf
+    loaded_from: PathBuf,
+    // Whether the mod is core or a required dependency of a core mod (perhaps indirectly)
+    is_core: bool
 }
 
 
@@ -34,6 +36,10 @@ impl Mod {
 
     pub fn manifest(&self) -> &ModInfo {
         &self.manifest
+    }
+
+    pub fn is_core(&self) -> bool {
+        self.is_core
     }
 }
 
@@ -188,7 +194,8 @@ impl ModManager {
             files_exist: Self::check_if_mod_files_exist(&manifest).context("Failed to check if mod files exist when loading mod")?,
             manifest,
             installed: None, // Must call update_mods_status
-            loaded_from: from
+            loaded_from: from,
+            is_core: false // Only set when the user of the ModManager calls set_core_mod
         })
     }
 
@@ -508,7 +515,8 @@ impl ModManager {
             installed: None,
             files_exist: Self::check_if_mod_files_exist(&loaded_mod_manifest)?,
             manifest: loaded_mod_manifest,
-            loaded_from: extract_path
+            loaded_from: extract_path,
+            is_core: false
         };
         self.mods.insert(id.clone(), Rc::new(RefCell::new(loaded_mod)));
 
@@ -555,6 +563,30 @@ impl ModManager {
                 Ok(())
             },
             None => Ok(())
+        }
+    }
+
+    /// Sets a particular mod ID as being a core mod.
+    /// This will also make all dependencies of the mod core.
+    /// Does nothing if the mod with the given ID doesn't exist or is already marked as core.
+    pub fn set_mod_core(&self, id: &str) {
+        if let Some(mod_rc) = self.mods.get(id) {
+            let mut mod_ref = match mod_rc.try_borrow_mut() {
+                Ok(mod_ref) => mod_ref,
+                Err(_) => {
+                    warn!("Failed to set mod as core as it was already borrowed: this is due to a cyclical dependency: {id} depends on itself");
+                    return;
+                }
+            };
+
+            mod_ref.is_core = true;
+
+            // Recursively mark all dependencies as core.
+            for dependency in &mod_ref.manifest.dependencies {
+                if dependency.required {
+                    self.set_mod_core(&dependency.id);
+                }
+            }
         }
     }
 

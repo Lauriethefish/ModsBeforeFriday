@@ -27,8 +27,7 @@ const isDeveloperUrl: boolean = new URLSearchParams(window.location.search).get(
 // Sorts them with the newest versions first.
 export function GetSortedDowngradableVersions(modStatus: ModStatus): string[] | undefined {
     return modStatus.core_mods?.downgrade_versions
-        .filter(version => modStatus.core_mods?.supported_versions !== undefined &&
-                version in modStatus.core_mods.supported_versions)
+        .filter(version => modStatus.core_mods?.supported_versions.includes(version))
         .sort(CompareBeatSaberVersions)
 }
 
@@ -91,7 +90,7 @@ export function DeviceModder(props: DeviceModderProps) {
             <p>To mod Beat Saber, MBF needs to download files such as a mod loader and several essential mods.
                 <br />This occurs on your Quest's connection. Please make sure that WiFi is enabled, then refresh the page.</p>
         </div>
-    } else if (!(modStatus.app_info.version in modStatus.core_mods.supported_versions) && !isDeveloperUrl) {
+    } else if (!(modStatus.core_mods.supported_versions.includes(modStatus.app_info.version)) && !isDeveloperUrl) {
         // Check if we can downgrade to a supported version
         const downgradeVersions = GetSortedDowngradableVersions(modStatus);
         console.log("Available versions to downgrade: " + downgradeVersions);
@@ -155,7 +154,19 @@ function ValidModLoaderMenu({ device, modStatus, setModStatus, quit }: { device:
         </div>
 
         <ModManager modStatus={modStatus}
-            setMods={mods => setModStatus({ ...modStatus, installed_mods: mods })}
+            setMods={mods => {
+                // When changing mod statuses, the core mods are not fetched by the backend, so it doesn't know which mods are core
+                // Therefore, any previously core mods need to have this status copied over to the newly set mods
+                modStatus.installed_mods.filter(existing => existing.is_core)
+                    .forEach(existing => {
+                        let new_mod = mods.find(mod => mod.id === existing.id);
+                        if(new_mod) {
+                            new_mod.is_core = true;
+                        }
+                    })
+
+                setModStatus({ ...modStatus, installed_mods: mods });
+            }}
             setModStatus={status => setModStatus(status)}
             device={device}
             gameVersion={modStatus.app_info!.version}
@@ -217,7 +228,7 @@ function InstallStatus(props: InstallStatusProps) {
 }
 
 function UpdateInfo({ modStatus, device, quit }: { modStatus: ModStatus, device: Adb, quit: () => void }) {
-    const sortedModdableVersions = Object.keys(modStatus.core_mods!.supported_versions).sort(CompareBeatSaberVersions);
+    const sortedModdableVersions = modStatus.core_mods!.supported_versions.sort(CompareBeatSaberVersions);
     const newerUpdateExists = modStatus.app_info?.version !== sortedModdableVersions[0];
 
     const [updateWindowOpen, setUpdateWindowOpen] = useState(false);

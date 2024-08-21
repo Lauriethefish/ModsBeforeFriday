@@ -8,7 +8,6 @@ import { useState } from 'react';
 
 interface ModCardProps {
     mod: Mod,
-    isCore: boolean,
     gameVersion: string,
     onEnabledChanged: (enabled: boolean) => void,
     onRemoved: () => void
@@ -33,7 +32,7 @@ export function ModCard(props: ModCardProps) {
         <div className='modName'>
             <span className="nameSpan">
                 <p className='nameText'>{props.mod.name}</p>
-                {props.isCore && <CoreModBadge />}
+                {props.mod.is_core && <CoreModBadge />}
             </span>
             <p className='idVersionText'>{props.mod.id} v{props.mod.version}</p>
         </div>

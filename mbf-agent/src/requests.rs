@@ -108,9 +108,7 @@ pub enum Request {
 #[derive(Serialize)]
 pub struct CoreModsInfo {
     /// All of the Beat Saber versions with core mods using Scotland2 are keys in this HashMap
-    /// The values are a list of the mod IDs of the core mods for each version. 
-    /// This is needed by the frontend to display the "do not uninstall, this is a core mod" message around each core mod.
-    pub supported_versions: HashMap<String, Vec<String>>,
+    pub supported_versions: Vec<String>,
     /// The versions of Beat Saber that can be reached by downgrading the game.
     pub downgrade_versions: Vec<String>,
     /// True only if the Beat Saber version does not support mods, and the latest diff available in the diff index 
@@ -223,7 +221,9 @@ pub struct ModModel {
     pub version: Version,
     pub game_version: Option<String>,
     pub description: Option<String>,
-    pub is_enabled: bool
+    pub is_enabled: bool,
+    // True if the mod is core or if it is a required dependency of another core mod (potentially indirectly.)
+    pub is_core: bool
 }
 
 impl From<&Mod> for ModModel {
@@ -234,7 +234,8 @@ impl From<&Mod> for ModModel {
             version: value.manifest().version.clone(),
             game_version: value.manifest().package_version.clone(),
             description: value.manifest().description.clone(),
-            is_enabled: value.installed()
+            is_enabled: value.installed(),
+            is_core: value.is_core()
         }
     }
 }

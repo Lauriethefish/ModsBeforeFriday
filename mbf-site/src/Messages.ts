@@ -134,7 +134,7 @@ export interface DowngradedManifest {
 export type Response = LogMsg | ModStatus | Mods | ImportResult | FixedPlayerData | DowngradedManifest | Patched | ModSyncResult;
 
 export interface CoreModsInfo {
-    supported_versions: { [version: string]: string[] },
+    supported_versions: string[],
     downgrade_versions: string[],
     core_mod_install_status: InstallStatus,
     is_awaiting_diff: boolean

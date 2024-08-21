@@ -5,6 +5,7 @@ interface Mod {
     version: string,
     is_enabled: boolean,
     game_version: string | null
+    is_core: boolean
 }
 
 interface CoreMod {

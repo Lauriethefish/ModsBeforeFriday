@@ -34,9 +34,8 @@ export function ModManager(props: ModManagerProps) {
     const [logEvents, addLogEvent] = useLog();
     const [modError, setModError] = useState(null as string | null);
     const [menu, setMenu] = useState('add' as SelectedMenu);
-    const coreModIds = modStatus.core_mods!.supported_versions[modStatus.app_info!.version];
 
-    sortByIdAndIfCore(mods, coreModIds);
+    sortByIdAndIfCore(mods);
 
     return <>
         <Title menu={menu} setMenu={setMenu}/>
@@ -47,7 +46,6 @@ export function ModManager(props: ModManagerProps) {
             <AddModsMenu
                 mods={mods}
                 setMods={setMods}
-                coreModIds={coreModIds}
                 setWorking={working => setWorking(working)}
                 gameVersion={gameVersion}
                 setError={err => setModError(err)}
@@ -60,7 +58,6 @@ export function ModManager(props: ModManagerProps) {
             <InstalledModsMenu
                 mods={mods}
                 setMods={setMods}
-                coreModIds={coreModIds}
                 setWorking={working => setWorking(working)}
                 gameVersion={gameVersion}
                 setError={err => setModError(err)}
@@ -114,7 +111,6 @@ interface ModMenuProps {
     mods: Mod[],
     setMods: (mods: Mod[]) => void,
     gameVersion: string,
-    coreModIds: string[],
     setWorking: (working: boolean) => void,
     setError: (err: string) => void,
     addLogEvent: LogEventSink,
@@ -125,7 +121,6 @@ function InstalledModsMenu(props: ModMenuProps) {
     const { mods,
         setMods,
         gameVersion,
-        coreModIds,
         setWorking,
         setError,
         addLogEvent,
@@ -158,7 +153,6 @@ function InstalledModsMenu(props: ModMenuProps) {
 			{mods.map(mod => <ModCard
 				gameVersion={gameVersion}
 				mod={mod}
-                isCore={coreModIds.includes(mod.id)}
 				key={mod.id}
 				onRemoved={async () => {
 					setWorking(true);
@@ -372,15 +366,13 @@ function AddModsMenu(props: ModMenuProps) {
 
 // Sorts mods by their ID alphabetically
 // Also sorts the mods so that core mods come last in the list.
-function sortByIdAndIfCore(mods: Mod[], coreModIds: string[]) {
+function sortByIdAndIfCore(mods: Mod[]) {
     mods.sort((a, b) => {
         // Sort core mods after other mods
         // This is so that user-installed mods are more obvious in the list.
-        const aIsCore = coreModIds.includes(a.id);
-        const bIsCore = coreModIds.includes(b.id);
-        if(!bIsCore && aIsCore) {
+        if(!b.is_core && a.is_core) {
             return 1;
-        }   else if(!aIsCore && bIsCore) {
+        }   else if(!a.is_core && b.is_core) {
             return -1;
         }
 

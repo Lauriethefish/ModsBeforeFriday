@@ -87,7 +87,7 @@ fn handle_get_mod_status(override_core_mod_url: Option<String>) -> Result<Respon
             info!("Loading installed mods");
             let mut mod_manager = ModManager::new(&app_info.version);
             mod_manager.load_mods().context("Failed to load installed mods")?;
-
+            
             (
                 get_core_mods_info(&app_info.version, &mod_manager, override_core_mod_url)?,
                 get_mod_models(mod_manager)?
@@ -136,26 +136,17 @@ fn get_core_mods_info(apk_version: &str, mod_manager: &ModManager, override_core
         None => InstallStatus::Missing
     };
 
-    let mut supported_versions = HashMap::new();
-    for (version, core_mods) in core_mods.into_iter() {
+    let supported_versions: Vec<String> = core_mods.into_keys().filter(|version| {
         let mut iter = version.split('.');
         let _major = iter.next().unwrap();
         let minor = iter.next().unwrap();
 
-        // Skip QuestLoader versions (i.e. pre-1.35)
-        if minor.parse::<i64>().expect("Invalid version in core mod index") >= 35 {
-            let core_mod_ids = core_mods.mods
-                .into_iter()
-                .map(|core_mod| core_mod.id)
-                .collect();
-
-            supported_versions.insert(version, core_mod_ids);
-        }
-    }
+        minor.parse::<i64>().expect("Invalid version in core mod index") >= 35
+    }).collect();
 
     let diff_index = mbf_res_man::external_res::get_diff_index().context("Failed to get downgrading information")?;
 
-    let is_version_supported = supported_versions.keys().any(|ver| ver == apk_version);
+    let is_version_supported = supported_versions.iter().any(|ver| ver == apk_version);
     let newer_than_latest_diff = is_version_newer_than_latest_diff(apk_version, &diff_index);
 
     let downgrade_versions: Vec<String> = diff_index.into_iter()
@@ -177,6 +168,7 @@ fn get_core_mods_info(apk_version: &str, mod_manager: &ModManager, override_core
 // of the core mods are not installed or not even present.
 fn get_core_mods_install_status(core_mods: &[CoreMod], mod_man: &ModManager) -> InstallStatus {
     info!("Checking if core mods installed and up to date");
+    mark_all_core_mods(mod_man, core_mods);
 
     let mut missing_core_mods = false;
     let mut outdated_core_mods = false;
@@ -565,6 +557,13 @@ fn handle_patch(downgrade_to: Option<String>,
     Ok(Response::Patched { installed_mods: get_mod_models(mod_manager)?, did_remove_dlc: removed_dlc })
 }
 
+/// Marks all of the mods with IDs matching mods in `core_mods` and all of their dependencies as core within the provided ModManager
+fn mark_all_core_mods(mod_manager: &ModManager, core_mods: &[CoreMod]) {
+    for core_mod in core_mods {
+        mod_manager.set_mod_core(&core_mod.id);
+    }
+}
+
 fn install_core_mods(mod_manager: &mut ModManager, app_info: AppInfo, override_core_mod_url: Option<String>) -> Result<()> {
     info!("Preparing core mods");
     let core_mod_index = mbf_res_man::external_res::fetch_core_mods(override_core_mod_url)?;
@@ -598,6 +597,7 @@ fn install_core_mods(mod_manager: &mut ModManager, app_info: AppInfo, override_c
 
     info!("Installing core mods");
     mod_manager.load_mods().context("Failed to load core mods - is one invalid? If so, this is a BIG problem")?;
+    mark_all_core_mods(&mod_manager, &core_mods.mods);
     for core_mod in &core_mods.mods {
         mod_manager.install_mod(&core_mod.id)?;
     }
