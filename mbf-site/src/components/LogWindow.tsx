@@ -3,8 +3,12 @@ import '../css/LogWindow.css';
 import '../fonts/Consolas.ttf';
 import AlertTriangle from '../icons/alert-triangle.svg';
 import AlertCircle from '../icons/alert-circle.svg';
-import { useLogStore } from '../Logging';
+import { Log, useLogStore } from '../Logging';
 import { LogMsg } from '../Messages';
+import DebugIcon from '../icons/debug.svg';
+import CopyIcon from '../icons/copy.svg';
+import { IconButton } from './IconButton';
+import { toast } from 'react-toastify';
 
 export function LogItem({ event }: { event: LogMsg }) {
     switch(event.level) {
@@ -27,7 +31,7 @@ export function LogItem({ event }: { event: LogMsg }) {
 }
 
 export function LogWindow() {
-    const { logEvents } = useLogStore();
+    const { logEvents, enableDebugLogs } = useLogStore();
 
     // Ensure that the logs always get scrolled to the bottom.
     let bottomDiv: Element | null = null;
@@ -35,9 +39,35 @@ export function LogWindow() {
         bottomDiv?.scrollIntoView();
     })
 
-    return <div id="logWindow" className="codeBox">
-        {logEvents.map((event, idx) => <LogItem event={event} key={idx} />)}
+    return <div className="logWindowParent">
+        <LogWindowControls />
+        <div className="codeBox logWindow">
+            {logEvents
+                // Filter out debug logs if these are disabled.
+                .filter(event => {
+                    const isDebug = event.level == 'Debug' || event.level == 'Trace';
 
-        <div ref={element => { bottomDiv = element }}/>
+                    return !isDebug || enableDebugLogs;
+                })
+                .map((event, idx) => <LogItem event={event} key={idx} />)}
+
+            <div ref={element => { bottomDiv = element }}/>
+        </div>
     </div>
+}
+
+function LogWindowControls() {
+    const { enableDebugLogs, setEnableDebugLogs } = useLogStore();
+
+    return <div className="logWindowControls">
+        <IconButton src={CopyIcon} iconSize={25} alt="Copy Logs to clipboard" onClick={async () => copyLogsToClipboard()}/>
+        <IconButton src={DebugIcon} iconSize={25} alt="Enable Debug Logs"
+            onClick={() => setEnableDebugLogs(!enableDebugLogs)}
+            isOn={enableDebugLogs}/>
+    </div>
+}
+
+async function copyLogsToClipboard() {
+    await navigator.clipboard.writeText(Log.getLogsAsString());
+    toast.success("Copied logs to clipboard");
 }

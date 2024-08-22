@@ -1,8 +1,24 @@
-#logWindow {
+.logWindowParent {
+    position: relative;
+}
+
+.logWindow {
     padding: 0;
     height: 30rem;
     overflow: auto;
     width: auto;
+}
+
+.logWindowControls {
+    position: absolute;
+    right: 0px;
+
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    background-color: rgb(10, 10, 10);
+    border-radius: 5px;
 }
 
 .logItem {

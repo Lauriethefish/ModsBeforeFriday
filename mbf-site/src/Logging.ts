@@ -3,13 +3,17 @@ import { create } from 'zustand';
 
 export interface LogEventStore {
     logEvents: LogMsg[];
-    addLogEvent: (msg: LogMsg) => void
+    addLogEvent: (msg: LogMsg) => void,
+    enableDebugLogs: boolean,
+    setEnableDebugLogs: (enabled: boolean) => void
 }
 
 // Used to globally distribute the MBF log messages.
 export const useLogStore = create<LogEventStore>(set => ({
     logEvents: [],
-    addLogEvent: (msg: LogMsg) => set((state) => ({ logEvents: [...state.logEvents, msg]} ))
+    enableDebugLogs: false,
+    addLogEvent: (msg: LogMsg) => set((state) => ({ logEvents: [...state.logEvents, msg]} )),
+    setEnableDebugLogs: (enabled: boolean) => set(_ => ({ enableDebugLogs: enabled }))
 }))
 
 // Logging class which provides convenience functions to manipulate the global logging state.
@@ -34,6 +38,16 @@ export class Log {
             case 'Trace':
                 console.trace(event.message);
         }
+    }
+
+    // Gets a large string containing all messages logged to MBF.
+    static getLogsAsString(): string {
+        let logs = "";
+        useLogStore.getState().logEvents.forEach(event => {
+            logs += `${event.level.toUpperCase()}> ${event.message}\n`;
+        });
+
+        return logs;
     }
 
     static trace(msg: any) {
