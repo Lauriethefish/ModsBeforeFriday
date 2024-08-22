@@ -32,6 +32,12 @@
     gap: 10px;
 }
 
+.syncingTitle {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
 #errorTitle {
     display: flex;
     flex-direction: row;

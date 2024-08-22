@@ -4,6 +4,7 @@
 
 .logWindow {
     padding: 0;
+    padding-bottom: 5px;
     height: 30rem;
     overflow: auto;
     width: auto;

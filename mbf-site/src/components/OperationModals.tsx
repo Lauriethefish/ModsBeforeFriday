@@ -1,3 +1,4 @@
+import { ScaleLoader } from "react-spinners";
 import { useSyncStore } from "../SyncStore";
 import { LogWindow, LogWindowControls } from "./LogWindow";
 import { ErrorModal } from "./Modal";
@@ -28,7 +29,11 @@ function SyncingModal({ isVisible, title, onClose }: { isVisible: boolean, title
         return  <div className="modalBackground coverScreen">
             <div className="modal container screenWidth">
                 <div className="syncingWindow">
-                    <h2>{title}</h2>
+                    <div className="syncingTitle">
+                        <h2>{title}</h2>
+                        {onClose === undefined && <ScaleLoader color={"white"} height={20} />}
+                    </div>
+
                     {/* Disable the controls built into the log window and instead put the controls to the right of the heading*/}
                     <LogWindowControls onClose={onClose} />
                     <LogWindow showControls={false} />
