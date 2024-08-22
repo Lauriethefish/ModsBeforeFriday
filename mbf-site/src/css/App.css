@@ -38,12 +38,11 @@ h1:hover > .title {
     align-items: center;
     justify-content: first baseline;
     gap: 3px;
+    height: auto;
 }
 
-@media screen and (min-width: 1200px) {
-    .main {
-        height: 100vh;
-    }
+body {
+    height: auto;
 }
 
 #chooseDevice {

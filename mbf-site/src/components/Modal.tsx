@@ -74,7 +74,7 @@ interface SyncingModalProps {
 
 export function SyncingModal(props: SyncingModalProps) {
     if(props.isVisible) {
-        return  <div className="modalBackground">
+        return  <div className="modalBackground coverScreen">
             <div className="modal container screenWidth">
                 <div className="syncingWindow">
                     <h1>{props.title}</h1>
@@ -83,6 +83,6 @@ export function SyncingModal(props: SyncingModalProps) {
             </div>
         </div>
     }   else   {
-        return <div className="modalBackground modalClosed"></div>
+        return <div className="modalBackground modalClosed coverScreen"></div>
     }
 }

@@ -25,8 +25,8 @@ a {
     font-weight: bold;
 }
 
-html {
-    overflow-y: scroll;
+.coverScreen {
+    z-index: 2;
 }
 
 .container {
@@ -39,6 +39,11 @@ html {
 
 .mainContainer {
     max-width: 40rem;
+}
+
+.sticky {
+    top: 0;
+    position: sticky;
 }
 
 .codeBox {
