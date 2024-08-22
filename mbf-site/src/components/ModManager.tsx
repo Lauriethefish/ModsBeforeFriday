@@ -274,7 +274,7 @@ function AddModsMenu(props: ModMenuProps) {
 
         let disconnected = false;
         device.disconnected.then(() => disconnected = true);
-        const setWorking = useSetWorking("Importing . . .");
+        const setWorking = useSetWorking("Importing");
         setWorking(true);
         while(importQueue.length > 0 && !disconnected) {
             // Process the next import, depending on if it is a URL or file
