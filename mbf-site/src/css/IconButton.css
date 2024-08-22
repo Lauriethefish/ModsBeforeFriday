@@ -1,0 +1,17 @@
+.iconButton {
+    display: flex;
+    align-items: center;
+    padding: 5px;
+    border-radius: 5px;
+    transition-property: background-color;
+    transition-duration: 300ms;
+    --hover-bg-color: rgba(0, 103, 221, 0.699);
+}
+
+.iconButtonOff:hover {
+    background-color: rgba(50, 50, 50, 0.7);
+}
+
+.iconButtonOn {
+    background-color: var(--hover-bg-color);
+}
