@@ -11,7 +11,7 @@ export interface LogEventStore {
 // Used to globally distribute the MBF log messages.
 export const useLogStore = create<LogEventStore>(set => ({
     logEvents: [],
-    enableDebugLogs: false,
+    enableDebugLogs: import.meta.env.DEV,
     addLogEvent: (msg: LogMsg) => set((state) => ({ logEvents: [...state.logEvents, msg]} )),
     setEnableDebugLogs: (enabled: boolean) => set(_ => ({ enableDebugLogs: enabled }))
 }))
