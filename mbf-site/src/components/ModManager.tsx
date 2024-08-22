@@ -15,6 +15,7 @@ import useFileDropper from "../hooks/useFileDropper";
 import { Log } from "../Logging";
 import { useSetWorking, wrapOperation } from "../SyncStore";
 import { OperationModals } from "./OperationModals";
+import { OpenLogsButton } from "./OpenLogsButton";
 
 interface ModManagerProps {
     gameVersion: string,
@@ -66,6 +67,7 @@ export function ModManager(props: ModManagerProps) {
             />    
         </div>
 
+        <OpenLogsButton />
         <OperationModals />
     </>
 }

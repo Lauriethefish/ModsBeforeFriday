@@ -16,15 +16,20 @@ export interface OperationError {
 export interface SyncStore {
     currentOperation: string | null;
     currentError: OperationError | null,
+    // Whether or not the logs have been manually opened by the user.
+    logsManuallyOpen: boolean,
     setOperation: (operation: string | null) => void,
     setError: (error: OperationError | null) => void,
+    setLogsManuallyOpen: (manuallyOpen: boolean) => void,
 }
 
 export const useSyncStore = create<SyncStore>(set => ({
     currentOperation: null,
     currentError: null,
+    logsManuallyOpen: false,
     setOperation: (operation: string | null) => set(_ => ({ currentOperation: operation })),
-    setError: (error: OperationError | null) => set(_ => ({ currentError: error }))
+    setError: (error: OperationError | null) => set(_ => ({ currentError: error })),
+    setLogsManuallyOpen: (manuallyOpen: boolean) => set(_ => ({ logsManuallyOpen: manuallyOpen }))
 }));
 
 // Creates a function that can be used to set whether or not a particular operation is currently in progress.

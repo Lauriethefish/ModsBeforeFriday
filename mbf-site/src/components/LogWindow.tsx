@@ -7,6 +7,7 @@ import { Log, useLogStore } from '../Logging';
 import { LogMsg } from '../Messages';
 import DebugIcon from '../icons/debug.svg';
 import CopyIcon from '../icons/copy.svg';
+import QuitIcon from '../icons/exit.svg';
 import { IconButton } from './IconButton';
 import { toast } from 'react-toastify';
 
@@ -30,7 +31,7 @@ export function LogItem({ event }: { event: LogMsg }) {
     }
 }
 
-export function LogWindow() {
+export function LogWindow({ showControls }: { showControls: boolean }) {
     const { logEvents, enableDebugLogs } = useLogStore();
 
     // Ensure that the logs always get scrolled to the bottom.
@@ -40,7 +41,7 @@ export function LogWindow() {
     })
 
     return <div className="logWindowParent">
-        <LogWindowControls />
+        {showControls && <LogWindowControls />}
         <div className="codeBox logWindow">
             {logEvents
                 // Filter out debug logs if these are disabled.
@@ -56,7 +57,7 @@ export function LogWindow() {
     </div>
 }
 
-function LogWindowControls() {
+export function LogWindowControls({ onClose }: { onClose?: () => void}) {
     const { enableDebugLogs, setEnableDebugLogs } = useLogStore();
 
     return <div className="logWindowControls">
@@ -64,6 +65,7 @@ function LogWindowControls() {
         <IconButton src={DebugIcon} iconSize={25} alt="Enable Debug Logs"
             onClick={() => setEnableDebugLogs(!enableDebugLogs)}
             isOn={enableDebugLogs}/>
+        {onClose && <IconButton src={QuitIcon} iconSize={25} alt="Close log window" onClick={onClose} warning={true} />}
     </div>
 }
 

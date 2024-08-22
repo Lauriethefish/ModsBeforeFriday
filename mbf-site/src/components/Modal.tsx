@@ -2,7 +2,6 @@ import { ReactNode } from "react";
 import AlertIcon from '../icons/alert-triangle.svg'
 
 import '../css/Modal.css';
-import { LogWindow } from "./LogWindow";
 
 interface ModalProps {
     children: ReactNode,
@@ -65,24 +64,4 @@ export function YesNoModal(props: YesNoModalProps) {
             <button onClick={props.onNo}>No</button>
         </div>
     </Modal>
-}
-
-interface SyncingModalProps {
-    isVisible: boolean,
-    title: string,
-}
-
-export function SyncingModal(props: SyncingModalProps) {
-    if(props.isVisible) {
-        return  <div className="modalBackground coverScreen">
-            <div className="modal container screenWidth">
-                <div className="syncingWindow">
-                    <h1>{props.title}</h1>
-                    <LogWindow />
-                </div>
-            </div>
-        </div>
-    }   else   {
-        return <div className="modalBackground modalClosed coverScreen"></div>
-    }
 }

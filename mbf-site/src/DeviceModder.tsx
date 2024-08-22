@@ -77,7 +77,7 @@ export function DeviceModder(props: DeviceModderProps) {
         return <div className='container mainContainer fadeIn'>
             <h2>Checking Beat Saber installation</h2>
             <p>This might take a minute or so the first few times.</p>
-            <LogWindow />
+            <LogWindow showControls={true} />
         </div>
     } else if (modStatus.app_info === null) {
         return <div className='container mainContainer'>
@@ -361,7 +361,7 @@ function PatchingMenu(props: PatchingMenuProps) {
             <h1>App is being patched</h1>
             <p>This should only take a few minutes, but could take much, much longer if your internet connection is slow.</p>
             <p className='warning'>You must not disconnect your device during this process.</p>
-            <LogWindow />
+            <LogWindow showControls={true} />
         </div>
     }
 }

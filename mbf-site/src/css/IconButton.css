@@ -5,7 +5,8 @@
     border-radius: 5px;
     transition-property: background-color;
     transition-duration: 300ms;
-    --hover-bg-color: rgba(0, 103, 221, 0.699);
+    cursor: pointer;
+    --hover-bg-color: rgba(4, 92, 255, 0.699);
 }
 
 .iconButtonOff:hover {
@@ -14,4 +15,13 @@
 
 .iconButtonOn {
     background-color: var(--hover-bg-color);
+}
+
+.iconButtonWarning {
+    background-color: rgba(196, 46, 46, 0.7);
+}
+
+.iconButtonWarning:hover {
+    background-color: rgba(250, 64, 64, 0.7);
+
 }
