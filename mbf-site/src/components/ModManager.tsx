@@ -212,7 +212,7 @@ function AddModsMenu(props: ModMenuProps) {
                 if (result.failures !== null) {
                     toast.error(result.failures, { autoClose: false });
                 }   else    {
-                    toast.success("Successfully downloaded and installed " + imported_id + " v" + imported_mod.version)
+                    toast.success("Successfully downloaded and installed " + imported_mod.name + " v" + imported_mod.version)
                 }
 
             }   catch(err) {
