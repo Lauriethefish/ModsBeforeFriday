@@ -19,8 +19,10 @@ export function OperationModals() {
         <SyncingModal isVisible={needSyncModal}
             title={currentOperation ?? "Log output"}
             onClose={canClose ? () => setLogsManuallyOpen(false) : undefined} />
-        <ErrorModal isVisible={currentError !== null} title={currentError?.title ?? ""} onClose={() => setError(null)}>
-            {currentError?.error ?? ""}
+        <ErrorModal isVisible={currentError !== null}
+            title={currentError?.title ?? ""}
+            description={currentError?.error}
+            onClose={() => setError(null)}>
         </ErrorModal>
     </>
 }
