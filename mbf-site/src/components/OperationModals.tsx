@@ -12,9 +12,11 @@ export function OperationModals() {
         setLogsManuallyOpen } = useSyncStore();
 
     const canClose = logsManuallyOpen && currentError === null;
+    const needSyncModal = (logsManuallyOpen || currentOperation !== null) 
+        && currentError === null;
 
     return <>
-        <SyncingModal isVisible={(currentOperation !== null || logsManuallyOpen) && currentError === null}
+        <SyncingModal isVisible={needSyncModal}
             title={currentOperation ?? "Log output"}
             onClose={canClose ? () => setLogsManuallyOpen(false) : undefined} />
         <ErrorModal isVisible={currentError !== null} title={currentError?.title ?? ""} onClose={() => setError(null)}>

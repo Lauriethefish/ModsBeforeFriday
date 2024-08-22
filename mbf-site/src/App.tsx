@@ -12,6 +12,8 @@ import 'react-toastify/dist/ReactToastify.css';
 import { CornerSourceLink, SmallSourceLink } from './components/SourceLink';
 import { setCoreModOverrideUrl } from './Agent';
 import { Log } from './Logging';
+import { OperationModals } from './components/OperationModals';
+import { OpenLogsButton } from './components/OpenLogsButton';
 
 type NoDeviceCause = "NoDeviceSelected" | "DeviceInUse";
 
@@ -254,6 +256,8 @@ function App() {
   return <div className='main'>
     <AppContents />
     <CornerSourceLink />
+    <OpenLogsButton />
+    <OperationModals />
     <ToastContainer
       position="bottom-right"
       theme="dark"

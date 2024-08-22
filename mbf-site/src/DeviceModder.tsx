@@ -11,7 +11,7 @@ import { PermissionsMenu } from './components/PermissionsMenu';
 import { SelectableList } from './components/SelectableList';
 import { AndroidManifest } from './AndroidManifest';
 import { Log } from './Logging';
-import { useSetWorking } from './SyncStore';
+import { wrapOperation } from './SyncStore';
 
 interface DeviceModderProps {
     device: Adb,
@@ -185,9 +185,6 @@ interface InstallStatusProps {
 function InstallStatus(props: InstallStatusProps) {
     const { modStatus, onFixed, device } = props;
 
-    const [error, setError] = useState(null as string | null);
-    const setFixing = useSetWorking("Fixing issues");
-
     const modloaderStatus = modStatus.modloader_install_status;
     const coreModStatus = modStatus.core_mods!.core_mod_install_status;
 
@@ -208,14 +205,8 @@ function InstallStatus(props: InstallStatusProps) {
                     <li>Core mod updates need to be installed.</li>}
             </ul>
             <button onClick={async () => {
-                try {
-                    setFixing(true);
-                    onFixed(await quickFix(device, modStatus, false));
-                } catch (e) {
-                    setError(String(e));
-                } finally {
-                    setFixing(false);
-                }
+                wrapOperation("Fixing issues", "Failed to fix install", async () =>
+                    onFixed(await quickFix(device, modStatus, false)));
             }}>Fix issues</button>
         </div>
     }

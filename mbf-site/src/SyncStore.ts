@@ -18,18 +18,25 @@ export interface SyncStore {
     currentError: OperationError | null,
     // Whether or not the logs have been manually opened by the user.
     logsManuallyOpen: boolean,
+    // Whether to open a modal during sync.
+    // Before the modding status is loaded, the progress of the operation
+    // is shown in the main UI instead of in a modal. Therefore, this property is set to `false`
+    // to avoid covering this with a modal.
+    showSyncModal: boolean,
+
     setOperation: (operation: string | null) => void,
     setError: (error: OperationError | null) => void,
-    setLogsManuallyOpen: (manuallyOpen: boolean) => void,
+    setLogsManuallyOpen: (manuallyOpen: boolean) => void
 }
 
 export const useSyncStore = create<SyncStore>(set => ({
     currentOperation: null,
     currentError: null,
     logsManuallyOpen: false,
+    showSyncModal: false,
     setOperation: (operation: string | null) => set(_ => ({ currentOperation: operation })),
     setError: (error: OperationError | null) => set(_ => ({ currentError: error })),
-    setLogsManuallyOpen: (manuallyOpen: boolean) => set(_ => ({ logsManuallyOpen: manuallyOpen }))
+    setLogsManuallyOpen: (manuallyOpen: boolean) => set(_ => ({ logsManuallyOpen: manuallyOpen })),
 }));
 
 // Creates a function that can be used to set whether or not a particular operation is currently in progress.
