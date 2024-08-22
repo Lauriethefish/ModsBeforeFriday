@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { Mod, trimGameVersion } from "../Models";
-import { ErrorModal, Modal, SyncingModal } from "./Modal";
+import { Modal } from "./Modal";
 import { Adb } from '@yume-chan/adb';
 import { ModCard } from "./ModCard";
 import UploadIcon from '../icons/upload.svg';
@@ -13,7 +13,8 @@ import { ImportResult, ImportedMod, ModStatus } from "../Messages";
 import { OptionsMenu } from "./OptionsMenu";
 import useFileDropper from "../hooks/useFileDropper";
 import { Log } from "../Logging";
-import { useSetWorking, useSyncStore, wrapOperation } from "../SyncStore";
+import { useSetWorking, wrapOperation } from "../SyncStore";
+import { OperationModals } from "./OperationModals";
 
 interface ModManagerProps {
     gameVersion: string,
@@ -29,10 +30,7 @@ type SelectedMenu = 'add' | 'current' | 'options';
 export function ModManager(props: ModManagerProps) {
     const { modStatus, setModStatus, setMods, device, gameVersion, quit } = props;
     const mods = modStatus.installed_mods;
-
-    const [modError, setModError] = useState(null as string | null);
     const [menu, setMenu] = useState('add' as SelectedMenu);
-    const { currentOperation, currentError, setError } = useSyncStore();
 
     sortByIdAndIfCore(mods);
 
@@ -67,16 +65,8 @@ export function ModManager(props: ModManagerProps) {
                 setModStatus={setModStatus}
             />    
         </div>
-        
-        <ErrorModal isVisible={modError != null}
-            title={"Failed to sync mods"}
-            description={modError!}
-            onClose={() => setModError(null)} />
 
-        <SyncingModal isVisible={currentOperation !== null} title={currentOperation ?? ""} />
-        <ErrorModal isVisible={currentError !== null} title={currentError?.title ?? ""} onClose={() => setError(null)}>
-            {currentError?.error ?? ""}
-        </ErrorModal>
+        <OperationModals />
     </>
 }
 
