@@ -34,7 +34,6 @@ h1:hover > .title {
 
 .main {
     display: flex;
-    overflow-x: hidden;
     flex-direction: column;
     align-items: center;
     justify-content: first baseline;
@@ -44,6 +43,7 @@ h1:hover > .title {
 
 body {
     height: auto;
+    overflow-y: scroll;
 }
 
 .chooseDeviceContainer {
