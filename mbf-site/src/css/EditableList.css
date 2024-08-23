@@ -1,14 +1,18 @@
-#editableList > p {
+.editableList > p {
     margin: 0px;
     font-size: 15px;
     cursor: pointer;
 }
 
-#editableList > p:hover {
+.editableList {
+    overflow-x: scroll;
+}
+
+.editableList > p:hover {
     text-decoration: line-through;
 }
 
-#editableList > input[type=text] {
+.editableList > input[type=text] {
     background-color: transparent;
     color: white;
     font-family: Consolas;
@@ -17,11 +21,11 @@
     width: 100%;
 }
 
-#editableList > input[type=text]:invalid {
+.editableList > input[type=text]:invalid {
     color: rgb(252, 74, 74);
 }
 
-#listTitle {
+.listTitle {
     display: flex;
     flex-direction: row;
     align-items: center;
@@ -30,12 +34,12 @@
     gap: 10px;
 }
 
-#listTitle > h4 {
+.listTitle > h4 {
     margin-top: 0px;
     margin-bottom: 0px;
 }
 
-#listTitle > button {
+.listTitle > button {
     width: 30px;
     height: 30px;
     padding: 0px;

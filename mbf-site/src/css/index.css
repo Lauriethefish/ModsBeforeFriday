@@ -42,7 +42,9 @@ a {
 }
 
 .mainContainer {
-    max-width: 40rem;
+    max-width: min(40rem, 95vw);
+    overflow: hidden;
+    display: fit-content;
 }
 
 .sticky {

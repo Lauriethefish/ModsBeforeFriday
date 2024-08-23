@@ -12,13 +12,13 @@ export function EditableList({ list, addItem, removeItem, title }:
     const [newValue, setNewValue] = useState("");
 
     return <>
-        <span id="listTitle">
+        <span className="listTitle">
             <h4>{title}</h4>
             <button onClick={() => setAdding(true)}>+</button>
         </span>
 
 
-        <div id="editableList" className="codeBox">
+        <div className="editableList codeBox">
             {list.length > 0 || isAdding ? <>
                 {list.map(item => 
                     <p key={item}
