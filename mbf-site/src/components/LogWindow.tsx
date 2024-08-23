@@ -31,7 +31,7 @@ export function LogItem({ event }: { event: LogMsg }) {
     }
 }
 
-export function LogWindow({ showControls }: { showControls: boolean }) {
+export function LogWindow() {
     const { logEvents, enableDebugLogs } = useLogStore();
 
     // Ensure that the logs always get scrolled to the bottom.
@@ -41,7 +41,6 @@ export function LogWindow({ showControls }: { showControls: boolean }) {
     })
 
     return <div className="logWindowParent">
-        {showControls && <LogWindowControls />}
         <div className="codeBox logWindow">
             {logEvents
                 // Filter out debug logs if these are disabled.

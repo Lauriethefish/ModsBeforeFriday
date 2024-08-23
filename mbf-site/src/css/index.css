@@ -25,6 +25,10 @@ a {
     font-weight: bold;
 }
 
+.floatRight {
+    float: right;
+}
+
 .coverScreen {
     z-index: 2;
 }

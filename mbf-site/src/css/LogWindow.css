@@ -11,8 +11,7 @@
 }
 
 .logWindowControls {
-    position: absolute;
-    right: 0px;
+    margin-left: auto;
 
     display: flex;
     flex-direction: row;

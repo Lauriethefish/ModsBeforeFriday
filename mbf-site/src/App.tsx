@@ -124,36 +124,39 @@ function ChooseDevice() {
 
           <NoCompatibleDevices />
 
-          <button id="chooseDevice" onClick={async () => {
-            let device: Adb | null;
+          <div className="chooseDeviceContainer">
+            <span><OpenLogsButton /></span>
+            <button onClick={async () => {
+              let device: Adb | null;
 
-            try {
-              const result = await connect(() => setAuthing(true));
-              if(result === "NoDeviceSelected") {
-                device = null;
-              } else if(result === "DeviceInUse") {
-                setDeviceInUse(true);
-                return;
-              } else  {
-                device = result;
+              try {
+                const result = await connect(() => setAuthing(true));
+                if(result === "NoDeviceSelected") {
+                  device = null;
+                } else if(result === "DeviceInUse") {
+                  setDeviceInUse(true);
+                  return;
+                } else  {
+                  device = result;
 
-                const androidVersion = await getAndroidVersion(device);
-                Log.debug("Device android version: " + androidVersion);
-                setdevicePreV51(androidVersion < MIN_SUPPORTED_ANDROID_VERSION);
-                setAuthing(false);
-                setChosenDevice(device);
+                  const androidVersion = await getAndroidVersion(device);
+                  Log.debug("Device android version: " + androidVersion);
+                  setdevicePreV51(androidVersion < MIN_SUPPORTED_ANDROID_VERSION);
+                  setAuthing(false);
+                  setChosenDevice(device);
 
-                await device.transport.disconnected;
+                  await device.transport.disconnected;
+                  setChosenDevice(null);
+                }
+
+              } catch(error) {
+                Log.error("Failed to connect: " + error);
+                setConnectError(String(error));
                 setChosenDevice(null);
+                return;
               }
-
-            } catch(error) {
-              Log.error("Failed to connect: " + error);
-              setConnectError(String(error));
-              setChosenDevice(null);
-              return;
-            }
-          }}>Connect to Quest</button>
+            }}>Connect to Quest</button>
+          </div>
 
           <ErrorModal isVisible={connectError != null}
             title="Failed to connect to device"
@@ -256,7 +259,6 @@ function App() {
   return <div className='main'>
     <AppContents />
     <CornerSourceLink />
-    <OpenLogsButton />
     <OperationModals />
     <ToastContainer
       position="bottom-right"

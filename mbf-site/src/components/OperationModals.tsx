@@ -33,14 +33,13 @@ function SyncingModal({ isVisible, title, onClose }: { isVisible: boolean, title
         return  <div className="modalBackground coverScreen">
             <div className="modal container screenWidth">
                 <div className="syncingWindow">
+
                     <div className="syncingTitle">
                         <h2>{title}</h2>
                         {onClose === undefined && <ScaleLoader color={"white"} height={20} />}
+                        <LogWindowControls onClose={onClose} />
                     </div>
-
-                    {/* Disable the controls built into the log window and instead put the controls to the right of the heading*/}
-                    <LogWindowControls onClose={onClose} />
-                    <LogWindow showControls={false} />
+                    <LogWindow />
                 </div>
             </div>
         </div>

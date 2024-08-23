@@ -3,7 +3,7 @@ import { getDowngradedManifest, loadModStatus, patchApp, quickFix } from "./Agen
 import { ReactNode, useEffect, useState } from 'react';
 import { ModLoader, ModStatus } from './Messages';
 import './css/DeviceModder.css';
-import { LogWindow } from './components/LogWindow';
+import { LogWindow, LogWindowControls } from './components/LogWindow';
 import { ErrorModal, Modal } from './components/Modal';
 import { ModManager } from './components/ModManager';
 import { trimGameVersion } from './Models';
@@ -12,6 +12,7 @@ import { SelectableList } from './components/SelectableList';
 import { AndroidManifest } from './AndroidManifest';
 import { Log } from './Logging';
 import { wrapOperation } from './SyncStore';
+import { OpenLogsButton } from './components/OpenLogsButton';
 
 interface DeviceModderProps {
     device: Adb,
@@ -76,8 +77,9 @@ export function DeviceModder(props: DeviceModderProps) {
     if (modStatus === null) {
         return <div className='container mainContainer fadeIn'>
             <h2>Checking Beat Saber installation</h2>
+            <span className="floatRight"><LogWindowControls/></span>
             <p>This might take a minute or so the first few times.</p>
-            <LogWindow showControls={true} />
+            <LogWindow />
         </div>
     } else if (modStatus.app_info === null) {
         return <div className='container mainContainer'>
@@ -86,6 +88,7 @@ export function DeviceModder(props: DeviceModderProps) {
         </div>
     } else if (modStatus.core_mods === null) {
         return <div className='container mainContainer'>
+            <OpenLogsButton />
             <h1>No internet</h1>
             <p>It seems as though <b>your Quest</b> has no internet connection.</p>
             <p>To mod Beat Saber, MBF needs to download files such as a mod loader and several essential mods.
@@ -139,6 +142,7 @@ function ValidModLoaderMenu({ device, modStatus, setModStatus, quit }: { device:
 
     return <>
         <div className='container mainContainer'>
+            <OpenLogsButton />
             <h1>App is modded</h1>
             <UpdateInfo modStatus={modStatus} device={device} quit={quit}/>
 
@@ -291,6 +295,8 @@ function PatchingMenu(props: PatchingMenuProps) {
         </div>
     } else if(!isPatching) {
         return <div className='container mainContainer'>
+            <OpenLogsButton />
+
             {downgradingTo !== null && <DowngradeMessage
                 toVersion={downgradingTo}
                 wasUserSelected={versionOverridden}
@@ -351,8 +357,9 @@ function PatchingMenu(props: PatchingMenuProps) {
         return <div className='container mainContainer'>
             <h1>App is being patched</h1>
             <p>This should only take a few minutes, but could take much, much longer if your internet connection is slow.</p>
+            <span className="floatRight"><LogWindowControls/></span>
             <p className='warning'>You must not disconnect your device during this process.</p>
-            <LogWindow showControls={true} />
+            <LogWindow />
         </div>
     }
 }
