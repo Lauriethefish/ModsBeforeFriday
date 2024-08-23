@@ -30,7 +30,7 @@ async function connect(
   let connection: AdbDaemonWebUsbConnection;
   try {
     if(import.meta.env.DEV) {
-      Log.warn("Developer build detected, attempting to disconnect ADB server before connecting to quest");
+      Log.debug("Developer build detected, attempting to disconnect ADB server before connecting to quest");
       await tryDisconnectAdb();
     }
 
