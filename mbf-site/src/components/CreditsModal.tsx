@@ -5,10 +5,10 @@ export function CreditsModal({ isVisible, onClose }: { isVisible: boolean, onClo
     return <Modal isVisible={isVisible}>
         <h2>Credits</h2>
         <p>Hi, it's <b>Lauriethefish</b> here, the original author of ModsBeforeFriday.</p>
-        <p>MBF is an <a href={SourceUrl}>open source project</a>, and over the course of the project, numerous people have stepped up to improve the app.</p>
+        <p>MBF is an <a href={SourceUrl}>open source project</a>, and over the course of development, numerous people have stepped up to improve the app.</p>
         <p>It is important to remember that MBF is just <em>installing</em> your mods. There are many very talented people behind the core mods that MBF installs,
         and unless you've been paying close attention to the mod list, you won't even know many of their names!</p>
-        <p>This menu focuses on people who have contributed to the MBF app.</p>
+        <p>This menu solely focuses on people who have contributed to the MBF app.</p>
 
         <h3>MBF contributors</h3>
         <ul>
