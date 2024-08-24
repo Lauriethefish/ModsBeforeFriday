@@ -1,4 +1,4 @@
-.sourceLink {
+.cornerMenu {
     position: fixed;
     bottom: 0;
     left: 0;
@@ -11,20 +11,12 @@
     gap: 5px;
 }
 
-.mobileOnly {
-    display: none;
-}
-
-@media screen and (max-width: 1200px) {
-    .sourceLink {
+@media screen and (max-width: 1500px) {
+    .cornerMenu {
         display: none;
     }
-
-    .mobileOnly {
-        display: inline;
-    }
 }
 
-.sourceLink > p {
+.cornerMenu > p {
     margin: 0;
 }

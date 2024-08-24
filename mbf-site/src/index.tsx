@@ -7,8 +7,10 @@ import '@fontsource/roboto/400.css';
 import '@fontsource/roboto/500.css';
 import '@fontsource/roboto/700.css';
 
-import { createAnimatedBackground, destroyAnimatedBackground } from "./AnimatedBackground";
+import { createAnimatedBackground } from "./AnimatedBackground";
 import { isViewingOnMobile } from './platformDetection';
+
+export const SourceUrl: string = "https://github.com/Lauriethefish/ModsBeforeFriday";
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement

@@ -9,12 +9,13 @@ import { DeviceModder } from './DeviceModder';
 import { ErrorModal } from './components/Modal';
 import { Bounce, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { CornerSourceLink, SmallSourceLink } from './components/SourceLink';
+import { CornerSourceLink } from './components/CornerMenu';
 import { setCoreModOverrideUrl } from './Agent';
 import { Log } from './Logging';
 import { OperationModals } from './components/OperationModals';
 import { OpenLogsButton } from './components/OpenLogsButton';
 import { isViewingOnIos, isViewingOnMobile, isViewingOnWindows, usingOculusBrowser } from './platformDetection';
+import { SourceUrl } from '.';
 
 type NoDeviceCause = "NoDeviceSelected" | "DeviceInUse";
 
@@ -199,7 +200,7 @@ function Title() {
       <span className="initial">!</span>
       <p className="williamGay">william gay</p>
     </h1>
-    <SmallSourceLink />
+    <a href={SourceUrl} target="_blank" rel="noopener noreferrer" className="mobileOnly">Source Code</a>
     <p>The easiest way to install custom songs for Beat Saber on Quest!</p>
   </>
 }

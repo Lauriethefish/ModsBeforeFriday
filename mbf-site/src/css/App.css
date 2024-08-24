@@ -82,3 +82,13 @@ body {
 h1:hover > .williamGay {
     color: blue;
 }
+
+.mobileOnly {
+    display: none;
+}
+
+@media screen and (max-width: 1200px) {
+    .mobileOnly {
+        display: inline;
+    }
+}
