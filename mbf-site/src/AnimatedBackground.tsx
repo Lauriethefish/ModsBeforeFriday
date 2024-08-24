@@ -229,14 +229,23 @@ function createSvgNode(tag:string, attributes:any = {}){
 	return svg;
 }
 
+function onWindowResize() {
+	svg?.setAttribute("viewBox", `0 0 ${window.innerWidth} ${window.innerHeight}`);
+}
 
-export function AnimatedBackground() {
-	let svg = createSvgNode("svg", {
+export function isBackgroundEnabled(): boolean {
+	return svg !== null;
+}
+
+
+let svg: SVGSVGElement | null = null;
+export function createAnimatedBackground() {
+	svg = createSvgNode("svg", {
 		id:"anim-bg",
 		viewBox:`0 0 ${window.innerWidth} ${window.innerHeight}`
 	}) as SVGSVGElement;
-	let defs = createSvgNode("defs", {});
-	let gradient = createSvgNode("radialGradient", {id:"bomb-gradient"});
+	const defs = createSvgNode("defs", {});
+	const gradient = createSvgNode("radialGradient", {id:"bomb-gradient"});
 	gradient.appendChild(createSvgNode("stop", { offset:0, style:"stop-color: rgb(20, 20, 20);"}));
 	gradient.appendChild(createSvgNode("stop", { offset:0.75, style:"stop-color: rgb(3, 3, 3);"}));
 	defs.appendChild(gradient);
@@ -244,17 +253,19 @@ export function AnimatedBackground() {
 
 	document.body.appendChild(svg);
 
-	window.addEventListener("resize", ()=>{
-		svg.setAttribute("viewBox", `0 0 ${window.innerWidth} ${window.innerHeight}`);
-	});
+	window.addEventListener("resize", onWindowResize);
 
-	let particles: FallingBlockParticle[] = [];
-
+	const particles: FallingBlockParticle[] = [];
 	const blockCount = calculateBlockCount();
-	for(let i=0; i < blockCount; i++){
+	for(let i = 0; i < blockCount; i++){
 		particles.push(new FallingBlockParticle(svg));
 	}
-	setInterval(()=>{
+	const intervalId = setInterval(() => {
+		if(svg === null) {
+			clearInterval(intervalId);
+			return;
+		}
+
 		const blockCount = calculateBlockCount();
 
 		if(particles.length < blockCount) {
@@ -266,10 +277,18 @@ export function AnimatedBackground() {
 			FallingBlockParticle.onExit = (p:FallingBlockParticle)=>{
 				if(particles.length > blockCount){
 					particles.splice(particles.findIndex((e)=>(e===p)), 1);
-				}else{
+				} else {
 					FallingBlockParticle.onExit = null;
 				}
 			};
 		}
 	}, 500);
+}
+
+export function destroyAnimatedBackground() {
+	if(svg !== null) {
+		document.body.removeChild(svg);
+		svg = null;
+		window.removeEventListener("resize", onWindowResize);
+	}
 }

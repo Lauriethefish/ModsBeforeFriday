@@ -7,7 +7,7 @@ import '@fontsource/roboto/400.css';
 import '@fontsource/roboto/500.css';
 import '@fontsource/roboto/700.css';
 
-import { AnimatedBackground } from "./AnimatedBackground";
+import { createAnimatedBackground, destroyAnimatedBackground } from "./AnimatedBackground";
 import { isViewingOnMobile } from './platformDetection';
 
 const root = ReactDOM.createRoot(
@@ -18,7 +18,7 @@ root.render(
 );
 
 if(Animation && !isViewingOnMobile()) {
-  AnimatedBackground();
+  createAnimatedBackground();
 }
 
 // If you want to start measuring performance in your app, pass a function
