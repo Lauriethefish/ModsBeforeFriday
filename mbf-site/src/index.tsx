@@ -8,6 +8,7 @@ import '@fontsource/roboto/500.css';
 import '@fontsource/roboto/700.css';
 
 import { AnimatedBackground } from "./AnimatedBackground";
+import { isViewingOnMobile } from './platformDetection';
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
@@ -16,7 +17,7 @@ root.render(
   <App />
 );
 
-if(Animation) {  
+if(Animation && !isViewingOnMobile()) {
   AnimatedBackground();
 }
 

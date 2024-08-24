@@ -216,6 +216,20 @@ export class FallingBlockParticle {
 	}
 }
 
+function calculateBlockCount(){
+	return Math.ceil(Math.max(window.innerWidth * window.innerHeight * BLOCK_DENSITY / window.devicePixelRatio, 20));
+}
+
+function createSvgNode(tag:string, attributes:any = {}){
+	let svg:SVGElement = document.createElementNS("http://www.w3.org/2000/svg", tag);
+	for(let attr in attributes){
+		if(attr === "className") attr = "class";
+		svg.setAttribute(attr, attributes[attr]);
+	}
+	return svg;
+}
+
+
 export function AnimatedBackground() {
 	let svg = createSvgNode("svg", {
 		id:"anim-bg",
@@ -258,17 +272,4 @@ export function AnimatedBackground() {
 			};
 		}
 	}, 500);
-}
-
-function calculateBlockCount(){
-	return Math.ceil(Math.max(window.innerWidth * window.innerHeight * BLOCK_DENSITY / window.devicePixelRatio, 20));
-}
-
-function createSvgNode(tag:string, attributes:any = {}){
-	let svg:SVGElement = document.createElementNS("http://www.w3.org/2000/svg", tag);
-	for(let attr in attributes){
-		if(attr === "className") attr = "class";
-		svg.setAttribute(attr, attributes[attr]);
-	}
-	return svg;
 }
