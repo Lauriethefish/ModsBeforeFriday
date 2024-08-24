@@ -9,7 +9,7 @@ import { DeviceModder } from './DeviceModder';
 import { ErrorModal } from './components/Modal';
 import { Bounce, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { CornerSourceLink } from './components/CornerMenu';
+import { CornerMenu } from './components/CornerMenu';
 import { setCoreModOverrideUrl } from './Agent';
 import { Log } from './Logging';
 import { OperationModals } from './components/OperationModals';
@@ -260,7 +260,7 @@ function AppContents() {
 function App() {
   return <div className='main'>
     <AppContents />
-    <CornerSourceLink />
+    <CornerMenu />
     <OperationModals />
     <ToastContainer
       position="bottom-right"

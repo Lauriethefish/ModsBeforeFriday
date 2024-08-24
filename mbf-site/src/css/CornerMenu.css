@@ -3,11 +3,10 @@
     bottom: 0;
     left: 0;
 
-    padding: 10px;
+    padding: 0px;
     display: flex;
     flex-direction: column;
     justify-content: center;
-    align-items: center;
     gap: 5px;
 }
 
@@ -17,6 +16,27 @@
     }
 }
 
-.cornerMenu > p {
+.cornerMenuRow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: row;
+    gap: 7px;
+    padding: 8px;
+    border-radius: 5px;
+    width: auto;
+    cursor: pointer;
+}
+
+.cornerMenuRow:hover {
+    background-color: #0030E0;
+    transition-duration: 200ms;
+}
+
+.cornerMenuRow > img {
+    margin-left: auto;
+}
+
+.cornerMenuRow > p {
     margin: 0;
 }
