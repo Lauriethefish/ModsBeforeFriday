@@ -434,6 +434,24 @@ pub fn get_modloader_installed(apk: &mut ZipFile<File>) -> Result<Option<ModLoad
     }
 }
 
+/// Checks that there is at least one file with extension .obb in the 
+/// `/sdcard/Android/obb/com.beatgames.beatsaber` folder.
+/// 
+/// MBF only supports BS versions >1.35.0, which all use OBBs so if the obb is not present
+/// the installation is invalid and we need to prompt the user to uninstall it.
+pub fn check_obb_present() -> Result<bool> {
+    if !Path::new(APP_OBB_PATH).exists() {
+        return Ok(false);
+    }
+
+    // Check if any of the files in the OBB directory have extension OBB
+    Ok(std::fs::read_dir(APP_OBB_PATH)?
+        .any(|stat_res| 
+            stat_res.is_ok_and(|path| path.path()
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("obb")))))
+}
+
 fn patch_manifest(zip: &mut ZipFile<File>, additional_properties: String) -> Result<()> {
     let mut xml_reader = xml::EventReader::new(Cursor::new(additional_properties.as_bytes()));
 

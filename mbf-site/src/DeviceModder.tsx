@@ -94,6 +94,8 @@ export function DeviceModder(props: DeviceModderProps) {
             <p>To mod Beat Saber, MBF needs to download files such as a mod loader and several essential mods.
                 <br />This occurs on your Quest's connection. Please make sure that WiFi is enabled, then refresh the page.</p>
         </div>
+    }  else if (!modStatus.app_info.obb_present) {
+        return <NoObb device={device} quit={() => quit(undefined)}/>
     } else if (!(modStatus.core_mods.supported_versions.includes(modStatus.app_info.version)) && !isDeveloperUrl) {
         // Check if we can downgrade to a supported version
         const downgradeVersions = GetSortedDowngradableVersions(modStatus);
@@ -133,6 +135,18 @@ export function DeviceModder(props: DeviceModderProps) {
             onCompleted={modStatus => setModStatus(modStatus)}
             initialDowngradingTo={null} />
     }
+}
+
+function NoObb({ device, quit }: { device: Adb, quit: () => void }) {
+     return <div className="container mainContainer">
+        <h1>OBB not present</h1>
+        <p>MBF has detected that the OBB file, which contains asset files required for Beat Saber to load, is not present in the installation.</p>
+        <p>This means your installation is corrupt. You will need to uninstall Beat Saber with the button below, and reinstall the latest version from the Meta store.</p>
+        <button onClick={async () => {
+            await uninstallBeatSaber(device);
+            quit();
+        }}>Uninstall Beat Saber</button>
+     </div>
 }
 
 function ValidModLoaderMenu({ device, modStatus, setModStatus, quit }: { device: Adb,

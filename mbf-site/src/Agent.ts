@@ -334,7 +334,8 @@ export async function patchApp(device: Adb,
       app_info: {
           loader_installed: 'Scotland2',
           version: downgradeToVersion ?? beforePatch.app_info!.version,
-          manifest_xml: manifestMod
+          manifest_xml: manifestMod,
+          obb_present: beforePatch.app_info!.obb_present
       },
       core_mods: {
           core_mod_install_status: "Ready",

@@ -8,6 +8,7 @@ use crate::mod_man::Mod;
 #[derive(Serialize)]
 pub struct AppInfo {
     pub loader_installed: Option<ModLoader>,
+    pub obb_present: bool,
     #[serde(skip_serializing)]
     pub path: String,
     pub version: String,

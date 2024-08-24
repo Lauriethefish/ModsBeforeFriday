@@ -144,6 +144,7 @@ export type ModLoader = "Scotland2" | "QuestLoader" | "Unknown";
 
 export interface AppInfo {
     version: string,
+    obb_present: boolean,
     loader_installed: ModLoader | null,
     manifest_xml: string
 }

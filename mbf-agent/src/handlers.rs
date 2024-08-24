@@ -243,11 +243,13 @@ fn get_app_info() -> Result<Option<AppInfo>> {
     let mut apk = ZipFile::open(apk_reader).context("Failed to read APK as ZIP")?;
 
     let modloader = patching::get_modloader_installed(&mut apk)?;
+    let obb_present = patching::check_obb_present()?;
 
     let (manifest_info, manifest_xml) = get_manifest_info_and_xml(&mut apk)?;
     Ok(Some(AppInfo {
         loader_installed: modloader,
         version: manifest_info.package_version,
+        obb_present,
         path: apk_path,
         manifest_xml
     }))    
