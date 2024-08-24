@@ -1,4 +1,5 @@
 import "./css/AnimatedBackground.css";
+import { isViewingOnMobile } from "./platformDetection";
 
 //	Speed (in pixels per millisecond) at which the blocks will move
 const BLOCK_FALL_SPEED = 10 /1000;
@@ -233,13 +234,8 @@ function onWindowResize() {
 	svg?.setAttribute("viewBox", `0 0 ${window.innerWidth} ${window.innerHeight}`);
 }
 
-export function isBackgroundEnabled(): boolean {
-	return svg !== null;
-}
-
-
 let svg: SVGSVGElement | null = null;
-export function createAnimatedBackground() {
+function createAnimatedBackground() {
 	svg = createSvgNode("svg", {
 		id:"anim-bg",
 		viewBox:`0 0 ${window.innerWidth} ${window.innerHeight}`
@@ -285,10 +281,43 @@ export function createAnimatedBackground() {
 	}, 500);
 }
 
-export function destroyAnimatedBackground() {
+function destroyAnimatedBackground() {
 	if(svg !== null) {
 		document.body.removeChild(svg);
 		svg = null;
 		window.removeEventListener("resize", onWindowResize);
+	}
+}
+
+// Whether the background is currently being rendered
+function isBackgroundVisible(): boolean {
+	return svg !== null;
+}
+
+// Gets whether the user's preference is to enable or disable the background
+// The default is true if no preference is set
+export function getBgUserPreference(): boolean {
+	const storedPreference = window.localStorage.getItem("animatedBg");
+	if(storedPreference === null) {
+		return true;
+	}	else	{
+		return storedPreference === "true" ? true : false;
+	}
+}
+
+// Sets whether the user's preference is to enable or disable the animated background
+export function setBgUserPreference(showBg: boolean) {
+	window.localStorage.setItem("animatedBg", String(showBg));
+	updateBackgroundVisibility();
+}
+
+// Updates whether or not the background is visible based upon the current user settings
+// and whether the platform is mobile or desktop.
+export function updateBackgroundVisibility() {
+	const showBackground = getBgUserPreference() && !isViewingOnMobile() && Animation !== undefined;
+	if(showBackground && !isBackgroundVisible()) {
+		createAnimatedBackground();
+	}	else if(!showBackground && isBackgroundVisible()) {
+		destroyAnimatedBackground();
 	}
 }

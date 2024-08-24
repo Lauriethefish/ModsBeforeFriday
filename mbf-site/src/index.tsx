@@ -7,8 +7,7 @@ import '@fontsource/roboto/400.css';
 import '@fontsource/roboto/500.css';
 import '@fontsource/roboto/700.css';
 
-import { createAnimatedBackground } from "./AnimatedBackground";
-import { isViewingOnMobile } from './platformDetection';
+import { updateBackgroundVisibility } from "./AnimatedBackground";
 
 export const SourceUrl: string = "https://github.com/Lauriethefish/ModsBeforeFriday";
 
@@ -19,9 +18,7 @@ root.render(
   <App />
 );
 
-if(Animation && !isViewingOnMobile()) {
-  createAnimatedBackground();
-}
+updateBackgroundVisibility();
 
 // If you want to start measuring performance in your app, pass a function
 // to log results (for example: reportWebVitals(console.log))
