@@ -38,11 +38,11 @@ export function ModRepoCard({ mod, onInstall, update, isFlagged, setFlagged }:
             <p>{mod.description}</p>
             <div className="auxOptions">
                 <a href={mod.source} target="_blank">
-                    <LabelledIconButton iconSrc={CodeIcon} iconAlt="Programming code" label="View Source"/>
+                    <LabelledIconButton iconSrc={CodeIcon} iconAlt="Programming code" label="Source Code" noIconOnMobile/>
                 </a>
                 {mod.source.includes("github") && 
                     <a href={mod.source + "/issues"} target="_blank">
-                        <LabelledIconButton iconSrc={BugIcon} iconAlt="A bug" label="Report bug" />
+                        <LabelledIconButton iconSrc={BugIcon} iconAlt="A bug" label="Report bug" noIconOnMobile/>
                     </a>}
 
                 <button className="installMod" onClick={onInstall}>

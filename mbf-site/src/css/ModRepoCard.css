@@ -63,6 +63,10 @@
     font-weight: bold;
 }
 
+.installMod > img {
+    width: 35px;
+}
+
 @media (max-width: 800px) {
     .modRepoCard {
         --cover-width: 5rem;
