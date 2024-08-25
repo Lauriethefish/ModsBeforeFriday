@@ -60,13 +60,13 @@
 }
 
 @media (max-width: 800px) {
-    #modRepoCard {
+    .modRepoCard {
         --cover-width: 5rem;
     }
-    #cover {
+    .cover {
         rotate: -90deg;
     }
-    #installMod {
+    .installMod {
         max-height: 46px;
     }
 }
