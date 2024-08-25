@@ -9,7 +9,7 @@ export default defineConfig({
     server: {    
         open: true,
         port: 3000,
-        https: false
+        https: true
     },
     build: {
         sourcemap: true
