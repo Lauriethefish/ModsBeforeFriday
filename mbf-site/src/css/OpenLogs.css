@@ -1,10 +1,4 @@
 .openLogs {
     float: right;
     cursor: pointer;
-
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    padding: 7px;
-    border-radius: 5px;
 }

@@ -1,0 +1,10 @@
+.labelledIconButton {
+    /* Smaller border radius compared to regular button */
+    border-radius: 5px;
+
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 7px;
+}
