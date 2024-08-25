@@ -11,7 +11,7 @@
     background-color: #0080E0;
 }
 
-input[type=checkbox] {
+.switch > input[type=checkbox] {
     display: none;
     padding: none
 }
