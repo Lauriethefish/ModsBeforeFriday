@@ -65,15 +65,24 @@ export default function useFileDropper(props: Props) {
             }
         }
 
+        // Prevent user from dragging images from within the app into the file dropper. 
+        async function ondragstart(event: any) {
+            if(event.target.localName == 'img') {
+                event.preventDefault();
+            }
+        }
+
         window.addEventListener('dragover', ondragover);
         window.addEventListener('drop', ondrop);
         window.addEventListener('dragenter', ondragenter);
         window.addEventListener('dragleave', ondragleave);
+        window.addEventListener('dragstart', ondragstart, false);
         return () => {
             window.removeEventListener('dragover', ondragover);
             window.removeEventListener('drop', ondrop);
             window.removeEventListener('dragenter', ondragenter);
             window.removeEventListener('dragleave', ondragleave);
+            window.removeEventListener('dragstart', ondragstart);
         }
     }, [])
 
