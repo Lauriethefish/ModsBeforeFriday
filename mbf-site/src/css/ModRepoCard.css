@@ -1,4 +1,4 @@
-#modRepoCard {
+.modRepoCard {
     width: min(40rem, 95%);
     padding: 2px;
     display: grid;
@@ -14,14 +14,15 @@
     --cover-width: 10rem;
 }
 
-#auxOptions {
+.auxOptions {
     display: flex;
     flex-direction: row;
-    align-items: last baseline;
+    justify-content: last baseline;
+    align-items: end;
     gap: 10px;
 }
 
-#defaultCover {
+.defaultCover {
     display: flex;
     min-width: var(--cover-width);
     width: 100%;
@@ -31,23 +32,23 @@
     justify-content: center;
 }
 
-#cover {
+.cover {
     object-fit: contain;
     width: var(--cover-width);
 }
 
-#modDetails {
+.modDetails {
     margin-bottom: 0px;
     margin-top: 5px;
 }
 
-#author {
+.author {
     margin-top: 3px;
     font-size: smaller;
     font-style: italic;
 }
 
-#installMod {
+.installMod {
     margin-top: auto;
     margin-left: auto;
 

@@ -6,10 +6,10 @@ export function LabelledIconButton({ label, iconSrc, iconAlt, onClick }: {
     label: string,
     iconSrc: string,
     iconAlt: string,
-    onClick: () => void
+    onClick?: () => void
 }) {
     return <button className="discreetButton labelledIconButton" onClick={onClick}>
         {label}
-        <img src={iconSrc} alt={iconAlt} />
+        <img src={iconSrc} alt={iconAlt} width={22} />
     </button>
 }
