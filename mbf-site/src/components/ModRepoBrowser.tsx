@@ -4,10 +4,13 @@ import { ModRepoCard } from "./ModRepoCard";
 import { gt as semverGt } from "semver";
 import { Mod } from "../Models";
 import { Log } from "../Logging";
+import '../css/ModRepoBrowser.css';
+import { LabelledIconButton } from "./LabelledIconButton";
+import DownloadIcon from '../icons/download-icon.svg';
 
 interface ModRepoBrowserProps {
     gameVersion: string,
-    onDownload: (url: string) => void,
+    onDownload: (urls: string[]) => void,
     existingMods: Mod[]
 }
 
@@ -17,6 +20,13 @@ export function ModRepoBrowser(props: ModRepoBrowserProps) {
     const [failedToLoad, setFailedToLoad] = useState(false);
     const [attempt, setAttempt] = useState(0);
 
+    const [flagged, setFlagged] = useState([] as string[]);
+
+    // Removes a mod from the list of flagged mods
+    function unflag(displayInfo: ModDisplayInfo) {
+        setFlagged(flagged.filter(url => url != displayInfo.mod.download))
+    }
+    
     useEffect(() => {
         Log.debug("Loading mods");
         loadRepo(gameVersion)
@@ -39,13 +49,35 @@ export function ModRepoBrowser(props: ModRepoBrowserProps) {
         }
     }   else {
         return <>
+            {flagged.length > 0 && 
+                <button className="installMarked fadeIn" onClick={() => {
+                    onDownload(flagged);
+                    setFlagged([]);
+                }}>
+                    Install {flagged.length} {flagged.length > 1 ? "mods" : "mod"}
+                    <img src={DownloadIcon} alt="A download icon" />
+                </button>}
+
             <div className="mod-list fadeIn">
                 {prepareModRepoForDisplay(latestVersions(modRepo), props.existingMods).map(displayInfo => 
                     <ModRepoCard
                             mod={displayInfo.mod}
                             key={displayInfo.mod.id}
                             update={displayInfo.needUpdate}
-                            onInstall={() => onDownload(displayInfo.mod.download)} />
+                            onInstall={() => {
+                                onDownload([displayInfo.mod.download]);
+                                if(flagged.includes(displayInfo.mod.download)) {
+                                    unflag(displayInfo);
+                                }
+                            }}
+                            isFlagged={flagged.includes(displayInfo.mod.download)}
+                            setFlagged={isFlagged => {
+                                if(isFlagged) {
+                                    setFlagged([...flagged, displayInfo.mod.download]);
+                                }   else    {
+                                    unflag(displayInfo);
+                                }
+                            }} />
                 )}
             </div>
         </>

@@ -327,12 +327,12 @@ function AddModsMenu(props: ModMenuProps) {
                 return { type: "File", file: file };
             }))} />
 
-        <ModRepoBrowser existingMods={mods} gameVersion={gameVersion} onDownload={async url => {
-            const urlImport: QueuedUrlImport = {
+        <ModRepoBrowser existingMods={mods} gameVersion={gameVersion} onDownload={async urls => {
+            const urlImports: QueuedUrlImport[] = urls.map(url => { return {
                 type: "Url",
                 url: url
-            };
-            enqueueImports([urlImport]);
+            }});
+            enqueueImports(urlImports);
         }} />
     </div>
 }

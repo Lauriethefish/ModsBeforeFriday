@@ -1,0 +1,19 @@
+.installMarked {
+    position: fixed;
+    bottom: -5px;
+}
+
+.installMarked {
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: none;
+    font-size: larger;
+    background-color: #444444;
+    font-weight: bold;
+}
+
+.installMarked > img {
+    width: 35px;
+}

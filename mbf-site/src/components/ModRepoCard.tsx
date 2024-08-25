@@ -5,8 +5,18 @@ import ModIcon from '../icons/mod-icon.svg';
 import { LabelledIconButton } from "./LabelledIconButton";
 import CodeIcon from '../icons/code.svg';
 import BugIcon from '../icons/debug.svg';
+import FlagIcon from '../icons/flag.svg';
+import FilledFlagIcon from '../icons/flag-filled.svg';
+import { IconButton } from "./IconButton";
 
-export function ModRepoCard({ mod, onInstall, update }: { mod: ModRepoMod, onInstall: () => void, update: boolean }) {
+export function ModRepoCard({ mod, onInstall, update, isFlagged, setFlagged }: 
+    { 
+        mod: ModRepoMod,
+        onInstall: () => void,
+        update: boolean,
+        isFlagged: boolean,
+        setFlagged: (flagged: boolean) => void }) {
+
     // In the DB, the mod cover is either null, undefined or any empty string.
     // How fun that we get to check for all three!
     const hasCover = mod.cover !== null && mod.cover !== undefined && mod.cover.length > 0;
@@ -16,8 +26,15 @@ export function ModRepoCard({ mod, onInstall, update }: { mod: ModRepoMod, onIns
             <img src={ModIcon} width={40} />
         </div>}
         <div className="mod-repo-card-info">
-            <p className="modDetails">{mod.name} v{mod.version}</p>
-            <p className="author">by {mod.author}</p>
+            <span className="modDetails">
+                <span className="bookmarkMod">
+                    <IconButton src={isFlagged ? FilledFlagIcon : FlagIcon} alt="A flag"
+                        onClick={() => setFlagged(!isFlagged)}
+                        isOn={isFlagged}/>
+                </span>
+                {mod.name} v{mod.version}
+                <p className="author">by {mod.author}</p>
+            </span>
             <p>{mod.description}</p>
             <div className="auxOptions">
                 <a href={mod.source} target="_blank">

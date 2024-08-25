@@ -36,9 +36,13 @@
     width: var(--cover-width);
 }
 
-.modDetails {
+.modDetails > p {
     margin-bottom: 0px;
     margin-top: 5px;
+}
+
+.bookmarkMod {
+    float: right;
 }
 
 .author {
