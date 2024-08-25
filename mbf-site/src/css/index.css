@@ -74,7 +74,7 @@ button:hover {
 }
 
 .discreetButton {
-    background-color: rgba(105, 105, 105, 0.13);
+    background-color: rgba(105, 105, 105, 0.25);
     float: right;
 }
 
