@@ -17,7 +17,6 @@
 .auxOptions {
     display: flex;
     flex-direction: row;
-    justify-content: last baseline;
     align-items: end;
     gap: 10px;
 }
