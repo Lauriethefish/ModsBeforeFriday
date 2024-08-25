@@ -312,19 +312,11 @@ function AddModsMenu(props: ModMenuProps) {
     const { isDragging } = useFileDropper({
         onFilesDropped: async files => {
             enqueueImports(files
-                // It's possible that a user drag-drops an icon from MBF into MBF
-                // We don't want to trigger a file import in this case.
-                .filter(file => !file.name.toLowerCase().endsWith(".svg"))
                 .map(file => {
                 return { type: "File", file: file };
             }))
         },
         onUrlDropped: async url => {
-            // Sometimes the SVG import can also be triggered as a URL import.
-            if(url.toLowerCase().endsWith(".svg")) {
-                return;
-            }
-
             const urlImport: QueuedUrlImport = {
                 type: "Url",
                 url: url
