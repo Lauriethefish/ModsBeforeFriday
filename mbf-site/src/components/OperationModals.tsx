@@ -7,6 +7,7 @@ import { ErrorModal } from "./Modal";
 export function OperationModals() {
     const { currentOperation,
         currentError,
+        statusText,
         setError,
         logsManuallyOpen,
         setLogsManuallyOpen } = useSyncStore();
@@ -18,6 +19,7 @@ export function OperationModals() {
     return <>
         <SyncingModal isVisible={needSyncModal}
             title={currentOperation ?? "Log output"}
+            subtext={statusText}
             onClose={canClose ? () => setLogsManuallyOpen(false) : undefined} />
         <ErrorModal isVisible={currentError !== null}
             title={currentError?.title ?? ""}
@@ -28,17 +30,23 @@ export function OperationModals() {
 }
 
 
-function SyncingModal({ isVisible, title, onClose }: { isVisible: boolean, title: string, onClose?: () => void }) {
+function SyncingModal({ isVisible, title, subtext, onClose }:
+    { 
+        isVisible: boolean,
+        title: string,
+        subtext: string | null,
+        onClose?: () => void }) {
     if(isVisible) {
         return  <div className="modalBackground coverScreen">
             <div className="modal container screenWidth">
                 <div className="syncingWindow">
-
                     <div className="syncingTitle">
                         <h2>{title}</h2>
                         {onClose === undefined && <ScaleLoader color={"white"} height={20} />}
                         <LogWindowControls onClose={onClose} />
                     </div>
+                    {subtext && <span className="syncingSubtext">{subtext}</span>}
+
                     <LogWindow />
                 </div>
             </div>

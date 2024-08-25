@@ -13,7 +13,8 @@ import { ImportResult, ImportedMod, ModStatus } from "../Messages";
 import { OptionsMenu } from "./OptionsMenu";
 import useFileDropper from "../hooks/useFileDropper";
 import { Log } from "../Logging";
-import { useSetWorking, wrapOperation } from "../SyncStore";
+import { useSetWorking, useSyncStore, wrapOperation } from "../SyncStore";
+import { ModRepoMod } from "../ModsRepo";
 
 interface ModManagerProps {
     gameVersion: string,
@@ -165,7 +166,7 @@ function UploadButton({ onUploaded }: { onUploaded: (files: File[]) => void}) {
 }
 
 
-type ImportType = "Url" | "File";
+type ImportType = "Url" | "File" | "ModRepo";
 interface QueuedImport {
     type: ImportType
 }
@@ -178,6 +179,11 @@ interface QueuedFileImport extends QueuedImport {
 interface QueuedUrlImport extends QueuedImport {
     url: string,
     type: "Url"
+}
+
+interface QueuedModRepoImport extends QueuedImport {
+    mod: ModRepoMod,
+    type: 'ModRepo',
 }
 
 const importQueue: QueuedImport[] = [];
@@ -275,16 +281,28 @@ function AddModsMenu(props: ModMenuProps) {
         let disconnected = false;
         device.disconnected.then(() => disconnected = true);
         const setWorking = useSetWorking("Importing");
+        const { setStatusText } = useSyncStore.getState(); 
+
         setWorking(true);
         while(importQueue.length > 0 && !disconnected) {
             // Process the next import, depending on if it is a URL or file
             const newImport = importQueue.pop()!;
+
             if(newImport.type == "File") {
                 const file = (newImport as QueuedFileImport).file;
+                setStatusText(`Processing file ${file.name}`);
                 await handleFileImport(file);
-            }   else    {
+            }   else if(newImport.type == "Url") {
                 const url = (newImport as QueuedUrlImport).url;
+                setStatusText(`Processing url ${url}`);
+
                 await handleUrlImport(url);
+            }   else if(newImport.type == "ModRepo") {
+                const mod = (newImport as QueuedModRepoImport).mod;
+
+                setStatusText(`Installing ${mod.name} v${mod.version}`);
+
+                await handleUrlImport(mod.download);
             }
         }
         setWorking(false);
@@ -327,12 +345,12 @@ function AddModsMenu(props: ModMenuProps) {
                 return { type: "File", file: file };
             }))} />
 
-        <ModRepoBrowser existingMods={mods} gameVersion={gameVersion} onDownload={async urls => {
-            const urlImports: QueuedUrlImport[] = urls.map(url => { return {
-                type: "Url",
-                url: url
+        <ModRepoBrowser existingMods={mods} gameVersion={gameVersion} onDownload={async mods => {
+            const modRepoImports: QueuedModRepoImport[] = mods.map(mod => { return {
+                type: "ModRepo",
+                mod
             }});
-            enqueueImports(urlImports);
+            enqueueImports(modRepoImports);
         }} />
     </div>
 }

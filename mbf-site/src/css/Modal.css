@@ -31,6 +31,10 @@
     gap: 10px;
 }
 
+.syncingSubtext {
+    overflow-wrap: anywhere;
+}
+
 .syncingTitle {
     display: flex;
     align-items: center;

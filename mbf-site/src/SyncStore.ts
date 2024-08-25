@@ -14,7 +14,10 @@ export interface OperationError {
 }
 
 export interface SyncStore {
+    // Name of the current ongoing operation
     currentOperation: string | null;
+    // Progress/status text for the ongoing operation
+    statusText: string | null;
     currentError: OperationError | null,
     // Whether or not the logs have been manually opened by the user.
     logsManuallyOpen: boolean,
@@ -26,7 +29,8 @@ export interface SyncStore {
 
     setOperation: (operation: string | null) => void,
     setError: (error: OperationError | null) => void,
-    setLogsManuallyOpen: (manuallyOpen: boolean) => void
+    setLogsManuallyOpen: (manuallyOpen: boolean) => void,
+    setStatusText: (text: string | null) => void,
 }
 
 export const useSyncStore = create<SyncStore>(set => ({
@@ -34,19 +38,22 @@ export const useSyncStore = create<SyncStore>(set => ({
     currentError: null,
     logsManuallyOpen: false,
     showSyncModal: false,
+    statusText: null,
     setOperation: (operation: string | null) => set(_ => ({ currentOperation: operation })),
     setError: (error: OperationError | null) => set(_ => ({ currentError: error })),
     setLogsManuallyOpen: (manuallyOpen: boolean) => set(_ => ({ logsManuallyOpen: manuallyOpen })),
+    setStatusText: (text: string | null) => set(_ => ({ statusText: text }))
 }));
 
 // Creates a function that can be used to set whether or not a particular operation is currently in progress.
 export function useSetWorking(operationName: string): (working: boolean) => void {
-    const { setOperation } = useSyncStore.getState();
+    const { setOperation, setStatusText } = useSyncStore.getState();
 
     return working => {
         if(working) {
             setOperation(operationName);
         }   else    {
+            setStatusText(null);
             setOperation(null);
         }
     }

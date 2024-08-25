@@ -5,12 +5,11 @@ import { gt as semverGt } from "semver";
 import { Mod } from "../Models";
 import { Log } from "../Logging";
 import '../css/ModRepoBrowser.css';
-import { LabelledIconButton } from "./LabelledIconButton";
 import DownloadIcon from '../icons/download-icon.svg';
 
 interface ModRepoBrowserProps {
     gameVersion: string,
-    onDownload: (urls: string[]) => void,
+    onDownload: (urls: ModRepoMod[]) => void,
     existingMods: Mod[]
 }
 
@@ -20,11 +19,11 @@ export function ModRepoBrowser(props: ModRepoBrowserProps) {
     const [failedToLoad, setFailedToLoad] = useState(false);
     const [attempt, setAttempt] = useState(0);
 
-    const [flagged, setFlagged] = useState([] as string[]);
+    const [flagged, setFlagged] = useState([] as ModRepoMod[]);
 
     // Removes a mod from the list of flagged mods
     function unflag(displayInfo: ModDisplayInfo) {
-        setFlagged(flagged.filter(url => url != displayInfo.mod.download))
+        setFlagged(flagged.filter(url => url != displayInfo.mod))
     }
     
     useEffect(() => {
@@ -65,15 +64,15 @@ export function ModRepoBrowser(props: ModRepoBrowserProps) {
                             key={displayInfo.mod.id}
                             update={displayInfo.needUpdate}
                             onInstall={() => {
-                                onDownload([displayInfo.mod.download]);
-                                if(flagged.includes(displayInfo.mod.download)) {
+                                onDownload([displayInfo.mod]);
+                                if(flagged.includes(displayInfo.mod)) {
                                     unflag(displayInfo);
                                 }
                             }}
-                            isFlagged={flagged.includes(displayInfo.mod.download)}
+                            isFlagged={flagged.includes(displayInfo.mod)}
                             setFlagged={isFlagged => {
                                 if(isFlagged) {
-                                    setFlagged([...flagged, displayInfo.mod.download]);
+                                    setFlagged([...flagged, displayInfo.mod]);
                                 }   else    {
                                     unflag(displayInfo);
                                 }
