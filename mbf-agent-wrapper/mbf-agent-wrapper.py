@@ -516,7 +516,7 @@ class ArgumentParser(argparse.ArgumentParser):
         if not self.interactive:
             super(ArgumentParser, self).error(message)
 
-    def exit(self, code, message):
+    def exit(self, code=0, message=None):
         if not self.interactive:
             super(ArgumentParser, self).exit(code, message)
 
