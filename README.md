@@ -9,10 +9,12 @@ MBF has some query parameters which can be passed with the URL. These are useful
 
 ## Project Structure
 
-`./mbf-agent` contains the agent, which is an executable written in Rust that is executed by the frontend via ADB. This agent does pretty much all the work, including installing mods and patching the game.
-`./mbf-res-man` contains the MBF resource management project, which contains code used by MBF to access external resources e.g. core mods, but also for updating its own resource repositories, e.g. [MBF Diffs](https://github.com/Lauriethefish/mbf-diffs/releases) whenever a new version of Beat Saber is released.
-`./mbf-zip` is a simple library for reading/writing ZIP files (and signing APKs) used by the `mbf-agent`.
-`./mbf-site` contains the frontend, which communicates with the agent via JSON. (Written in typescript with React).
+- `./mbf-agent` contains the agent, which is an executable written in Rust that is executed by the frontend via ADB. This agent does pretty much all the work, including installing mods and patching the game.
+- `./mbf-agent-wrapper` is a Python script that can be used to invoke the MBF backend with a command-line-interface, handy for developers or Chromium-haters.
+- `./mbf-adb-killer` is a development utility that kills any running ADB server when the frontend tries to connect to your Quest, thus avoiding conflicts between MBF and other apps *during development only.*. 
+- `./mbf-res-man` contains the MBF resource management project, which contains code used by MBF to access external resources e.g. core mods, but also for updating its own resource repositories, e.g. [MBF Diffs](https://github.com/Lauriethefish/mbf-diffs/releases) whenever a new version of Beat Saber is released.
+- `./mbf-zip` is a simple library for reading/writing ZIP files (and signing APKs) used by the `mbf-agent`.
+- `./mbf-site` contains the frontend, which communicates with the agent via JSON. (Written in typescript with React).
 
 ## Compilation Instructions
 ### Build Requirements
