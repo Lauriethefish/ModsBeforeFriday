@@ -26,11 +26,13 @@ LEVEL_CONVERTER = {
 class Wrapper():
     def __init__(self):
         self.initialize_parsers()
+
         try:
             self.args = self.parser.parse_args()
         except argparse.ArgumentError:
             self.parser.print_help()
             exit(2)
+
         self.log_level = INFO + self.args.verbosity - self.args.quiteness
 
         self.verify_agent()
@@ -113,7 +115,20 @@ class Wrapper():
 
         self.set_mod_statuses(args)
 
+    def auto_game_version(self, args):
+        if not hasattr(self, 'mod_status'):
+            self.get_mod_status(args)
+
+        if args.game_version == 'auto':
+            supported_versions = self.mod_status['core_mods']['supported_versions']
+
+            supported_versions.sort(key = lambda version: version.replace('_', '.').split('.'))
+
+            args.game_version = supported_versions[-1]
+
     def patch(self, args):
+        self.auto_game_version(args)
+
         args.manifest_mod = None
         args.override_core_mod_url = None
 
@@ -131,7 +146,7 @@ class Wrapper():
                 'remodding': args.remodding,
                 'allow_no_core_mods': args.allow_no_core_mods}
 
-        if args.no_downgrade:
+        if args.no_downgrade or args.game_version == self.mod_status['app_info']['version']:
             del payload_args['downgrade_to']
 
         if args.override_core_mod_url:
@@ -143,6 +158,8 @@ class Wrapper():
         self.send_payload('FixPlayerData')
 
     def get_downgraded_manifest(self, args):
+        self.auto_game_version(args)
+
         self.send_payload('GetDowngradedManifest', version = args.game_version)
 
         self.manifest_mod = self.downgraded_manifest
@@ -388,7 +405,7 @@ class Wrapper():
 
         get_manifest_parser = subparser.add_parser('GetDowngradeManifest', help='Get the manifest for Beat Saber')
         self.get_manifest_parser = get_manifest_parser
-        get_manifest_parser.add_argument('game_version', help='Which version of Beat Saber to get the manifest for')
+        get_manifest_parser.add_argument('-g', '--game_version', default='auto', help='Which version of Beat Saber to get the manifest for')
         get_manifest_parser.set_defaults(func=self.get_downgraded_manifest)
 
         import_parser = subparser.add_parser('Import', help='Import a mod')
@@ -412,7 +429,7 @@ class Wrapper():
 
         patch_parser = subparser.add_parser('Patch', help='Patch the game with a mod loader')
         self.patch_parser = patch_parser
-        patch_parser.add_argument('game_version', help='Which version of the game to downgrade to')
+        patch_parser.add_argument('-g', '--game_version', default='auto', help='Which version of the game to downgrade to')
         patch_parser.add_argument('-a', '--allow_no_core_mods', action='store_true', help='Allows installing versions that do not have core mods')
         patch_parser.add_argument('-o', '--override_core_mod_url', help='Use a custom URL for core mods')
         patch_parser.add_argument('-n', '--no_downgrade', action='store_true', help='Use the existing beatsaber version. Do not downgrade')
