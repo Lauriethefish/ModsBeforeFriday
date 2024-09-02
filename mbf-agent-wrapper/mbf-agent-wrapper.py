@@ -227,7 +227,7 @@ class Wrapper():
         selector.register(process.stdout, selectors.EVENT_READ)
         selector.register(process.stderr, selectors.EVENT_READ)
 
-        combined_stdout = ''
+        combined_stdout = bytes()
         while True:
             for key, _ in selector.select():
                 raw_output = key.fileobj.read1()
@@ -237,11 +237,11 @@ class Wrapper():
 
                 if key.fileobj is process.stdout:
                     for response in raw_output.splitlines():
-                        combined_stdout += response.decode('utf8')
+                        combined_stdout += response
 
                         try:
-                            self.parse_response(json.loads(combined_stdout))
-                            combined_stdout = ''
+                            self.parse_response(json.loads(combined_stdout.decode('utf8')))
+                            combined_stdout = bytes()
                         except json.decoder.JSONDecodeError:
                             pass
                 else:
