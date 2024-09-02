@@ -66,11 +66,11 @@ class Wrapper():
         while True:
             command = shlex.split(input("\033[32mMBF Agent Wrapper\033[0m> "))
 
-            if command[0].lower() == 'quit' or command[0].lower() == 'exit':
-                return
+            if command[0].lower()[:4] == 'quit' or command[0].lower()[:4] == 'exit':
+                exit(0)
 
             try:
-                self.parser.parse_args(command)
+                self.args = self.parser.parse_args(command)
                 self.args.func(self.args)
             except argparse.ArgumentError:
                 self.log('Invalid Arguments', level=ERROR)
