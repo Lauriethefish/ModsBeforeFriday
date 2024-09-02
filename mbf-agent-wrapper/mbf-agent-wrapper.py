@@ -8,6 +8,7 @@ import selectors
 import shlex
 import subprocess
 import sys
+import requests
 import xml.etree.ElementTree as ET
 
 TRACE=4
@@ -108,6 +109,51 @@ class Wrapper():
         args.disable = None
 
         for url in args.urls:
+            self.send_payload('ImportUrl', from_url=url)
+
+            if 'imported_id' in self.import_result['result']:
+                args.enable += [self.import_result['result']['imported_id']]
+
+        self.set_mod_statuses(args)
+
+    def get_global_mods(self, args):
+        if not hasattr(args, 'override_core_mod_url'):
+            args.override_core_mod_url = None
+
+        if not hasattr(args, 'game_version'):
+            args.game_version = 'auto'
+            self.auto_game_version(args)
+
+        url = f'https://mods.bsquest.xyz/{args.game_version}.json'
+        self.global_mods = json.loads(requests.get(url).text)
+
+    def show_global_mods(self, args):
+        if not hasattr(self, 'global_mods'):
+            self.get_global_mods(args)
+
+        self.log('\033[1mAvailable Mods\033[0m')
+        for id in self.global_mods:
+            latest_version = list(self.global_mods[id].keys())[-1]
+            mod = self.global_mods[id][latest_version]
+            self.log(f'  \033[1m{mod["name"]}\033[0m')
+            self.log(f'    ID: \033[1m{id}\033[0m')
+            self.log(f'    Author: \033[1m{mod["author"]}\033[0m')
+            self.log(f'    Version: \033[1mv{mod["version"]}\033[0m\n')
+
+    def import_id(self, args):
+        if not hasattr(self, 'global_mods'):
+            self.get_global_mods(args)
+
+        args.enable = []
+        args.disable = None
+
+        for id in args.ids:
+            if id not in self.global_mods:
+                self.log(f'The mod \'{id}\' was not found in the global API! It will not be installed', level=ERROR)
+                continue
+
+            latest_version = list(self.global_mods[id].keys())[-1]
+            url = self.global_mods[id][latest_version]['download']
             self.send_payload('ImportUrl', from_url=url)
 
             if 'imported_id' in self.import_result['result']:
@@ -393,6 +439,9 @@ class Wrapper():
         interactive_parser = subparser.add_parser('Interactive', help='Run in interactive mode')
         interactive_parser.set_defaults(func=self.interactive)
 
+        get_global_mods_parser = subparser.add_parser('GetGlobalMods', help='Outputs a list of all available mods for your current version')
+        get_global_mods_parser.set_defaults(func=self.show_global_mods)
+
         get_status_parser = subparser.add_parser('GetModStatus', help='Get the current status of mods on the headset')
         get_status_parser.add_argument('-o', '--override_core_mod_url', help='Use a custom URL for core mods')
         get_status_parser.set_defaults(func=self.get_mod_status)
@@ -421,6 +470,11 @@ class Wrapper():
         self.import_url_parser = import_url_parser
         import_url_parser.add_argument('urls', nargs='+', help='The URL(s) to import')
         import_url_parser.set_defaults(func=self.import_url)
+
+        import_id_parser = import_subparser.add_parser('ID', help='Import a mod by ID')
+        self.import_id_parser = import_id_parser
+        import_id_parser.add_argument('ids', nargs='+', help='The ID(s) to import')
+        import_id_parser.set_defaults(func=self.import_id)
 
         remove_parser = subparser.add_parser('RemoveMod', help='Remove/Uninstall a mod')
         self.remove_parser = remove_parser
