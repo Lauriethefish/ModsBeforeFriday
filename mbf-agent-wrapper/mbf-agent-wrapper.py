@@ -429,7 +429,7 @@ class Wrapper():
         print(text, file = file)
 
     def initialize_parsers(self):
-        parser = ArgumentParser(prog='mbf-agent-wrapper', description='Automates the generation of payloads for mbf-agent for easy cli integration', epilog='Remaining Arguments', exit_on_error=False)
+        parser = ArgumentParser(prog='mbf-agent-wrapper', description='Automates the generation of payloads for mbf-agent for easy cli integration', epilog='Remaining Arguments')
         self.parser = parser
 
         parser.add_argument('-v', '--verbose', dest='verbosity', action='count', default=0, help='Output more logging data')
