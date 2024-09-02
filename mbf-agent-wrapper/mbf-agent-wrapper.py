@@ -31,7 +31,7 @@ class Wrapper():
 
         try:
             self.args = self.parser.parse_args()
-        except argparse.ArgumentError:
+        except (AttributeError, argparse.ArgumentError):
             self.parser.print_help()
             exit(2)
 
@@ -77,7 +77,6 @@ class Wrapper():
                 self.args.func(self.args)
             except (AttributeError, argparse.ArgumentError):
                 self.log('Invalid Arguments', level=ERROR)
-                self.parser.print_help()
 
     def get_mod_status(self, args):
         self.send_payload('GetModStatus', override_core_mod_url = args.override_core_mod_url)
