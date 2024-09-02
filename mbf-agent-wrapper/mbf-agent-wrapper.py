@@ -66,6 +66,9 @@ class Wrapper():
         while True:
             command = shlex.split(input("\033[32mMBF Agent Wrapper\033[0m> "))
 
+            if len(command) <= 0:
+                continue
+
             if command[0].lower()[:4] == 'quit' or command[0].lower()[:4] == 'exit':
                 exit(0)
 
