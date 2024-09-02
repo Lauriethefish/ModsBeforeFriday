@@ -264,11 +264,12 @@ class Wrapper():
             self.log('\033[1mMod Status\033[0m')
 
             # App Info
-            self.log('  \033[1;90mApp Info\033[0m')
-            self.log(f'    Loader Installed: {response["app_info"]["loader_installed"]}')
-            self.log(f'    OBB Present: {self.color_bool(response["app_info"]["obb_present"])}')
-            self.log(f'    Version: {response["app_info"]["version"]}\n')
-            self.log(f'    Manifest XML: {response["app_info"]["manifest_xml"]}\n', level=TRACE)
+            if 'app_info' in response:
+                self.log('  \033[1;90mApp Info\033[0m')
+                self.log(f'    Loader Installed: {response["app_info"]["loader_installed"]}')
+                self.log(f'    OBB Present: {self.color_bool(response["app_info"]["obb_present"])}')
+                self.log(f'    Version: {response["app_info"]["version"]}\n')
+                self.log(f'    Manifest XML: {response["app_info"]["manifest_xml"]}\n', level=TRACE)
 
             # Installed Mods
             self.log('  \033[1;32mInstalled Mods\033[0m')
@@ -276,19 +277,20 @@ class Wrapper():
                 self.log_mod(mod)
 
             # Core Mods
-            self.log('  \033[1;92mCore Mods\033[0m', level=DEBUG)
+            if 'core_mods' in response:
+                self.log('  \033[1;92mCore Mods\033[0m', level=DEBUG)
 
-            core_status = response['core_mods']['core_mod_install_status']
-            core_status_code = '\033[32m' if core_status == 'Ready' \
-                    else '\033[33m' if core_status == 'NeedUpdate' \
-                    else '\033[31m'
-            self.log(f'    Core Mod Install Status: {core_status_code}{core_status}', level=DEBUG)
-            self.log('    Supported Versions', level=DEBUG)
-            for supported_version in response['core_mods']['supported_versions']:
-                self.log(f'      {supported_version}', level=DEBUG)
-            self.log('    Downgrade Versions', level=DEBUG)
-            for downgrade_version in response['core_mods']['downgrade_versions']:
-                self.log(f'      {downgrade_version}', level=DEBUG)
+                core_status = response['core_mods']['core_mod_install_status']
+                core_status_code = '\033[32m' if core_status == 'Ready' \
+                        else '\033[33m' if core_status == 'NeedUpdate' \
+                        else '\033[31m'
+                self.log(f'    Core Mod Install Status: {core_status_code}{core_status}', level=DEBUG)
+                self.log('    Supported Versions', level=DEBUG)
+                for supported_version in response['core_mods']['supported_versions']:
+                    self.log(f'      {supported_version}', level=DEBUG)
+                self.log('    Downgrade Versions', level=DEBUG)
+                for downgrade_version in response['core_mods']['downgrade_versions']:
+                    self.log(f'      {downgrade_version}', level=DEBUG)
 
             self.log(f'    Is Awaiting Diff? {self.color_bool(response["core_mods"]["is_awaiting_diff"], flipped=True)}', level=DEBUG)
 
