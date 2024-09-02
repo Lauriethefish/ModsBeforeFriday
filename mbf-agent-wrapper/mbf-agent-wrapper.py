@@ -4,10 +4,11 @@ import argparse
 import hashlib
 import json
 import os
-import selectors
 import shlex
 import subprocess
 import sys
+from threading import Thread
+from queue import Queue
 import requests
 import xml.etree.ElementTree as ET
 
@@ -215,6 +216,14 @@ class Wrapper():
                           override_core_mod_url=args.override_core_mod_url,
                           wipe_existing_mods=args.wipe_existing_mods)
 
+    def read_pipe(self, pipe, queue):
+        try:
+            with pipe:
+                for line in iter(pipe.readline, b''):
+                    queue.put((pipe, line))
+        finally:
+            queue.put(None)
+
     def send_payload(self, payload_type, **kwargs):
         payload = {'type': payload_type} | kwargs
         self.log(json.dumps(payload), level=TRACE)
@@ -223,20 +232,16 @@ class Wrapper():
         process.stdin.write(json.dumps(payload).encode('utf8'))
         process.stdin.close()
 
-        selector = selectors.DefaultSelector()
-        selector.register(process.stdout, selectors.EVENT_READ)
-        selector.register(process.stderr, selectors.EVENT_READ)
+        out_queue = Queue()
+
+        Thread(target=self.read_pipe, args=[process.stdout, out_queue]).start()
+        Thread(target=self.read_pipe, args=[process.stderr, out_queue]).start()
 
         combined_stdout = bytes()
-        while True:
-            for key, _ in selector.select():
-                raw_output = key.fileobj.read1()
-
-                if not raw_output:
-                    return
-
-                if key.fileobj is process.stdout:
-                    for response in raw_output.splitlines():
+        for _ in range(2):
+            for source, line in iter(out_queue.get, None):
+                if source is process.stdout:
+                    for response in line.splitlines():
                         combined_stdout += response
 
                         try:
@@ -245,7 +250,7 @@ class Wrapper():
                         except json.decoder.JSONDecodeError:
                             pass
                 else:
-                    self.log(raw_output.decode('utf8'), level=ERROR)
+                    self.log(line.decode('utf8'), level=ERROR)
 
     def parse_response(self, response):
         response_type = response['type']
