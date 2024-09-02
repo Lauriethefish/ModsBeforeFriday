@@ -435,7 +435,8 @@ class Wrapper():
         parser.add_argument('-v', '--verbose', dest='verbosity', action='count', default=0, help='Output more logging data')
         parser.add_argument('-q', '--quiet', dest='quiteness', action='count', default=0, help='Disabled all stdout outputs')
 
-        subparser = parser.add_subparsers(required=True)
+        subparser = parser.add_subparsers(dest='command')
+        subparser.required = True
         self.subparser = subparser
 
         interactive_parser = subparser.add_parser('Interactive', help='Run in interactive mode')
