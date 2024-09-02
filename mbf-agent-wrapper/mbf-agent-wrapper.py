@@ -72,7 +72,7 @@ class Wrapper():
             try:
                 self.args = self.parser.parse_args(command)
                 self.args.func(self.args)
-            except argparse.ArgumentError:
+            except (AttributeError, argparse.ArgumentError):
                 self.log('Invalid Arguments', level=ERROR)
                 self.parser.print_help()
 
@@ -434,7 +434,7 @@ class Wrapper():
         print(text, file = file)
 
     def initialize_parsers(self):
-        parser = ArgumentParser(prog='mbf-agent-wrapper', description='Automates the generation of payloads for mbf-agent for easy cli integration', epilog='Remaining Arguments')
+        parser = ArgumentParser(prog='mbf-agent-wrapper', description='Automates the generation of payloads for mbf-agent for easy cli integration')
         self.parser = parser
 
         parser.add_argument('-v', '--verbose', dest='verbosity', action='count', default=0, help='Output more logging data')
