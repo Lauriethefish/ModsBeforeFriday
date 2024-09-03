@@ -79,39 +79,42 @@ fn find_bs_ver_beginning_with(bs_version: &str) -> Result<PathBuf> {
     }
 }
 
+// Finds the path to the Beat Saber version `bs_version`
+// Setting `fuzzy_lookup` to true will instead find the (single) Beat Saber version beginning with `bs_version`
+// Gives an Err if the bs_version does not exist, or multiple match if using fuzzy lookup
+fn get_bs_ver_path(bs_version: &str, fuzzy_lookup: bool) -> Result<PathBuf> {
+    let version_path = Path::new(BS_VERSIONS_PATH).join(&bs_version);
+    if !version_path.exists() && !fuzzy_lookup {
+        Err(anyhow!("Beat Saber version {bs_version} not in cache!"))
+    }   else {
+        find_bs_ver_beginning_with(bs_version)
+    }
+}
+
 // Installs the APK and pushes OBBs for the given Beat Saber version to the quest.
 fn install_bs_version(bs_version: &str, fuzzy_lookup: bool) -> Result<()> {
     info!("Removing existing installation (if there is one)");
     let _ = uninstall_package(APK_ID); // Allow failure, i.e. if app not already installed.
 
     info!("Installing BS {bs_version}");
-    let mut version_path = Path::new(BS_VERSIONS_PATH).join(&bs_version);
-    if !version_path.exists() {
-        // If allowing fuzzy lookup, then attempt to find a BS version starting with `bs_version`
-        if fuzzy_lookup {
-            version_path = find_bs_ver_beginning_with(bs_version)?;
-        }   else {
-            return Err(anyhow!("Beat Saber version {bs_version} not in cache!"));
-        }
-    }
+    let version_path = get_bs_ver_path(bs_version, fuzzy_lookup)?;
 
-    let apk_path = version_path.join(format!("{APK_ID}.apk"));
+    let (apk_path, maybe_obb_path) = get_obb_and_apk_path(bs_version, fuzzy_lookup)
+        .context("Failed to get APK and OBB path")?;
+
     info!("Installing APK");
     adb::install_apk(&apk_path.to_string_lossy())?;
 
-    for file_res in std::fs::read_dir(version_path)? {
-        let file_path = file_res?.path();
+    if let Some(obb_path) = maybe_obb_path {
+        let obb_file_name = obb_path.file_name().ok_or(anyhow!("Obb had no filename"))?
+            .to_string_lossy()
+            .to_string();
+        info!("Copying {obb_file_name}");
 
-        // Upload any files with the obb file extension to the obbs folder on the quest.
-        if file_path.extension() == Some(OsStr::new("obb")) {
-            let obb_file_name = file_path.file_name().ok_or(anyhow!("Obb had no filename"))?
-                .to_string_lossy()
-                .to_string();
-            info!("Copying {obb_file_name}");
-
-            let obb_dest = format!("/sdcard/Android/obb/{APK_ID}/{obb_file_name}");
-            adb::push_file(&file_path.to_string_lossy(), &obb_dest)?;
-        }
+        let obb_dest = format!("/sdcard/Android/obb/{APK_ID}/{obb_file_name}");
+        adb::push_file(&obb_path.to_string_lossy(), &obb_dest)?;
+    }   else {
+        info!("No OBB found to copy");
     }
 
     Ok(())
@@ -146,11 +149,8 @@ fn save_diff_index(index: DiffIndex) -> Result<()> {
 
 // Gets the path to the OBB and APK for the given Beat Saber version.
 // Will error if multiple OBBs exist, or if the version is not stored locally.
-fn get_obb_and_apk_path(version: &str) -> Result<(PathBuf, PathBuf)> {
-    let version_path = Path::new(BS_VERSIONS_PATH).join(&version);
-    if !version_path.exists() {
-        return Err(anyhow!("Beat Saber version {version} is not pulled"));
-    }
+fn get_obb_and_apk_path(version: &str, fuzzy_lookup: bool) -> Result<(PathBuf, Option<PathBuf>)> {
+    let version_path = get_bs_ver_path(version, fuzzy_lookup)?;
 
     // APK is always in the same place
     let apk_path = version_path.join(format!("{APK_ID}.apk"));
@@ -177,11 +177,7 @@ fn get_obb_and_apk_path(version: &str) -> Result<(PathBuf, PathBuf)> {
         }
     }
 
-    if let Some(path_of_obb) = obb_path {
-        Ok((apk_path, path_of_obb))
-    }   else {
-        Err(anyhow!("No obb file found"))
-    }
+    Ok((apk_path, obb_path))
 }
 
 // Removes a file if it already exists.
@@ -232,17 +228,22 @@ fn add_diff_to_index(from_version: String, to_version: String, delete_existing: 
 
     verify_no_existing_diff(&mut current_diff_idx, &from_version, &to_version, delete_existing).context("Failed to verify removal of existing diff")?;
 
-    let (from_apk, from_obb) = get_obb_and_apk_path(&from_version).context("Getting APK/OBB path for original version")?;
-    let (to_apk, to_obb) = get_obb_and_apk_path(&to_version).context("Getting APK/OBB path for downgraded version")?;
+    let (from_apk, from_obb) = get_obb_and_apk_path(&from_version, false).context("Getting APK/OBB path for original version")?;
+    let (to_apk, to_obb) = get_obb_and_apk_path(&to_version, false).context("Getting APK/OBB path for downgraded version")?;
     
+    if from_obb == None || to_obb == None {
+        return Err(anyhow!("One of the Beat Saber versions had no OBB! Obb-less diffs aren't supported by mbf-res-man"));
+    }
+
     let apk_diff_name = format!("bs-apk-{from_version}-to-{to_version}.apk.diff");
     let obb_diff_name = format!("bs-obb-{from_version}-to-{to_version}.obb.diff");
 
     info!("Generating diff for APK");
     let apk_diff = diff_builder::generate_diff(from_apk, to_apk, Path::new(DIFFS_PATH)
         .join(apk_diff_name)).context("Failed to generate diff for APK")?;
+    
     info!("Generating diff for OBB");
-    let obb_diff = diff_builder::generate_diff(from_obb, to_obb, Path::new(DIFFS_PATH)
+    let obb_diff = diff_builder::generate_diff(from_obb.unwrap(), to_obb.unwrap(), Path::new(DIFFS_PATH)
         .join(obb_diff_name)).context("Failed to generate diff for OBB")?;
 
     info!("Adding to diff index");
