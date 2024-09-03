@@ -27,6 +27,7 @@ const BS_VERSIONS_PATH: &str = formatcp!("{APK_DATA_DIR}/versions");
 const DIFFS_PATH: &str = formatcp!("{APK_DATA_DIR}/diffs");
 const MANIFESTS_PATH: &str = formatcp!("{APK_DATA_DIR}/manifests");
 const DIFF_INDEX_PATH: &str = formatcp!("{DIFFS_PATH}/index.json");
+const META_TOKEN_PATH: &str = "META_TOKEN.txt";
 
 // Downloads the installed version of Beat Saber to BS_VERSIONS_PATH
 fn download_installed_bs() -> Result<String> {
@@ -403,6 +404,9 @@ fn merge_obb(version: String, out_path: impl AsRef<Path>) -> Result<()> {
 struct Cli {
     #[command(subcommand)]
     command: Commands,
+
+    #[clap(short, long)]
+    access_token: Option<String>
 }
 
 #[derive(Subcommand)]
@@ -429,15 +433,10 @@ enum Commands {
     FetchVersion {
         version: String,
         #[arg(short, long)]
-        access_token: String,
-        #[arg(short, long)]
         older_binaries: bool,
     },
     /// Lists the currently LIVE Beat Saber versions from the Oculus API.
-    ListVersions {
-        #[arg(short, long)]
-        access_token: String,
-    },
+    ListVersions,
     /// Installs the given Beat Saber version onto the Quest.
     InstallVersion {
         version: String
@@ -461,7 +460,10 @@ enum Commands {
         #[arg(short, long)]
         email: String,
         #[arg(short, long)]
-        password: String
+        password: String,
+        /// Saves the access token to disk to be used in later commands without entering it each time.
+        #[arg(short, long)]
+        save: bool
     },
     MergeObb {
         #[arg(short, long)]
@@ -475,9 +477,25 @@ enum Commands {
     /// - Uploads the diff to the mbf-diffs repo.
     UpdateReposFromOculusApi {
         #[arg(short, long)]
-        access_token: String,
-        #[arg(short, long)]
         min_version: Option<String>
+    }
+}
+
+/// If `argument` is Some, this unwraps `argument` and returns the contained access token.
+/// Otherwise, this function tries to load the meta access token from META_TOKEN_PATH
+/// Gives an error if reading the file fails. (or the file doesn't exist)
+fn get_or_load_access_token(argument: Option<String>) 
+    -> Result<String> {
+    match argument {
+        Some(arg_token) => Ok(arg_token),
+        None => {
+            if Path::new(META_TOKEN_PATH).exists() {
+                Ok(std::fs::read_to_string(META_TOKEN_PATH)?)
+            }   else {
+                Err(anyhow!("No meta access token passed (with argument -a <token>) and
+{META_TOKEN_PATH} did not exist, so could not get access token"))
+            }
+        }
     }
 }
 
@@ -492,7 +510,8 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
         Commands::PullVersion => { download_installed_bs()?; },
-        Commands::FetchVersion { version, access_token, older_binaries } => {
+        Commands::FetchVersion { version, older_binaries } => {
+            let access_token = get_or_load_access_token(cli.access_token)?;
             let versions = version_grabber::get_live_bs_versions(&access_token, Version::new(0, 0, 0))?;
 
             version_grabber::download_version(&access_token,
@@ -502,7 +521,8 @@ fn main() -> Result<()> {
                 BS_VERSIONS_PATH,
                 false)?;
         },
-        Commands::ListVersions { access_token } => {
+        Commands::ListVersions => {
+            let access_token = get_or_load_access_token(cli.access_token)?;
             let versions = version_grabber::get_live_bs_versions(&access_token, Version::new(0, 0, 0))?;
 
             for semi_sv in versions.keys() {
@@ -531,11 +551,25 @@ fn main() -> Result<()> {
             
             update_all_repositories(installed_bs_version)?;
         },
-        Commands::GetAccessToken { email, password } => {
+        Commands::GetAccessToken { email, password, save } => {
             let token = oculus_db::get_quest_access_token(&email, &password)?;
-            info!("Access token: {token}");
+            // Save the access token to a file if specified.
+            if save {
+                info!("Access token saved!");
+                let token_bytes = token.as_bytes();
+                let mut token_writer = OpenOptions::new()
+                    .truncate(true)
+                    .write(true)
+                    .create(true)
+                    .open(META_TOKEN_PATH)?;
+                token_writer.write_all(token_bytes)?;
+            }   else {
+                info!("Access token: {token}");
+            }
         },
-        Commands::UpdateReposFromOculusApi { access_token, min_version } => {
+        Commands::UpdateReposFromOculusApi { min_version } => {
+            let access_token = get_or_load_access_token(cli.access_token)?;
+
             let min_version_semver = match min_version {
                 Some(version_string) => semver::Version::parse(&version_string).context("Failed to parse provided version string")?,
                 None => semver::Version::new(0, 0, 0)

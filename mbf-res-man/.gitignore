@@ -3,3 +3,4 @@ apk_data/versions
 apk_data/manifests
 target/
 GITHUB_TOKEN.txt
+META_TOKEN.txt

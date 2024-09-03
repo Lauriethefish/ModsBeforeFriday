@@ -61,9 +61,9 @@ fn authenticate_application(access_token: &str, app_id: u64) -> Result<String> {
 
 pub fn get_quest_access_token(email: &str, password: &str) -> Result<String> {
     let access_token = meta_accounts_login(email, password).context("Accounts login failed")?;
-    info!("Account login succeeded, access token: {access_token}");
+    info!("Account login succeeded");
     let horizon_access_token = get_horizon_access_token(&access_token).context("Failed to get horizon token")?;
-    info!("Successfully obtained horizon access token {horizon_access_token}");
+    info!("Successfully obtained horizon access token");
     let quest_access_token = authenticate_application(&horizon_access_token, 1481000308606657)
         .context("Failed to authenticate application")?;
 
