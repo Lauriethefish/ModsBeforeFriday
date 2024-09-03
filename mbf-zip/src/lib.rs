@@ -157,20 +157,34 @@ impl<T: Read + Seek> ZipFile<T> {
         Ok(())
     }
 
-    pub fn read_file_contents(&mut self, name: &str, write_to: &mut impl Write) -> Result<()> {
+    // Checks if an entry with name `name` exists, and if it does:
+    // - Creates a buffered reader to read the local file header.
+    // - Reads the local file header of the entry
+    // - Leaves the `reader` at the first byte of the entry content.
+    // If the entry does not exist, this gives an appropriate error.
+    fn read_lfh_and_seek_to_contents(&mut self, name: &str) -> Result<(LocalFileHeader, &CentDirHeader, BufReader<&mut T>)> {
         let cd_header = match self.entries.get(name) {
             Some(header) => header,
             None => return Err(anyhow!("File with name {name} did not exist"))
         };
-        let mut buf_reader = BufReader::new(&mut self.file);
 
+        let mut buf_reader = BufReader::new(&mut self.file);
         buf_reader.seek(SeekFrom::Start(cd_header.local_header_offset as u64))?;
-        let _ = LocalFileHeader::read(&mut buf_reader).context("Invalid local file header")?;
+        let lfh = LocalFileHeader::read(&mut buf_reader)
+            .context("Invalid local file header")?;
+
         // TODO: Verify CRC32, file name, and other attributes match?
+        Ok((lfh, cd_header, buf_reader))
+    }    
+
+    /// Reads the contents of entry with full name `name` and writes them to `write_to`.
+    /// Gives an Err if the file does not exist (or the ZIP file header is corrupt)
+    pub fn read_file_contents(&mut self, name: &str, write_to: &mut impl Write) -> Result<()> {
+        let (lfh, _, mut buf_reader) = self.read_lfh_and_seek_to_contents(name)?;
 
         let mut compressed_contents = (&mut buf_reader)
-            .take(cd_header.compressed_len as u64);
-        match cd_header.compression_method {
+            .take(lfh.compressed_len as u64);
+        match lfh.compression_method {
             FileCompression::Deflate => {
                 // Limit the bytes to be decompressed
                 let mut decoder = deflate::Decoder::new(compressed_contents);
@@ -182,6 +196,61 @@ impl<T: Read + Seek> ZipFile<T> {
             },
             FileCompression::Unsupported(method) => return Err(anyhow!("Compression method `{method}` not supported for reading"))
         };
+
+        Ok(())
+    }
+
+    /// Copies all entries in this ZIP file into `dst_archive`. For each entry, the path is the same in both archives.
+    /// Any files that already exist in `dst_archive` will be overwritten.
+    pub fn copy_all_entries_to(&mut self, dst_archive: &mut ZipFile<File>) -> Result<()> {
+        let mut buf_reader = BufReader::new(&mut self.file);
+
+        for (src_name, cd_header) in &self.entries {
+            buf_reader.seek(SeekFrom::Start(cd_header.local_header_offset as u64))?;
+
+            let lfh = LocalFileHeader::read(&mut buf_reader)
+                .context("Invalid local file header")?;
+
+            Self::copy_entry_internal(lfh, &cd_header, &mut buf_reader, src_name.clone(), dst_archive)?;
+        }
+
+        Ok(())
+    }
+
+    /// Copies the entry in this ZIP file with name `src_name` to `dst_archive` with name `dst_name`.
+    /// If the entry already exists, it will be overwritten.
+    pub fn copy_entry(&mut self, src_name: &str, dst_archive: &mut ZipFile<File>, dst_name: String) -> Result<()> {
+        let (lfh, cd_header, mut buf_reader) = self.read_lfh_and_seek_to_contents(src_name)?;
+
+        Self::copy_entry_internal(lfh, cd_header, &mut buf_reader, dst_name, dst_archive)
+    }
+
+    fn copy_entry_internal(mut lfh: LocalFileHeader,
+        src_cdh: &CentDirHeader,
+        buf_reader: &mut BufReader<&mut T>,
+        dst_name: String,
+        dst_archive: &mut ZipFile<File>) -> Result<()> {
+        // Update the new position of the LFH in the CDH
+        let mut dst_cdh = src_cdh.clone();
+        dst_cdh.local_header_offset = dst_archive.end_of_entries_offset;
+        dst_cdh.file_name = dst_name.clone();
+        lfh.file_name = dst_name.clone();
+
+        // Locate a position in the destination archive for the new local header.
+
+        dst_archive.file.seek(SeekFrom::Start(dst_archive.end_of_entries_offset as u64))?;
+        let mut buf_writer = BufWriter::new(&mut dst_archive.file);
+        lfh.write(&mut buf_writer).context("Failed to save local file header")?;
+        let lfh_length = buf_writer.stream_position()? - dst_archive.end_of_entries_offset as u64;
+
+        // Copy the contents of the entry to the other archive (no need to decompress and recompress)
+        std::io::copy(&mut buf_reader.take(lfh.compressed_len as u64), &mut buf_writer)
+            .context("Failed to copy content of entry")?;
+
+        dst_archive.end_of_entries_offset = (lfh.compressed_len as u64 + lfh_length + dst_archive.end_of_entries_offset as u64)
+            .try_into().context("ZIP file too large")?;
+        
+        dst_archive.entries.insert(dst_name, dst_cdh);
 
         Ok(())
     }
@@ -215,6 +284,7 @@ fn copy_to_with_crc(from: &mut impl Read, to: &mut impl Write) -> Result<u32> {
 }
 
 impl ZipFile<File> {
+    /// Writes a file to the ZIP with entry name `name` and contents copied from `contents` (which is read until EOF)
     pub fn write_file(&mut self,
         name: &str,
         contents: &mut (impl Read + Seek),
