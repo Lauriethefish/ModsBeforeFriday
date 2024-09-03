@@ -1,7 +1,7 @@
 // Allow dead code since some functions are only used when this crate is imported by the MBF agent.
 #![allow(unused)]
 
-use std::{collections::HashMap, ffi::OsStr, fs::{FileType, OpenOptions}, io::Write, path::{Path, PathBuf}};
+use std::{cell::LazyCell, collections::HashMap, ffi::OsStr, fs::{FileType, OpenOptions}, io::Write, path::{Path, PathBuf}};
 use adb::uninstall_package;
 use anyhow::{anyhow, Context, Result};
 use clap::{arg, command, Parser, Subcommand};
@@ -11,7 +11,7 @@ use mbf_zip::ZipFile;
 use models::{DiffIndex, VersionDiffs};
 use oculus_db::{get_obb_binary, AndroidBinary};
 use release_editor::Repo;
-use semver::Version;
+use semver::{Op, Version};
 
 mod models;
 mod adb;
@@ -282,7 +282,22 @@ fn get_latest_moddable_bs() -> Result<String> {
     latest_ver.ok_or(anyhow!("No Beat Saber versions were moddable"))
 }
 
-const GITHUB_AUTH_TOKEN: &str = include_str!("../GITHUB_TOKEN.txt");
+const GITHUB_TOKEN_PATH: &str = "GITHUB_TOKEN.txt";
+const GITHUB_TOKEN: LazyCell<Option<&'static str>> = LazyCell::new(|| {
+    if Path::new(GITHUB_TOKEN_PATH).exists() {
+        Some(Box::leak(Box::new(std::fs::read_to_string(GITHUB_TOKEN_PATH)
+            .expect("Failed to read GH token"))))
+    }   else    {
+        None
+    }
+});
+
+// Attempts to get or load the github auth token from its containing file if present.
+// Gives an Err if the auth token file does not exist.
+fn get_github_auth_token() -> Result<&'static str> {
+    GITHUB_TOKEN.ok_or(
+        anyhow!("No github token found: {GITHUB_TOKEN_PATH} did not exist"))
+}
 
 // Updates the current diff index on github with the diffs in the diffs folder
 fn upload_diff_index() -> Result<()> {
@@ -292,8 +307,10 @@ fn upload_diff_index() -> Result<()> {
         repo: "mbf-diffs".to_string(),
         owner: "Lauriethefish".to_string()
     };
-    let latest_release = release_editor::get_latest_release(repo, GITHUB_AUTH_TOKEN)?;
-    release_editor::update_release_from_directory(DIFFS_PATH, &latest_release, GITHUB_AUTH_TOKEN)?;
+
+    let auth_token = get_github_auth_token()?;
+    let latest_release = release_editor::get_latest_release(repo, auth_token)?;
+    release_editor::update_release_from_directory(DIFFS_PATH, &latest_release, auth_token)?;
 
     Ok(())
 }
@@ -342,8 +359,10 @@ fn upload_manifests() -> Result<()> {
         repo: "mbf-manifests".to_string(),
         owner: "Lauriethefish".to_string()
     };
-    let latest_release = release_editor::get_latest_release(repo, GITHUB_AUTH_TOKEN)?;
-    release_editor::update_release_from_directory(MANIFESTS_PATH, &latest_release, GITHUB_AUTH_TOKEN)?;
+
+    let auth_token = get_github_auth_token()?;
+    let latest_release = release_editor::get_latest_release(repo, auth_token)?;
+    release_editor::update_release_from_directory(MANIFESTS_PATH, &latest_release, auth_token)?;
     Ok(())
 }
 
