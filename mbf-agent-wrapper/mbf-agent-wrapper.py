@@ -42,14 +42,21 @@ class Wrapper():
     def verify_agent(self):
         local_hasher = hashlib.sha1()
 
-        with open('../mbf-site/public/mbf-agent', 'rb') as file:
-            while True:
-                data = file.read(65536)
+        script_path = sys.argv[0]
+        agent_build_path = os.path.join(os.path.dirname(script_path), '../mbf-site/public/mbf-agent')
 
-                if not data:
-                    break
+        try:
+            with open(agent_build_path, 'rb') as file:
+                while True:
+                    data = file.read(65536)
 
-                local_hasher.update(data)
+                    if not data:
+                        break
+
+                    local_hasher.update(data)
+        except FileNotFoundError:
+            self.log("MBF agent not found at correct path relative to wrapper. Assuming agent already pushed by website.", level=WARN)
+            return
         
         local_hash = local_hasher.hexdigest()
         remote_hash = subprocess.run(['adb', 'shell', 'sha1sum', '/data/local/tmp/mbf-agent', '|', 'cut', '-f', '1', '-d', '" "'], universal_newlines=True, stdout=subprocess.PIPE).stdout[:-1];
@@ -58,7 +65,7 @@ class Wrapper():
             self.log('Local and remote agent differ, updating the remote agent')
             self.log(f'Local Agent Hash:  "{local_hash}"', level=DEBUG)
             self.log(f'Remote Agent Hash: "{remote_hash}"', level=DEBUG)
-            subprocess.run(['adb', 'push', '../mbf-site/public/mbf-agent', '/data/local/tmp/mbf-agent'])
+            subprocess.run(['adb', 'push', agent_build_path, '/data/local/tmp/mbf-agent'])
             subprocess.run(['adb', 'shell', 'chmod', '+x', '/data/local/tmp/mbf-agent'])
 
     def interactive(self, args):
