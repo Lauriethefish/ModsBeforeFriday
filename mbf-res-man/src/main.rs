@@ -1,7 +1,7 @@
 // Allow dead code since some functions are only used when this crate is imported by the MBF agent.
 #![allow(unused)]
 
-use std::{collections::HashMap, ffi::OsStr, fs::FileType, io::Write, path::{Path, PathBuf}};
+use std::{collections::HashMap, ffi::OsStr, fs::{FileType, OpenOptions}, io::Write, path::{Path, PathBuf}};
 use adb::uninstall_package;
 use anyhow::{anyhow, Context, Result};
 use clap::{arg, command, Parser, Subcommand};
@@ -366,6 +366,35 @@ fn update_all_repositories(latest_bs_version: String) -> Result<()> {
     Ok(())
 }
 
+fn merge_obb(version: String, out_path: impl AsRef<Path>) -> Result<()> {
+    info!("Merging APK and OBB for version {version}");
+    let (apk_path, maybe_obb_path) = get_obb_and_apk_path(&version, true)?;
+
+    info!("Copying APK to destination");
+    std::fs::copy(&apk_path, out_path.as_ref())
+        .context("Failed to copy APK to destination path")?;
+    
+    let apk_file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(out_path)?;
+    let mut apk_zip = ZipFile::open(apk_file)
+        .context("APK was not valid ZIP archive")?;
+
+    let obb_path = maybe_obb_path.ok_or(anyhow!("No OBB found for v{version} to merge"))?;
+
+    let mut obb_zip = ZipFile::open(std::fs::File::open(obb_path)?)
+        .context("OBB was not valid ZIP archive")?;
+
+    info!("Copying entries from OBB into APK");
+    obb_zip.copy_all_entries_to(&mut apk_zip).context("Failed to copy over OBB entries")?;
+
+    const CERT_PEM: &[u8] = include_bytes!("../../mbf-agent/src/debug_cert.pem");
+    let (cert, priv_key) = mbf_zip::signing::load_cert_and_priv_key(CERT_PEM);
+    apk_zip.save_and_sign_v2(&priv_key, &cert).context("Failed to sign/save APK")?;
+    Ok(())
+}
+
 #[derive(Parser)]
 #[command(version, long_about = None)]
 #[command(arg_required_else_help = true)]
@@ -419,6 +448,12 @@ enum Commands {
         email: String,
         #[arg(short, long)]
         password: String
+    },
+    MergeObb {
+        #[arg(short, long)]
+        version: String,
+        #[arg(short, long)]
+        out_path: String
     },
     /// Fetches Beat Saber versions from the oculus database, then:
     /// - Ensures all manifests are available on the manifests repo.
@@ -479,7 +514,8 @@ fn main() -> Result<()> {
             info!("Latest Beat Saber version is {latest_bs_version}");
             update_all_repositories(latest_bs_version)?;
 
-        }
+        },
+        Commands::MergeObb { version, out_path } => { merge_obb(version, out_path)? }
     }
 
     Ok(())
