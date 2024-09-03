@@ -12,6 +12,7 @@ use models::{DiffIndex, VersionDiffs};
 use oculus_db::{get_obb_binary, AndroidBinary};
 use release_editor::Repo;
 use semver::{Op, Version};
+use version_grabber::SemiSemVer;
 
 mod models;
 mod adb;
@@ -542,10 +543,13 @@ fn main() -> Result<()> {
         },
         Commands::ListVersions => {
             let access_token = get_or_load_access_token(cli.access_token)?;
-            let versions = version_grabber::get_live_bs_versions(&access_token, Version::new(0, 0, 0))?;
+            let mut versions: Vec<_> = version_grabber::get_live_bs_versions(&access_token, Version::new(0, 0, 0))?
+                .into_keys()
+                .collect();
+            versions.sort_by_cached_key(|ver| ver.semver.clone());
 
-            for semi_sv in versions.keys() {
-                info!("{}", semi_sv.non_semver);
+            for version in versions {
+                info!("{}", version.non_semver);
             }
         }
         Commands::GenerateDiff { from_version, to_version, overwrite } => add_diff_to_index(from_version, to_version, overwrite)?,

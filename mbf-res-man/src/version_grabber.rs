@@ -4,7 +4,7 @@ use anyhow::{anyhow, Context, Result};
 use log::{error, info, warn};
 use semver::Version;
 
-use crate::{oculus_db::{self, AndroidBinary}, APK_ID};
+use crate::{oculus_db::{self, AndroidBinary, ObbBinary}, APK_ID};
 
 const BEATSABER_GRAPH_APP_ID: &str = "2448060205267927";
 
@@ -32,31 +32,21 @@ pub struct ObbInfo {
 // The different Beat Saber builds available for a particular version.
 pub struct VersionBinaries {
     // The build with the newest version code.
-    main: BeatSaberBinaries,
+    main: AndroidBinary,
     // Any builds with older version codes.
-    older_versions: Vec<BeatSaberBinaries>
+    older_versions: Vec<AndroidBinary>
 }
 
 // For the given Beat Saber version, attempts to find an OBB file needed for its installation.
 // Returns the APK binary and its obb, if there is one.
-fn combine_with_obb_id(android_bin: &AndroidBinary, semver: &Version, access_token: &str) -> Result<BeatSaberBinaries> {
+fn get_obb_info(android_bin: &AndroidBinary, access_token: &str) -> Result<Option<ObbInfo>> {
     // Detect Beat Saber versions older than 1.34.6 and do not bother getting obb details: these versions do not use OBBs
-    let obb = if semver < &Version::new(1, 34, 6) {
-        None
-    }   else    {
-        info!("Fetching OBB data for version {}", android_bin.version);
-        let maybe_obb = oculus_db::get_obb_binary(&access_token, &android_bin.id)?;
-        maybe_obb.map(|obb| ObbInfo {
-            obb_id: obb.id,
-            obb_filename: obb.file_name
-        })
-    };
-    
-    Ok(BeatSaberBinaries {
-        apk_id: android_bin.id.clone(),
-        version_code: android_bin.version_code,
-        obb
-    })
+    info!("Fetching OBB data for version {}", android_bin.version);
+    let maybe_obb = oculus_db::get_obb_binary(&access_token, &android_bin.id)?;
+    Ok(maybe_obb.map(|obb| ObbInfo {
+        obb_id: obb.id,
+        obb_filename: obb.file_name
+    }))
 }
 
 /// Fetches all of the live (i.e. publicly accessible) Beat Saber versions newer than (or equal to) the specified minimum version.
@@ -102,16 +92,12 @@ pub fn get_live_bs_versions(access_token: &str, min_version: Version) -> Result<
             continue;
         }
 
-        // Fetch the OBB information for each binary.
-        let main_binary = combine_with_obb_id(&binary_vec[0], &semver, access_token)?;
-        let mut other_binaries = Vec::new();
-        for other_bin in &binary_vec[1..] {
-            other_binaries.push(combine_with_obb_id(other_bin, &semver, access_token)?)
-        }
-
+        let mut binary_iter = binary_vec.into_iter();
         let mut ver_binaries = VersionBinaries {
-            main: main_binary,
-            older_versions: other_binaries
+            // First binary
+            main: binary_iter.next().ok_or(anyhow!("Beat Saber version had no binaries"))?,
+            // Subsequent binaries, used on Quest 1
+            older_versions: binary_iter.collect()
         };
 
         ver_binaries_map.insert(SemiSemVer {
@@ -144,12 +130,14 @@ fn download_and_warn_on_err(binary_id: &str, path: impl AsRef<Path>, access_toke
 }
 
 // Downloads all of the binaries for the given Beat Saber build to `to`. Appends `suffix` to the filenames if not empty.
-fn download_binaries(access_token: &str, binaries: &BeatSaberBinaries, to: impl AsRef<Path>, suffix: &str) -> Result<()> {
+fn download_binaries(access_token: &str, apk_binary: &AndroidBinary, to: impl AsRef<Path>, suffix: &str) -> Result<()> {
     let apk_path = to.as_ref().join(format!("{APK_ID}{suffix}.apk"));
     info!("Downloading APK");
-    download_and_warn_on_err(&binaries.apk_id, apk_path, access_token);
 
-    if let Some(obb) = &binaries.obb {
+    download_and_warn_on_err(&apk_binary.id, apk_path, access_token);
+
+    let obb_info = get_obb_info(apk_binary, access_token).context("Failed to get OBB information")?;
+    if let Some(obb) = obb_info {
         let obb_path = to.as_ref().join(format!("{}{}", obb.obb_filename, suffix));
         info!("Downloading OBB");
         download_and_warn_on_err(&obb.obb_id, obb_path, access_token);
