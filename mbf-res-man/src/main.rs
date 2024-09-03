@@ -11,6 +11,7 @@ use mbf_zip::ZipFile;
 use models::{DiffIndex, VersionDiffs};
 use oculus_db::{get_obb_binary, AndroidBinary};
 use release_editor::Repo;
+use semver::Version;
 
 mod models;
 mod adb;
@@ -424,6 +425,19 @@ enum Commands {
         #[arg(short, long)]
         overwrite: bool
     },
+    /// Downloads the specified Beat Saber version from the Oculus API
+    FetchVersion {
+        version: String,
+        #[arg(short, long)]
+        access_token: String,
+        #[arg(short, long)]
+        older_binaries: bool,
+    },
+    /// Lists the currently LIVE Beat Saber versions from the Oculus API.
+    ListVersions {
+        #[arg(short, long)]
+        access_token: String,
+    },
     /// Installs the given Beat Saber version onto the Quest.
     InstallVersion {
         version: String
@@ -478,6 +492,23 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
         Commands::PullVersion => { download_installed_bs()?; },
+        Commands::FetchVersion { version, access_token, older_binaries } => {
+            let versions = version_grabber::get_live_bs_versions(&access_token, Version::new(0, 0, 0))?;
+
+            version_grabber::download_version(&access_token,
+                &versions,
+                &version,
+                older_binaries,
+                BS_VERSIONS_PATH,
+                false)?;
+        },
+        Commands::ListVersions { access_token } => {
+            let versions = version_grabber::get_live_bs_versions(&access_token, Version::new(0, 0, 0))?;
+
+            for semi_sv in versions.keys() {
+                info!("{}", semi_sv.non_semver);
+            }
+        }
         Commands::GenerateDiff { from_version, to_version, overwrite } => add_diff_to_index(from_version, to_version, overwrite)?,
         Commands::GenerateDiffToLatest { from_version, overwrite } => {
             let latest_moddable = get_latest_moddable_bs()?;
@@ -510,7 +541,7 @@ fn main() -> Result<()> {
                 None => semver::Version::new(0, 0, 0)
             };
 
-            let latest_bs_version = version_grabber::download_bs_versions(&access_token, BS_VERSIONS_PATH, min_version_semver)?;
+            let latest_bs_version = version_grabber::download_bs_versions(&access_token, BS_VERSIONS_PATH, min_version_semver, false)?;
             info!("Latest Beat Saber version is {latest_bs_version}");
             update_all_repositories(latest_bs_version)?;
 

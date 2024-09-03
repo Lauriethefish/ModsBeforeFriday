@@ -11,26 +11,26 @@ const BEATSABER_GRAPH_APP_ID: &str = "2448060205267927";
 // Used to hold a Beat Saber version, which follows semver but has a build suffix that is not valid semver.
 // The `non_semver` here is the complete version string with build suffix.
 #[derive(Hash, Eq, PartialEq, Clone)]
-struct SemiSemVer {
-    semver: Version,
-    non_semver: String
+pub struct SemiSemVer {
+    pub semver: Version,
+    pub non_semver: String
 }
 
 // The set of files needed to install a particular Beat Saber build.
-struct BeatSaberBinaries {
+pub struct BeatSaberBinaries {
     apk_id: String, // APK binary ID
     version_code: u32,
     obb: Option<ObbInfo>
 }
 
 // Information about an OBB file needed by an APK.
-struct ObbInfo {
+pub struct ObbInfo {
     obb_id: String,
     obb_filename: String
 }
 
 // The different Beat Saber builds available for a particular version.
-struct VersionBinaries {
+pub struct VersionBinaries {
     // The build with the newest version code.
     main: BeatSaberBinaries,
     // Any builds with older version codes.
@@ -59,9 +59,9 @@ fn combine_with_obb_id(android_bin: &AndroidBinary, semver: &Version, access_tok
     })
 }
 
-// Fetches all of the live (i.e. publicly accessible) Beat Saber versions newer than (or equal to) the specified minimum version.
-// If a version is invalid semver, it will be skipped.
-fn get_live_bs_versions(access_token: &str, min_version: Version) -> Result<HashMap<SemiSemVer, VersionBinaries>> {
+/// Fetches all of the live (i.e. publicly accessible) Beat Saber versions newer than (or equal to) the specified minimum version.
+/// If a version is invalid semver, it will be skipped.
+pub fn get_live_bs_versions(access_token: &str, min_version: Version) -> Result<HashMap<SemiSemVer, VersionBinaries>> {
     // Each version may potentially have multiple binaries as there may be a quest 1 and quest 2+ binary.
     let mut versions_map: HashMap<String, Vec<AndroidBinary>> = HashMap::new();
 
@@ -144,12 +144,12 @@ fn download_and_warn_on_err(binary_id: &str, path: impl AsRef<Path>, access_toke
 }
 
 // Downloads all of the binaries for the given Beat Saber build to `to`. Appends `suffix` to the filenames if not empty.
-fn download_binaries(access_token: &str, binaries: BeatSaberBinaries, to: impl AsRef<Path>, suffix: &str) -> Result<()> {
+fn download_binaries(access_token: &str, binaries: &BeatSaberBinaries, to: impl AsRef<Path>, suffix: &str) -> Result<()> {
     let apk_path = to.as_ref().join(format!("{APK_ID}{suffix}.apk"));
     info!("Downloading APK");
     download_and_warn_on_err(&binaries.apk_id, apk_path, access_token);
 
-    if let Some(obb) = binaries.obb {
+    if let Some(obb) = &binaries.obb {
         let obb_path = to.as_ref().join(format!("{}{}", obb.obb_filename, suffix));
         info!("Downloading OBB");
         download_and_warn_on_err(&obb.obb_id, obb_path, access_token);
@@ -158,35 +158,70 @@ fn download_binaries(access_token: &str, binaries: BeatSaberBinaries, to: impl A
     Ok(())
 }
 
+/// Downloads the Beat Saber version with version name `version`
+/// This will be stored in a directory with name `version` within `output_dir`
+/// Iff `include_older_binaries` is `true`, this will also download Quest 1 only binaries.
+pub fn download_version(access_token: &str,
+    versions: &HashMap<SemiSemVer, VersionBinaries>,
+    version: &str,
+    include_older_binaries: bool,
+    to_dir: impl AsRef<Path>,
+    skip_existing: bool) -> Result<()> {
+    let ver_path = to_dir.as_ref().join(version);
+    if ver_path.exists() && skip_existing {
+        return Ok(());
+    }
+    
+    // Get a map of all available BS versions
+    let matching_version: Option<&VersionBinaries> = versions.iter()
+        .filter(|(ver, _)| ver.non_semver == version)
+        .map(|(_, binaries)| binaries)
+        .next();
+
+    let binaries = match matching_version {
+        Some(binaries) => binaries,
+        None => return Err(anyhow!("Beat Saber version {version} not found"))
+    };
+
+    std::fs::create_dir_all(&ver_path)?;
+
+    info!("Downloading binaries for {}", version);
+    download_binaries(access_token, &binaries.main, &ver_path, "")?;
+    if include_older_binaries {
+        for other_bin in &binaries.older_versions {
+            info!("Also downloading quest 1 only binaries");
+            let ver_code_str = other_bin.version_code.to_string();
+            download_binaries(access_token, &other_bin, &ver_path, &ver_code_str)?;
+        }
+    }
+
+    Ok(())
+}
+
 // Downloads the currently available Beat Saber versions (skipping any that already have been downloaded.)
 // Will skip any versions older than `min_version`
 // Returns the latest Beat Saber version, as a string with its build suffix (_bignumber)
-pub fn download_bs_versions(access_token: &str, output_dir: impl AsRef<Path>, min_version: Version) -> Result<String> {
+pub fn download_bs_versions(access_token: &str, output_dir: impl AsRef<Path>, min_version: Version,
+    include_older_binaries: bool) -> Result<String> {
     info!("Using graph API to get version data");
     let mut latest_ver = SemiSemVer {
         non_semver: String::new(),
         semver: Version::new(0, 0, 0)
     };
+    let output_dir = output_dir.as_ref();
 
     let versions = get_live_bs_versions(access_token, min_version)?;
-    for (ver, binaries) in versions {
+    for (ver, binaries) in &versions {
         if ver.semver > latest_ver.semver {
             latest_ver = ver.clone();
         }
 
-        let ver_path = output_dir.as_ref().join(&ver.non_semver);
-        if ver_path.exists() {
-            continue;
-        }
-
-        std::fs::create_dir_all(&ver_path)?;
-        info!("Downloading binaries for {}", ver.non_semver);
-        download_binaries(access_token, binaries.main, &ver_path, "")?;
-        for other_bin in binaries.older_versions {
-            info!("Also downloading quest 1 only binaries");
-            let ver_code_str = other_bin.version_code.to_string();
-            download_binaries(access_token, other_bin, &ver_path, &ver_code_str)?;
-        }
+        download_version(access_token,
+            &versions,
+            &ver.non_semver,
+            include_older_binaries,
+            output_dir,
+            true)?;
     }
 
     Ok(latest_ver.non_semver)
