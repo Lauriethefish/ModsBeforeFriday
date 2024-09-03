@@ -1,7 +1,7 @@
 // Allow dead code since some functions are only used when this crate is imported by the MBF agent.
 #![allow(unused)]
 
-use std::{collections::HashMap, ffi::OsStr, io::Write, path::{Path, PathBuf}};
+use std::{collections::HashMap, ffi::OsStr, fs::FileType, io::Write, path::{Path, PathBuf}};
 use adb::uninstall_package;
 use anyhow::{anyhow, Context, Result};
 use clap::{arg, command, Parser, Subcommand};
@@ -52,15 +52,47 @@ fn download_installed_bs() -> Result<String> {
     Ok(bs_version)
 }
 
+// Attempts to find the path to the folder containing the APK/OBB for the Beat Saber version that begins with `bs_version`
+// Will give an Err if no BS version is saved that begins with bs_version, OR if multiple exist.
+fn find_bs_ver_beginning_with(bs_version: &str) -> Result<PathBuf> {
+    let mut matching = Vec::new();
+    for entry_res in std::fs::read_dir(Path::new(BS_VERSIONS_PATH))
+        .context("Failed to read apk_data folder")? {
+
+        // Skip entries where reading the metadata failed.
+        if let Ok(entry) = entry_res {
+            // Find directories that begin with the required BS version
+            if entry.file_type().is_ok_and(|file_type| file_type.is_dir()) 
+                && entry.file_name().to_string_lossy().starts_with(bs_version) {
+                    matching.push(entry.path());
+                }
+        }
+    }
+
+    // Only succeed if there is exactly one match
+    if matching.len() == 0 {
+        Err(anyhow!("No BS versions found beginning with {bs_version}"))
+    }   else if matching.len() > 1 {
+        Err(anyhow!("Multiple BS versions exist beginning with {bs_version}"))
+    }   else {
+        Ok(matching.into_iter().next().unwrap())
+    }
+}
+
 // Installs the APK and pushes OBBs for the given Beat Saber version to the quest.
-fn install_bs_version(bs_version: &str) -> Result<()> {
+fn install_bs_version(bs_version: &str, fuzzy_lookup: bool) -> Result<()> {
     info!("Removing existing installation (if there is one)");
     let _ = uninstall_package(APK_ID); // Allow failure, i.e. if app not already installed.
 
     info!("Installing BS {bs_version}");
-    let version_path = Path::new(BS_VERSIONS_PATH).join(&bs_version);
+    let mut version_path = Path::new(BS_VERSIONS_PATH).join(&bs_version);
     if !version_path.exists() {
-        return Err(anyhow!("Beat Saber version {bs_version} not in cache!"));
+        // If allowing fuzzy lookup, then attempt to find a BS version starting with `bs_version`
+        if fuzzy_lookup {
+            version_path = find_bs_ver_beginning_with(bs_version)?;
+        }   else {
+            return Err(anyhow!("Beat Saber version {bs_version} not in cache!"));
+        }
     }
 
     let apk_path = version_path.join(format!("{APK_ID}.apk"));
@@ -420,8 +452,9 @@ fn main() -> Result<()> {
             add_diff_to_index(from_version, latest_moddable, overwrite)?;
         }
         Commands::UpdateDiffIndex => upload_diff_index()?,
-        Commands::InstallVersion { version } => install_bs_version(&version)?,
-        Commands::InstallLatestModdable => install_bs_version(&get_latest_moddable_bs()?)?,
+        // Enable fuzzy lookup so that if e.g. 1.28.0 is selected, the command will find the full version string with the build suffix and install that
+        Commands::InstallVersion { version } => install_bs_version(&version, true)?,
+        Commands::InstallLatestModdable => install_bs_version(&get_latest_moddable_bs()?, false)?,
         Commands::UpdateManifestsRepo => {
             update_manifests()?;
             upload_manifests()?;
