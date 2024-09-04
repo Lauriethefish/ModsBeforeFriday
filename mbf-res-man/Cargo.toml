@@ -14,9 +14,12 @@ const_format = "0.2.32"
 crc = "3.0.1"
 byteorder = "1.5.0"
 log = "0.4.22"
-env_logger = "0.11.3"
-clap = { version = "4.5.8", features = ["derive"] }
 semver = { version = "1.0.23", features = ["serde"] }
+env_logger = { version = "0.11.3", optional = true }
+clap = { version = "4.5.8", features = ["derive"], optional = true }
+
+[features]
+build-binary = ["clap", "env_logger"]
 
 [lib]
 name = "mbf_res_man"
@@ -25,3 +28,4 @@ path = "src/lib.rs"
 [[bin]]
 name = "mbf_res_man"
 path = "src/main.rs"
+required-features = ["build-binary"]
