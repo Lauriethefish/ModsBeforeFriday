@@ -1,5 +1,5 @@
 use std::{collections::HashMap, fs::File, io::{BufReader, BufWriter, Cursor, Read, Seek, SeekFrom, Write}, path::Path};
-use byteorder::{ReadBytesExt, LE};
+use byteorder::{ReadBytesExt, WriteBytesExt, LE};
 use anyhow::{Result, anyhow, Context};
 use crc::{Crc, Algorithm};
 use libflate::deflate;
@@ -50,7 +50,7 @@ pub fn crc_bytes(bytes: &[u8]) -> u32 {
 }
 
 // The compression method of a file within the archive, which may be an unsupported method.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub enum FileCompression {
     Deflate,
     Store,
@@ -61,6 +61,11 @@ pub struct ZipFile<T: Read + Seek> {
     file: T,
     entries: HashMap<String, CentDirHeader>,
     end_of_entries_offset: u32,
+    // Alignment of entries created with the STORE compression method
+    // Alignment is preferred for non-compressed files in APKs so that they can be MMAP'd directly into
+    // memory, improving performance.
+    // Typically, already-compressed media files like PNG use the STORE compression method.
+    store_aligment: u16
 }
 
 impl<T: Read + Seek> ZipFile<T> {
@@ -103,7 +108,8 @@ impl<T: Read + Seek> ZipFile<T> {
         Ok(Self {
             end_of_entries_offset: (buf_file.stream_position()? + last_header.compressed_len as u64).try_into().context("ZIP file too large")?,
             file,
-            entries
+            entries,
+            store_aligment: 1
         })
     }
 
@@ -284,6 +290,48 @@ fn copy_to_with_crc(from: &mut impl Read, to: &mut impl Write) -> Result<u32> {
 }
 
 impl ZipFile<File> {
+    /// Sets the alignment for files written with the STORE compression method.
+    pub fn set_store_alignment(&mut self, alignment: u16) {
+        self.store_aligment = alignment;
+    }
+
+    
+    // Creates a field used to align the ZIP entry data to store_alignment
+    // `data_offset` is what the offset in the ZIP of the first byte of the data would be,
+    // with no alignment field.
+    fn create_alignment_field(&self, data_offset: u64) -> Result<Vec<u8>> {
+        const ALIGNMENT_EXTRA_DATA_HEADER: u16 = 0xD935;
+
+        let offset_from_alignment = data_offset % self.store_aligment as u64;
+        // No need for an alignment field if we are already aligned.
+        if offset_from_alignment == 0 {
+            return Ok(Vec::new());
+        }
+
+        // The alignment field is at least 6 bytes long, before the padding null bytes that achieve
+        // the desired alignment.
+        // First there is an extra data ID and data length (2 bytes each), then a 2 byte unsigned integer
+        // storing the level of aligment.
+        let after_min_len = data_offset + 6;
+        // Number of 0 bytes needed after the extra data field's header.
+        let padding_bytes = (self.store_aligment as u64 - (after_min_len % self.store_aligment as u64))
+            % self.store_aligment as u64;
+
+        let mut output_buf: Vec<u8> = Vec::new();
+        let mut cursor = Cursor::new(&mut output_buf);
+
+        // Write the extra data header and level of alignment.
+        cursor.write_u16::<LE>(ALIGNMENT_EXTRA_DATA_HEADER)?;
+        cursor.write_u16::<LE>((padding_bytes + 2) as u16)?;
+        cursor.write_u16::<LE>(self.store_aligment as u16)?;
+        // Actually write the padding which is contained within all these layers
+        for _ in 0..padding_bytes {
+            cursor.write_u8(0)?;
+        }
+
+        Ok(output_buf)
+    }
+
     /// Writes a file to the ZIP with entry name `name` and contents copied from `contents` (which is read until EOF)
     pub fn write_file(&mut self,
         name: &str,
@@ -292,7 +340,17 @@ impl ZipFile<File> {
         self.file.seek(SeekFrom::Start(self.end_of_entries_offset as u64))?;
 
         let lfh_offset = self.file.stream_position()?;
-        self.file.seek(SeekFrom::Current(30 + name.len() as i64))?; // Skip the location of the new LFH for now, since we don't know the data size yet.
+        // Find the offset of the first byte after the LFH ignoring alignment.
+        let unaligned_post_lfh_offset = self.file.stream_position()? + 30 + name.len() as u64;
+        let aligment_field = if compression_method == FileCompression::Store { 
+            self.create_alignment_field(unaligned_post_lfh_offset)?
+        }   else    {
+            // No need for alignment fields if using the DEFLATE compression method
+            Vec::new()
+        };
+
+        // Skip the location of the new LFH for now, since we don't know the data size yet.
+        self.file.seek(SeekFrom::Start(unaligned_post_lfh_offset + aligment_field.len() as u64))?;
         
         let data_start = self.file.stream_position()?;
 
@@ -335,7 +393,7 @@ impl ZipFile<File> {
             compressed_len,
             uncompressed_len,
             file_name: name.to_string(),
-            extra_field: Vec::new(),
+            extra_field: aligment_field,
         };
 
         // Write the local header with the known length/CRC
