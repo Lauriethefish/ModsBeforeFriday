@@ -91,6 +91,15 @@ impl log::Log for ResponseLogger {
     }
 
     fn log(&self, record: &log::Record) {
+        // Skip logs that are not from mbf_agent, mbf_zip, etc.
+        // ...as these are spammy logs from ureq or rustls, and we do nto want them.
+        match record.module_path() {
+            Some(module_path) => if !module_path.starts_with("mbf") {
+                return;
+            },
+            None => return
+        }
+
         // Ignore errors, logging should be infallible and we don't want to panic
         let _result = write_response(Response::LogMsg {
             message: format!("{}", record.args()),
@@ -123,7 +132,7 @@ fn main() -> Result<()> {
     let start_time = Instant::now();
 
     log::set_logger(&LOGGER).expect("Failed to set up logging");
-    log::set_max_level(log::LevelFilter::Info);
+    log::set_max_level(log::LevelFilter::Debug);
 
     let mut reader = BufReader::new(std::io::stdin());
     let mut line = String::new();
