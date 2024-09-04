@@ -1,0 +1,21 @@
+# Mirrors the main branch of the ModsBeforeFriday repository to the mbf-nightly repository's deploy branch
+#
+# A second repository for nightly builds is necessary because only one github pages domain can be associated
+# with a particular repository.
+
+name: "Compile and deploy"
+on:
+  push:
+    branches: ['main']
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build:
+    name: Mirror to nightly repo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: git remote add nightly https://github.com/Lauriethefish/mbf-nightly
+      - run: git push nightly main:deploy
