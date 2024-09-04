@@ -3,7 +3,7 @@
 # A second repository for nightly builds is necessary because only one github pages domain can be associated
 # with a particular repository.
 
-name: "Compile and deploy"
+name: "Mirror to nightly repo"
 on:
   push:
     branches: ['main']
@@ -19,5 +19,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           token: ${{ secrets.MIRROR_GITHUB_ACCESS_TOKEN }}
+      - run: git config user.name "MBF Mirror Bot"
+      - run: git config user.email "<>"
       - run: git remote add nightly https://github.com/Lauriethefish/mbf-nightly
       - run: git push --force nightly main:deploy
