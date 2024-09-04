@@ -11,6 +11,7 @@ export class AndroidManifest {
     private document!: XMLDocument;
     private manifestEl!: Node;
     private applicationEl!: Node;
+    private androidNsPrefix: string = "";
 
     // Initialises the manifest, loading it from the given XML.
     constructor(manifest_xml: string) {
@@ -30,35 +31,40 @@ export class AndroidManifest {
             throw new Error("Invalid XML " + errorNode);
         }
 
-
         this.document = tentativeDoc;
+        const androidNsPrefix = this.document.lookupPrefix(ANDROID_NS_URI);
+        if(androidNsPrefix === null) {
+            throw new Error("Not a manifest, has no Android namespace URI prefix");
+        }
+        this.androidNsPrefix = androidNsPrefix;
+        
         this.manifestEl = this.document.getElementsByTagName("manifest")[0];
         this.applicationEl = this.document.getElementsByTagName("application")[0];
         this.permissions = [];
         this.features = [];
         // Load the permissions and features already within the manifest.
         Array.from(this.document.getElementsByTagName("uses-permission")).forEach(permNode => {
-            const permName = permNode.getAttribute("android:name");
+            const permName = permNode.getAttribute(`${androidNsPrefix}:name`);
             if(permName !== null) {
                 this.permissions.push(permName);
             }
         })
         Array.from(this.document.getElementsByTagName("uses-feature")).forEach(permNode => {
-            const featName = permNode.getAttribute("android:name");
+            const featName = permNode.getAttribute(`${androidNsPrefix}:name`);
             if(featName !== null) {
                 this.features.push(featName);
             }
         })
         Array.from(this.document.getElementsByTagName("uses-native-library")).forEach(libNode => {
-            const libName = libNode.getAttribute("android:name");
+            const libName = libNode.getAttribute(`${androidNsPrefix}:name`);
             if(libName !== null) {
                 this.nativeLibraries.push(libName);
             }
         })
         Array.from(this.applicationEl.childNodes).forEach(appChild => {
             if(appChild.nodeType == Node.ELEMENT_NODE && appChild.nodeName == "meta-data") {
-                const metadataName = (appChild as Element).getAttribute("android:name");
-                const metadataValue = (appChild as Element).getAttribute("android:value");
+                const metadataName = (appChild as Element).getAttribute(`${androidNsPrefix}:name`);
+                const metadataValue = (appChild as Element).getAttribute(`${androidNsPrefix}:value`);
 
                 if(metadataName !== null && metadataValue !== null) {
                     if(metadataName in this.metadata) {
@@ -107,8 +113,8 @@ export class AndroidManifest {
     // - Enable hardware acceleration. (useful for any mods that make use of the WebView API)
     public applyPatchingManifestMod() {
         const application = this.document.getElementsByTagName("application")[0];
-        application.setAttributeNS(ANDROID_NS_URI, "android:debuggable", "true");
-        application.setAttributeNS(ANDROID_NS_URI, "android:hardwareAccelerated", "true");
+        application.setAttributeNS(ANDROID_NS_URI, `${this.androidNsPrefix}:debuggable`, "true");
+        application.setAttributeNS(ANDROID_NS_URI, `${this.androidNsPrefix}:hardwareAccelerated`, "true");
 
         this.addPermission("android.permission.MANAGE_EXTERNAL_STORAGE");
     }
@@ -121,7 +127,7 @@ export class AndroidManifest {
         }
 
         const permissionElement = this.document.createElement("uses-permission");
-        permissionElement.setAttributeNS(ANDROID_NS_URI, "android:name", perm);
+        permissionElement.setAttributeNS(ANDROID_NS_URI, `${this.androidNsPrefix}:name`, perm);
         this.manifestEl.appendChild(permissionElement);
         this.permissions.push(perm);
     }
@@ -135,8 +141,8 @@ export class AndroidManifest {
         }
 
         const featureElement = this.document.createElement("uses-feature");
-        featureElement.setAttributeNS(ANDROID_NS_URI, "android:name", feat);
-        featureElement.setAttributeNS(ANDROID_NS_URI, "android:required", "false");
+        featureElement.setAttributeNS(ANDROID_NS_URI, `${this.androidNsPrefix}:name`, feat);
+        featureElement.setAttributeNS(ANDROID_NS_URI, `${this.androidNsPrefix}:required`, "false");
         this.manifestEl.appendChild(featureElement);
         this.features.push(feat);
     }
@@ -149,8 +155,8 @@ export class AndroidManifest {
         }
 
         const nativeLibElement = this.document.createElement("uses-native-library");
-        nativeLibElement.setAttributeNS(ANDROID_NS_URI, "android:name", fileName);
-        nativeLibElement.setAttributeNS(ANDROID_NS_URI, "android:required", "false");
+        nativeLibElement.setAttributeNS(ANDROID_NS_URI, `${this.androidNsPrefix}:name`, fileName);
+        nativeLibElement.setAttributeNS(ANDROID_NS_URI, `${this.androidNsPrefix}:required`, "false");
         this.applicationEl.appendChild(nativeLibElement);
         this.nativeLibraries.push(fileName);
     }
@@ -158,16 +164,16 @@ export class AndroidManifest {
     // Adds or updates a <meta-data> tag to set the metadata with the given name to the provided value.
     public setMetadata(name: string, value: string) {
         const matchingMetadata = Array.from(this.document.getElementsByTagName("meta-data"))
-            .filter(element => element.getAttribute("android:name") == name);
+            .filter(element => element.getAttribute(`${this.androidNsPrefix}:name`) == name);
 
         if(matchingMetadata.length == 0) {
             // No existing element, so cannot update existing: create a new meta-data element
             const newMetaElement = this.document.createElement("meta-data");
-            newMetaElement.setAttributeNS(ANDROID_NS_URI, "android:name", name);
-            newMetaElement.setAttributeNS(ANDROID_NS_URI, "android:value", value);
+            newMetaElement.setAttributeNS(ANDROID_NS_URI, `${this.androidNsPrefix}:name`, name);
+            newMetaElement.setAttributeNS(ANDROID_NS_URI, `${this.androidNsPrefix}:value`, value);
             this.applicationEl.appendChild(newMetaElement);
         }   else    {
-            matchingMetadata[0].setAttributeNS(ANDROID_NS_URI, "android:value", value);
+            matchingMetadata[0].setAttributeNS(ANDROID_NS_URI, `${this.androidNsPrefix}:value`, value);
 
             // When loading the manifest, any duplicate metadata keys get automatically removed.
         }
@@ -178,7 +184,7 @@ export class AndroidManifest {
     // Removes any <meta-data> tag with the given name from the document, if one exists.
     public removeMetadata(name: string) {
         Array.from(this.document.getElementsByTagName("meta-data"))
-            .filter(element => element.getAttribute("android:name") == name)
+            .filter(element => element.getAttribute(`${this.androidNsPrefix}:name`) == name)
             .forEach(element => element.parentElement?.removeChild(element))
 
         delete this.metadata[name];
@@ -187,7 +193,7 @@ export class AndroidManifest {
     // Removes the <uses-permission> element for the specified permission, if it exists.
     public removePermission(perm: string) {
         const permTag = Array.from(this.document.getElementsByTagName("uses-permission"))
-            .find(permTag => permTag.getAttribute("android:name") === perm);
+            .find(permTag => permTag.getAttribute(`${this.androidNsPrefix}:name`) === perm);
         if(permTag !== undefined) {
             this.manifestEl.removeChild(permTag);
             const permIdx = this.permissions.indexOf(perm);
@@ -200,7 +206,7 @@ export class AndroidManifest {
     // Removes the <uses-feature> element for the specified feature, if it exists.
     public removeFeature(feat: string) {
         const featTag = Array.from(this.document.getElementsByTagName("uses-feature"))
-        .find(featTag => featTag.getAttribute("android:name") === feat);
+        .find(featTag => featTag.getAttribute(`${this.androidNsPrefix}:name`) === feat);
         if(featTag !== undefined) {
             this.manifestEl.removeChild(featTag);
             const permIdx = this.features.indexOf(feat);
@@ -213,7 +219,7 @@ export class AndroidManifest {
     // Removes the <uses-native-library> element with the specified name
     public removeNativeLibrary(fileName: string) {
         const libTag = Array.from(this.document.getElementsByTagName("uses-native-library"))
-            .find(tag => tag.getAttribute("android:name") === fileName);
+            .find(tag => tag.getAttribute(`${this.androidNsPrefix}:name`) === fileName);
         if(libTag !== undefined) {
             this.applicationEl.removeChild(libTag);
 
