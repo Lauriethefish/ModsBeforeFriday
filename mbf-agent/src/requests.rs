@@ -70,7 +70,10 @@ pub enum Request {
         // The contents of the manifest of the patched app, as XML
         // The frontend is reponsible for adding the necessary permissions and features here.
         manifest_mod: String,
-
+        // The complete path to a PNG file to be used as the vr_splash.png file within the APK
+        // This is the splash screen that appears when starting the game in headset.
+        // This file will always be automatically deleted after patching, whether it succeeded or failed.
+        vr_splash_path: Option<String>,
         // If this is true, patching will skip adding the modloader and libunity.so and will ONLY change permissions.
         // Patching will also not attempt to reinstall core mods.
         //

@@ -6,6 +6,7 @@ import { toast } from 'react-toastify';
 import { Log } from './Logging';
 
 const AgentPath: string = "/data/local/tmp/mbf-agent";
+const UploadsPath: string = "/data/local/tmp/mbf-uploads/";
 
 // Converts the provided byte array into a ReadableStream that can be fed into ADB.
 function readableStreamFromByteArray(array: Uint8Array): ReadableStream<Uint8Array> {
@@ -261,7 +262,7 @@ export async function getDowngradedManifest(device: Adb, gameVersion: string): P
 export async function importFile(device: Adb,
     file: File): Promise<ImportResult> {
   const sync = await device.sync();
-  const tempPath = "/data/local/tmp/mbf-uploads/" + file.name;
+  const tempPath = UploadsPath + file.name;
   try {
     
     Log.debug("Uploading to " + tempPath);
@@ -310,8 +311,24 @@ export async function patchApp(device: Adb,
   downgradeToVersion: string | null,
   manifestMod: string,
   remodding: boolean,
-  allow_no_core_mods: boolean): Promise<ModStatus> {
+  allow_no_core_mods: boolean,
+  splashScreen: File | null): Promise<ModStatus> {
   Log.debug("Patching with manifest: " + manifestMod);
+
+  let splashPath: string | null = null;
+  if(splashScreen !== null) {
+    const sync = await device.sync();
+    splashPath = UploadsPath + splashScreen.name;
+    try {
+      Log.debug(`Pushing splash to ${splashPath}`)
+      await sync.write({
+        filename: splashPath,
+        file: readableStreamFromByteArray(new Uint8Array(await splashScreen.arrayBuffer()))
+      })
+    } finally {
+      await sync.dispose();
+    }
+  }
 
   let response = await sendRequest(device, {
       type: 'Patch',
@@ -319,7 +336,8 @@ export async function patchApp(device: Adb,
       manifest_mod: manifestMod,
       allow_no_core_mods: allow_no_core_mods,
       override_core_mod_url: CORE_MOD_OVERRIDE_URL,
-      remodding
+      remodding,
+      vr_splash_path: splashPath
   }) as Patched;
 
   if(response.did_remove_dlc) {

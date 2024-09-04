@@ -68,6 +68,10 @@ button {
     transition-duration: 200ms;
 }
 
+.hoverStrikethrough:hover {
+    text-decoration: line-through;
+}
+
 button:hover {
     background-color: #0030E0;
     transition-duration: 200ms;

@@ -21,8 +21,13 @@ use xml::EmitterConfig;
 pub fn handle_request(request: Request) -> Result<Response> {
     match request {
         Request::GetModStatus { override_core_mod_url } => handle_get_mod_status(override_core_mod_url),
-        Request::Patch { downgrade_to , remodding, manifest_mod, allow_no_core_mods, override_core_mod_url} => 
-            handle_patch(downgrade_to, remodding, manifest_mod, allow_no_core_mods, override_core_mod_url),
+        Request::Patch { downgrade_to ,
+            remodding,
+            manifest_mod,
+            allow_no_core_mods,
+            override_core_mod_url,
+            vr_splash_path} => 
+            handle_patch(downgrade_to, remodding, manifest_mod, allow_no_core_mods, override_core_mod_url, vr_splash_path),
         Request::SetModsEnabled {
             statuses
         } => run_mod_action(statuses),
@@ -508,7 +513,8 @@ fn handle_patch(downgrade_to: Option<String>,
     repatch: bool,
     manifest_mod: String,
     allow_no_core_mods: bool,
-    override_core_mod_url: Option<String>) -> Result<Response> {
+    override_core_mod_url: Option<String>,
+    vr_splash_path: Option<String>) -> Result<Response> {
     let app_info = get_app_info()?
         .ok_or(anyhow!("Cannot patch when app not installed"))?;
 
@@ -523,15 +529,18 @@ fn handle_patch(downgrade_to: Option<String>,
             .next()
             .ok_or(anyhow!("No diff existed to go from {} to {}", app_info.version, to_version))?;
 
-        patching::downgrade_and_mod_apk(Path::new(TEMP_PATH), &app_info, version_diffs, manifest_mod)
+        patching::downgrade_and_mod_apk(Path::new(TEMP_PATH), &app_info, version_diffs, manifest_mod, vr_splash_path.as_deref())
             .context("Failed to downgrade and patch APK")
     }   else {
-        patching::mod_current_apk(Path::new(TEMP_PATH), &app_info, manifest_mod, repatch)
+        patching::mod_current_apk(Path::new(TEMP_PATH), &app_info, manifest_mod, repatch, vr_splash_path.as_deref())
             .context("Failed to patch APK").map(|_| false) // Modding the currently installed APK will never remove DLC as they are restored automatically.
     };
 
     // No matter what, make sure that all temporary files are gone.
     std::fs::remove_dir_all(TEMP_PATH)?;
+    if let Some(splash_path) = vr_splash_path {
+        std::fs::remove_file(splash_path)?;
+    }
 
     let removed_dlc = patching_result.context("Failed to patch game")?;
 

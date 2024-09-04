@@ -16,9 +16,13 @@ const MOD_TAG_PATH: &str = "modded.json";
 const LIB_MAIN_PATH: &str = "lib/arm64-v8a/libmain.so";
 const LIB_UNITY_PATH: &str = "lib/arm64-v8a/libunity.so";
 
+// Aligment to use for ZIP entries with the STORE compression method, in bytes.
+// 4 is the standard value.
+const STORE_ALIGNMENT: u16 = 4;
+
 // Mods the currently installed version of the given app and reinstalls it, without doing any downgrading.
 // If `manifest_only` is true, patching will only overwrite the manifest and will not add a modloader.
-pub fn mod_current_apk(temp_path: &Path, app_info: &AppInfo, manifest_mod: String, manifest_only: bool) -> Result<()> {
+pub fn mod_current_apk(temp_path: &Path, app_info: &AppInfo, manifest_mod: String, manifest_only: bool, vr_splash_path: Option<&str>) -> Result<()> {
     let libunity_path = if manifest_only {
         None
     }   else    {
@@ -38,7 +42,7 @@ pub fn mod_current_apk(temp_path: &Path, app_info: &AppInfo, manifest_mod: Strin
     let obb_backups = save_obbs(Path::new(APP_OBB_PATH), &obb_backup)
         .context("Failed to save OBB files")?;
 
-    patch_and_reinstall(libunity_path, &temp_apk_path, temp_path, obb_backups, manifest_mod, manifest_only)
+    patch_and_reinstall(libunity_path, &temp_apk_path, temp_path, obb_backups, manifest_mod, manifest_only, vr_splash_path)
         .context("Failed to patch and reinstall APK")?;
     Ok(())
 }
@@ -48,7 +52,8 @@ pub fn mod_current_apk(temp_path: &Path, app_info: &AppInfo, manifest_mod: Strin
 pub fn downgrade_and_mod_apk(temp_path: &Path,
     app_info: &AppInfo,
     diffs: VersionDiffs,
-    manifest_mod: String) -> Result<bool> {
+    manifest_mod: String,
+    vr_splash_path: Option<&str>) -> Result<bool> {
     // Download libunity.so *for the downgraded version*
     info!("Downloading unstripped libunity.so (this could take a minute)");
     let libunity_path = save_libunity(temp_path, &diffs.to_version)
@@ -90,7 +95,7 @@ pub fn downgrade_and_mod_apk(temp_path: &Path,
     let contains_dlc = has_file_with_no_extension(APP_OBB_PATH)
         .context("Failed to check for DLC")?;
 
-    patch_and_reinstall(libunity_path, &temp_apk_path, temp_path, obb_backup_paths, manifest_mod, false)
+    patch_and_reinstall(libunity_path, &temp_apk_path, temp_path, obb_backup_paths, manifest_mod, false, vr_splash_path)
         .context("Failed to patch and reinstall APK")?;
     Ok(contains_dlc)
 }
@@ -123,9 +128,10 @@ fn patch_and_reinstall(libunity_path: Option<PathBuf>,
     temp_path: &Path,
     obb_paths: Vec<PathBuf>,
     manifest_mod: String,
-    manifest_only: bool) -> Result<()> {
+    manifest_only: bool,
+    vr_splash_path: Option<&str>) -> Result<()> {
     info!("Patching APK at {:?}", temp_path);
-    patch_apk_in_place(&temp_apk_path, libunity_path, manifest_mod, manifest_only).context("Failed to patch APK")?;
+    patch_apk_in_place(&temp_apk_path, libunity_path, manifest_mod, manifest_only, vr_splash_path).context("Failed to patch APK")?;
 
     if Path::new(PLAYER_DATA_PATH).exists() {
         info!("Backing up player data");
@@ -357,7 +363,11 @@ pub fn get_modloader_status() -> Result<InstallStatus> {
     }
 }
 
-fn patch_apk_in_place(path: impl AsRef<Path>, libunity_path: Option<PathBuf>, manifest_mod: String, manifest_only: bool) -> Result<()> {
+fn patch_apk_in_place(path: impl AsRef<Path>,
+    libunity_path: Option<PathBuf>,
+    manifest_mod: String,
+    manifest_only: bool,
+    vr_splash_path: Option<&str>) -> Result<()> {
     let file = OpenOptions::new()
         .read(true)
         .write(true)
@@ -365,6 +375,7 @@ fn patch_apk_in_place(path: impl AsRef<Path>, libunity_path: Option<PathBuf>, ma
         .context("Failed to open temporary APK in order to patch it")?;
         
     let mut zip = ZipFile::open(file).unwrap();
+    zip.set_store_alignment(STORE_ALIGNMENT);
 
     info!("Applying manifest mods");
     patch_manifest(&mut zip, manifest_mod).context("Failed to patch manifest")?;
@@ -390,6 +401,13 @@ fn patch_apk_in_place(path: impl AsRef<Path>, libunity_path: Option<PathBuf>, ma
             },
             None => warn!("No unstripped unity added to the APK! This might cause issues later")
         }
+    }
+
+    if let Some(splash_path) = vr_splash_path {
+        info!("Applying custom splash screen");
+        let mut vr_splash_file = std::fs::File::open(splash_path).context("Failed to open vr splash image")?;
+
+        zip.write_file("assets/vr_splash.png", &mut vr_splash_file, FileCompression::Store)?;
     }
 
     info!("Signing");

@@ -344,7 +344,7 @@ function PatchingMenu(props: PatchingMenuProps) {
                 <button className="largeCenteredButton" onClick={async () => {
                     setIsPatching(true);
                     try {
-                        onCompleted(await patchApp(device, modStatus, downgradingTo, manifest.toString(), false, isDeveloperUrl));
+                        onCompleted(await patchApp(device, modStatus, downgradingTo, manifest.toString(), false, isDeveloperUrl, null));
                     } catch (e) {
                         setPatchingError(String(e));
                         setIsPatching(false);

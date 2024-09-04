@@ -10,6 +10,8 @@ import { ModStatus } from '../Messages';
 import { AndroidManifest } from '../AndroidManifest';
 import { useSetError, wrapOperation } from '../SyncStore';
 import { Log } from '../Logging';
+import { Modal } from './Modal';
+import { SplashScreenSelector } from './SplashScreenSelector';
 
 export function OptionsMenu({ device, quit, modStatus, setModStatus }: {
     device: Adb,
@@ -23,7 +25,7 @@ export function OptionsMenu({ device, quit, modStatus, setModStatus }: {
         <Collapsible title="ADB log" defaultOpen>
             <AdbLogger device={device}/>
         </Collapsible>
-        <Collapsible title="Change permissions">
+        <Collapsible title="Change Permissions/Repatch">
             <RepatchMenu device={device} quit={quit} modStatus={modStatus}/>
         </Collapsible>
     </div>
@@ -96,6 +98,7 @@ function RepatchMenu({ device, modStatus, quit }: {
     useEffect(() => {
         manifest.current.applyPatchingManifestMod();
     }, []);
+    const [splashScreen, setSplashScreen] = useState(null as File | null);
 
     return <>
         <p>Certain mods require particular Android permissions to be enabled in order to work. 
@@ -107,10 +110,13 @@ function RepatchMenu({ device, modStatus, quit }: {
                 // TODO: Right now we do not set the mod status back to the DeviceModder state for it.
                 // This is fine at the moment since repatching does not update this state in any important way,
                 // but would be a problem if repatching did update it!
-                await patchApp(device, modStatus, null, manifest.current.toString(), true, false);
-                toast.success("Successfully applied permissions");
+                await patchApp(device, modStatus, null, manifest.current.toString(), true, false, splashScreen);
+                toast.success("Successfully repatched");
             })
         }}>Repatch game</button>
+
+        <SplashScreenSelector selected={splashScreen}
+            onSelected={nowSelected => setSplashScreen(nowSelected)} />
     </>
 }
 
