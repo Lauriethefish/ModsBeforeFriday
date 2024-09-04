@@ -2,7 +2,7 @@ mod manifest;
 use std::{cell::RefCell, collections::{HashMap, HashSet}, fs::OpenOptions, io::{Cursor, Read, Seek}, path::{Path, PathBuf}, rc::Rc};
 
 use jsonschema::JSONSchema;
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 pub use manifest::*;
 
 use anyhow::{Context, Result, anyhow};
@@ -141,11 +141,17 @@ impl ModManager {
         // Load mods in legacy folder.
         // This is done last as loading the new qmods extracts them to the mods directory,
         // so the code above would lead to the mods being loaded again.
-        if let Err(err) = self.load_old_qmods() {
-            warn!("Failed to load legacy mods: {err}");
+        self.check_mods_installed().context("Failed to check if mods are installed")?;
+        match self.load_old_qmods() {
+            // If we had old QMODs loaded in this stage, then recheck if all mods are installed again, since the random load order of the legacy QMODs may mean
+            // that if a dependency of a mod existed, it might not have been loaded
+            // when the dependant mod was loaded.
+            Ok(had_old_qmods) => if had_old_qmods {
+                self.check_mods_installed()?;
+            }
+            Err(err) => warn!("Failed to load legacy mods: {err}")
         }
 
-        self.check_mods_installed().context("Failed to check if mods are installed")?;
         Ok(())
     }
 
@@ -153,18 +159,22 @@ impl ModManager {
     /// This will extract them in the new mods directory.
     /// The QMODs and the directory itself are then deleted.
     /// Will do nothing if the old mods directory does not exist.
-    fn load_old_qmods(&mut self) -> Result<()> {
+    /// Returns true if any old QMODs were found
+    fn load_old_qmods(&mut self) -> Result<bool> {
         if !Path::new(OLD_QMODS_DIR).exists() {
-            return Ok(());
+            return Ok(false);
         }
 
         warn!("Migrating mods from legacy folder");
+        let mut found_qmod = false;
         for stat_result in std::fs::read_dir(OLD_QMODS_DIR)
             .context("Failed to read old QMODs directory")? {
             let stat = stat_result?;
 
             let mod_stream = std::fs::File::open(stat.path())
                 .context("Failed to open legacy mod")?;
+            debug!("Migrating {:?}", stat.path());
+
             // Attempt to load a mod from each file
             match self.try_load_new_mod(mod_stream) {
                 Ok(new_mod) => info!("Successfully migrated legacy mod {new_mod}"),
@@ -172,11 +182,12 @@ impl ModManager {
             }
 
             // Delete the file either way
+            found_qmod = true;
             std::fs::remove_file(stat.path()).context("Failed to delete legacy mod")?;
         }
         std::fs::remove_dir(OLD_QMODS_DIR)?;
 
-        Ok(())
+        Ok(found_qmod)
     }
 
     fn load_mod_from_directory(&self, from: PathBuf) -> Result<Mod> {
@@ -237,13 +248,13 @@ impl ModManager {
     /// 2 - All of its dependencies are installed and are within the expected version range
     /// This method uses the existing state of `Mod#files_exist` for each mod, i.e. it will not re-check whether the mod files exist for each mod.
     pub fn check_mods_installed(&mut self) -> Result<()> {
+        debug!("Checking if mods are installed");
         // Set all mods to having no known install status
         // Required so that the recursive descent to check the install status of each mod is guaranteed to happen
         for mod_rc in self.mods.values() {
             mod_rc.borrow_mut().installed = None;
         }
 
-        // Reset each mod to having no known install status
         for mod_id in self.mods.keys() {
             let mut checked_in_pass = HashSet::new();
             self.check_mod_installed(mod_id, &mut checked_in_pass).context("Failed to check if individual mod was installed.")?;
