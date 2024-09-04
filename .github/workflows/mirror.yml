@@ -17,5 +17,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        token: ${{ secrets.MIRROR_GITHUB_ACCESS_TOKEN }}
       - run: git remote add nightly https://github.com/Lauriethefish/mbf-nightly
-      - run: git push nightly main:deploy
+      - run: git push --force nightly main:deploy
