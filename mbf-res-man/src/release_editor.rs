@@ -168,7 +168,7 @@ fn list_files_json_last(dir_path: impl AsRef<Path>) -> Result<Vec<DirEntry>> {
 }
 
 /// Reads the JSON file containing the CRC-32 hashes of each existing file within the release.
-pub fn read_existing_asset_crc32s(release_files: &[ReleaseAsset], auth_token: &str) -> Result<HashMap<String, u32>> {
+pub fn read_existing_asset_crc32s(release_files: &[ReleaseAsset], auth_token: &str) -> Result<(Option<ReleaseAsset>, HashMap<String, u32>)> {
     match release_files.iter().filter(|asset| asset.file_name == ASSET_CRC_FILENAME).next() {
         Some(crc32_asset) => {
             let resp = set_headers(ureq::get(&crc32_asset.url), auth_token)
@@ -176,9 +176,9 @@ pub fn read_existing_asset_crc32s(release_files: &[ReleaseAsset], auth_token: &s
                 .call()?;
 
             let json_str = resp.into_string()?;
-            Ok(serde_json::from_str(&json_str)?)
+            Ok((Some(crc32_asset.clone()), serde_json::from_str(&json_str)?))
         },
-        None => Ok(HashMap::new())
+        None => Ok((None, HashMap::new()))
     }
 }
 
@@ -197,7 +197,7 @@ pub fn update_release_from_directory(dir_path: impl AsRef<Path>,
     hash_cache: &mut HashCache<u32>) -> Result<()> {
     let release_files = get_assets(release, auth_token)?;
     info!("Getting CRC32 of files in release");
-    let mut crc32_map = read_existing_asset_crc32s(&release_files, auth_token)?;
+    let (crc32_asset, mut crc32_map) = read_existing_asset_crc32s(&release_files, auth_token)?;
 
     for file in list_files_json_last(&dir_path).context("Failed to list files")? {
         info!("Processing file {:?}", file.path());
@@ -233,6 +233,10 @@ pub fn update_release_from_directory(dir_path: impl AsRef<Path>,
         }
     }
 
+    if let Some(existing_crc_asset) = crc32_asset {
+        info!("Deleting existing digests file");
+        delete_asset(&existing_crc_asset, release, auth_token)?;
+    }
     info!("Uploading digests file to release");
     write_asset_crc32s(release, &crc32_map, auth_token).context("Failed to upload CRC32's file");
     Ok(())
