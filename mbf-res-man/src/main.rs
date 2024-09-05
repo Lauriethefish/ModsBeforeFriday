@@ -1,11 +1,12 @@
 // Allow dead code since some functions are only used when this crate is imported by the MBF agent.
 #![allow(unused)]
 
-use std::{cell::LazyCell, collections::HashMap, ffi::OsStr, fs::{FileType, OpenOptions}, io::Write, path::{Path, PathBuf}};
+use std::{cell::LazyCell, collections::HashMap, ffi::OsStr, fs::{FileType, OpenOptions}, io::Write, path::{Path, PathBuf}, str::FromStr};
 use adb::uninstall_package;
 use anyhow::{anyhow, Context, Result};
 use clap::{arg, command, Parser, Subcommand};
 use const_format::formatcp;
+use hash_cache::HashCache;
 use log::{info, warn};
 use mbf_zip::ZipFile;
 use models::{DiffIndex, VersionDiffs};
@@ -20,6 +21,7 @@ mod diff_builder;
 mod external_res;
 mod release_editor;
 mod oculus_db;
+mod hash_cache;
 mod version_grabber;
 
 const APK_ID: &str = "com.beatgames.beatsaber";
@@ -28,6 +30,7 @@ const BS_VERSIONS_PATH: &str = formatcp!("{APK_DATA_DIR}/versions");
 const DIFFS_PATH: &str = formatcp!("{APK_DATA_DIR}/diffs");
 const MANIFESTS_PATH: &str = formatcp!("{APK_DATA_DIR}/manifests");
 const DIFF_INDEX_PATH: &str = formatcp!("{DIFFS_PATH}/index.json");
+const CRC32_CACHE_PATH: &str = formatcp!("{APK_DATA_DIR}/crc_cache.json");
 const META_TOKEN_PATH: &str = "META_TOKEN.txt";
 
 // Downloads the installed version of Beat Saber to BS_VERSIONS_PATH
@@ -303,6 +306,7 @@ fn get_github_auth_token() -> Result<&'static str> {
 // Updates the current diff index on github with the diffs in the diffs folder
 fn upload_diff_index() -> Result<()> {
     info!("Updating diff index");
+    let mut crc32_cache = HashCache::new_crc32(CRC32_CACHE_PATH.into());
 
     let repo = Repo {
         repo: "mbf-diffs".to_string(),
@@ -311,7 +315,8 @@ fn upload_diff_index() -> Result<()> {
 
     let auth_token = get_github_auth_token()?;
     let latest_release = release_editor::get_latest_release(repo, auth_token)?;
-    release_editor::update_release_from_directory(DIFFS_PATH, &latest_release, auth_token, false)?;
+    release_editor::update_release_from_directory(DIFFS_PATH, &latest_release, auth_token, false, &mut crc32_cache)?;
+    crc32_cache.save()?;
 
     Ok(())
 }
@@ -361,9 +366,13 @@ fn upload_manifests() -> Result<()> {
         owner: "Lauriethefish".to_string()
     };
 
+    let mut crc32_cache = HashCache::new_crc32(CRC32_CACHE_PATH.into());
+
     let auth_token = get_github_auth_token()?;
     let latest_release = release_editor::get_latest_release(repo, auth_token)?;
-    release_editor::update_release_from_directory(MANIFESTS_PATH, &latest_release, auth_token, false)?;
+    release_editor::update_release_from_directory(MANIFESTS_PATH, &latest_release, auth_token, false, &mut crc32_cache)?;
+
+    crc32_cache.save()?;
     Ok(())
 }
 

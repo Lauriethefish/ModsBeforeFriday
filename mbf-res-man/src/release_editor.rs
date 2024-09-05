@@ -5,6 +5,8 @@ use anyhow::{anyhow, Context, Result};
 use byteorder::{ReadBytesExt, BE};
 use log::{error, info, warn};
 
+use crate::hash_cache::HashCache;
+
 const API_ROOT: &str = "https://api.github.com";
 const UPLOAD_API_ROOT: &str = "https://uploads.github.com";
 const ASSET_CRC_FILENAME: &str = "assets.crc32.json";
@@ -109,14 +111,14 @@ pub fn upload_or_overwrite(file_path: impl AsRef<Path>,
     assets: &[ReleaseAsset],
     crc32_map: &mut HashMap<String, u32>,
     release: &Release,
-    auth_token: &str) -> Result<()> {
+    auth_token: &str,
+    hash_cache: &mut HashCache<u32>) -> Result<()> {
     let file_name = file_path.as_ref()
         .file_name().ok_or(anyhow!("Asset had no filename"))?
         .to_string_lossy()
         .to_string();
 
-    let mut file_handle = std::fs::File::open(file_path)?;
-    let file_crc = mbf_zip::crc_of_stream(&mut file_handle)?;
+    let file_crc = hash_cache.get_file_hash(file_path.as_ref())?;
 
     // Only one asset may exist with each file-name
     match assets.iter().filter(|asset| asset.file_name == file_name).next() {
@@ -135,6 +137,7 @@ pub fn upload_or_overwrite(file_path: impl AsRef<Path>,
     };
 
     info!("Uploading file to the release");
+    let mut file_handle = std::fs::File::open(file_path)?;
     file_handle.seek(SeekFrom::Start(0))?;
     upload_asset_from_reader(release, &file_name, &mut file_handle, auth_token)?;
     crc32_map.insert(file_name, file_crc);
@@ -187,7 +190,11 @@ pub fn write_asset_crc32s(release: &Release, asset_crc32s: &HashMap<String, u32>
     Ok(())
 }
 
-pub fn update_release_from_directory(dir_path: impl AsRef<Path>, release: &Release, auth_token: &str, delete_nonexisting: bool) -> Result<()> {
+pub fn update_release_from_directory(dir_path: impl AsRef<Path>,
+    release: &Release,
+    auth_token: &str,
+    delete_nonexisting: bool,
+    hash_cache: &mut HashCache<u32>) -> Result<()> {
     let release_files = get_assets(release, auth_token)?;
     info!("Getting CRC32 of files in release");
     let mut crc32_map = read_existing_asset_crc32s(&release_files, auth_token)?;
@@ -206,7 +213,7 @@ pub fn update_release_from_directory(dir_path: impl AsRef<Path>, release: &Relea
             None => { error!("File had no file name"); continue } 
         };
 
-        if let Err(err) = upload_or_overwrite(&path, &release_files, &mut crc32_map, release, auth_token) {
+        if let Err(err) = upload_or_overwrite(&path, &release_files, &mut crc32_map, release, auth_token, hash_cache) {
             error!("Failed to upload/overwrite {file_name:?}: {err}");
         }
     }
