@@ -5,9 +5,8 @@ import ModIcon from '../icons/mod-icon.svg';
 import { LabelledIconButton } from "./LabelledIconButton";
 import CodeIcon from '../icons/code.svg';
 import BugIcon from '../icons/debug.svg';
-import FlagIcon from '../icons/flag.svg';
-import FilledFlagIcon from '../icons/flag-filled.svg';
-import { IconButton } from "./IconButton";
+import CheckboxEmpty from '../icons/checkbox-empty.svg';
+import CheckboxFilled from '../icons/checkbox-filled.svg';
 
 export function ModRepoCard({ mod, onInstall, update, isFlagged, setFlagged }: 
     { 
@@ -28,9 +27,8 @@ export function ModRepoCard({ mod, onInstall, update, isFlagged, setFlagged }:
         <div className="mod-repo-card-info">
             <span className="modDetails">
                 <span className="bookmarkMod">
-                    <IconButton src={isFlagged ? FilledFlagIcon : FlagIcon} alt="A flag"
-                        onClick={() => setFlagged(!isFlagged)}
-                        isOn={isFlagged}/>
+                    <img src={isFlagged ? CheckboxFilled : CheckboxEmpty} alt="A checkbox"
+                        onClick={() => setFlagged(!isFlagged)} />
                 </span>
                 {mod.name} v{mod.version}
                 <p className="author">by {mod.author}</p>

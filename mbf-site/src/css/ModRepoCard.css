@@ -45,6 +45,16 @@
     float: right;
 }
 
+.bookmarkMod > img {
+    width: 30px;
+    border-radius: 16px;
+    padding: 4px;
+}
+
+.bookmarkMod > img:hover {
+    background-color: rgba(50, 50, 50, 0.7);
+}
+
 .author {
     margin-top: 3px;
     font-size: smaller;
