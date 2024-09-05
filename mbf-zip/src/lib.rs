@@ -186,10 +186,12 @@ impl<T: Read + Seek> ZipFile<T> {
     /// Reads the contents of entry with full name `name` and writes them to `write_to`.
     /// Gives an Err if the file does not exist (or the ZIP file header is corrupt)
     pub fn read_file_contents(&mut self, name: &str, write_to: &mut impl Write) -> Result<()> {
-        let (lfh, _, mut buf_reader) = self.read_lfh_and_seek_to_contents(name)?;
+        let (lfh, cdh, mut buf_reader) = self.read_lfh_and_seek_to_contents(name)?;
 
+        // Use CDH for compressed length as LFH may have it set to 0 if this archive uses data descriptors.
         let mut compressed_contents = (&mut buf_reader)
-            .take(lfh.compressed_len as u64);
+            .take(cdh.compressed_len as u64);
+        
         match lfh.compression_method {
             FileCompression::Deflate => {
                 // Limit the bytes to be decompressed
