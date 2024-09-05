@@ -94,15 +94,13 @@ export function DeviceModder(props: DeviceModderProps) {
             <p>To mod Beat Saber, MBF needs to download files such as a mod loader and several essential mods.
                 <br />This occurs on your Quest's connection. Please make sure that WiFi is enabled, then refresh the page.</p>
         </div>
-    }  else if (!modStatus.app_info.obb_present) {
-        return <NoObb device={device} quit={() => quit(undefined)}/>
-    } else if (!(modStatus.core_mods.supported_versions.includes(modStatus.app_info.version)) && !isDeveloperUrl) {
+    }  else if (!(modStatus.core_mods.supported_versions.includes(modStatus.app_info.version)) && !isDeveloperUrl) {
         // Check if we can downgrade to a supported version
         const downgradeVersions = GetSortedDowngradableVersions(modStatus);
         Log.debug("Available versions to downgrade: " + downgradeVersions);
         if(downgradeVersions === undefined || downgradeVersions.length === 0) {
             if(modStatus.core_mods.is_awaiting_diff) {
-                return <NoDiffAvailable version={modStatus.app_info.version}/>
+                return <NoDiffAvailable version={modStatus.app_info.version} />
             }   else    {
                 return <NotSupported version={modStatus.app_info.version} device={device} quit={() => quit(undefined)} />
             }
@@ -110,6 +108,11 @@ export function DeviceModder(props: DeviceModderProps) {
             // App is already patched, and we COULD in theory downgrade this version normally, but since it has been modified, the diffs will not work.
             // Therefore, they need to reinstall the latest version.
             return <IncompatibleAlreadyModded installedVersion={modStatus.app_info.version} device={device} quit={() => quit(undefined)} />
+        } else if (!modStatus.app_info.obb_present) {
+            // After we've checked (downgrade) version compatibility, next check if we're missing the OBB
+            // We check this afterward so that, if the version is incorrect, the user is warned to reinstall *the correct version*.
+            // Reinstalling will fix the OBB, and the OBB message doesn't mention the version
+            return <NoObb device={device} quit={() => quit(undefined)}/>
         } else {
             return <PatchingMenu
                 quit={quit}
@@ -120,7 +123,9 @@ export function DeviceModder(props: DeviceModderProps) {
             />
         }
 
-    } else if (modStatus.app_info.loader_installed !== null) {
+    }   else if (!modStatus.app_info.obb_present) { // Before allowing modding the installed version without downgrading, check for missing OBB.
+        return <NoObb device={device} quit={() => quit(undefined)}/>
+    }   else if (modStatus.app_info.loader_installed !== null) {
         let loader = modStatus.app_info.loader_installed;
         if(loader === 'Scotland2') {
             return <ValidModLoaderMenu device={device} modStatus={modStatus} setModStatus={setModStatus} quit={() => quit(null)}/>
