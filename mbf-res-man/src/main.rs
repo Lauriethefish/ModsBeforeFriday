@@ -311,7 +311,7 @@ fn upload_diff_index() -> Result<()> {
 
     let auth_token = get_github_auth_token()?;
     let latest_release = release_editor::get_latest_release(repo, auth_token)?;
-    release_editor::update_release_from_directory(DIFFS_PATH, &latest_release, auth_token)?;
+    release_editor::update_release_from_directory(DIFFS_PATH, &latest_release, auth_token, false)?;
 
     Ok(())
 }
@@ -363,7 +363,7 @@ fn upload_manifests() -> Result<()> {
 
     let auth_token = get_github_auth_token()?;
     let latest_release = release_editor::get_latest_release(repo, auth_token)?;
-    release_editor::update_release_from_directory(MANIFESTS_PATH, &latest_release, auth_token)?;
+    release_editor::update_release_from_directory(MANIFESTS_PATH, &latest_release, auth_token, false)?;
     Ok(())
 }
 

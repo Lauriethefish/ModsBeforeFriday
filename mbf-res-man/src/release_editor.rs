@@ -1,12 +1,13 @@
 
-use std::{collections::HashSet, ffi::OsStr, fs::DirEntry, io::{Cursor, Read, Seek, SeekFrom}, path::Path};
+use std::{collections::{HashMap, HashSet}, ffi::OsStr, fs::DirEntry, io::{Cursor, Read, Seek, SeekFrom}, path::Path};
 
 use anyhow::{anyhow, Context, Result};
 use byteorder::{ReadBytesExt, BE};
-use log::{info, warn};
+use log::{error, info, warn};
 
 const API_ROOT: &str = "https://api.github.com";
 const UPLOAD_API_ROOT: &str = "https://uploads.github.com";
+const ASSET_CRC_FILENAME: &str = "assets.crc32.json";
 
 #[derive(Clone, Debug)]
 pub struct Repo {
@@ -104,22 +105,11 @@ pub fn upload_asset_from_reader(release: &Release, file_name: &str, mut content:
     Ok(read_asset_details(&document))
 }
 
-pub fn get_asset_crc32(assets: &[ReleaseAsset], file_name: &str, auth_token: &str) -> Result<Option<u32>> {
-    let crc32_filename = format!("{file_name}.crc32");
-
-    match assets.iter().filter(|asset| asset.file_name == crc32_filename).next() {
-        Some(crc32_asset) => {
-            let resp = set_headers(ureq::get(&crc32_asset.url), auth_token)
-                .set("Accept", "application/octet-stream")
-                .call()?;
-
-            Ok(Some(resp.into_reader().read_u32::<BE>()?))
-        },
-        None => Ok(None)
-    }
-}
-
-pub fn upload_or_overwrite(file_path: impl AsRef<Path>, assets: &[ReleaseAsset], release: &Release, auth_token: &str) -> Result<()> {
+pub fn upload_or_overwrite(file_path: impl AsRef<Path>,
+    assets: &[ReleaseAsset],
+    crc32_map: &mut HashMap<String, u32>,
+    release: &Release,
+    auth_token: &str) -> Result<()> {
     let file_name = file_path.as_ref()
         .file_name().ok_or(anyhow!("Asset had no filename"))?
         .to_string_lossy()
@@ -127,41 +117,27 @@ pub fn upload_or_overwrite(file_path: impl AsRef<Path>, assets: &[ReleaseAsset],
 
     let mut file_handle = std::fs::File::open(file_path)?;
     let file_crc = mbf_zip::crc_of_stream(&mut file_handle)?;
-    info!("CRC32: {file_crc}. Checking if up-to-date in release");
 
     // Only one asset may exist with each file-name
     match assets.iter().filter(|asset| asset.file_name == file_name).next() {
         Some(existing_asset) => {
-            let existing_crc = get_asset_crc32(assets, &existing_asset.file_name, auth_token)?;
-
-            // Asset already up to date
-            if existing_crc == Some(file_crc) {
-                info!("File up to date.");
+            if crc32_map.get(&file_name).copied() == Some(file_crc) {
+                info!("File up to date. (CRC {file_crc})");
                 return Ok(());
             }   else    {
-                info!("File not up to date {existing_crc:?}, deleting existing asset");
-                // Need to update asset, so delete existing asset
+                info!("File not up to date (New CRC {file_crc}), deleting existing asset");
                 delete_asset(existing_asset, release, auth_token)?;
-                let asset_crc_name = format!("{}.crc32", existing_asset.file_name);
-                if let Some(crc_asset) = assets.iter().filter(|asset| asset.file_name == asset_crc_name).next() {
-                    info!("Also deleting crc32");
-                    delete_asset(crc_asset, release, auth_token)?;
-                }
+                // Remove existing CRC32 before uploading new file to ensure the file is reuploaded in the case of a partial upload and internet failure.
+                crc32_map.remove(&file_name);
             }
         },
         None => info!("File does not already exist.")
     };
 
-    // Upload the asset to the release
-    info!("Uploading file and its CRC to the release");
+    info!("Uploading file to the release");
     file_handle.seek(SeekFrom::Start(0))?;
     upload_asset_from_reader(release, &file_name, &mut file_handle, auth_token)?;
-
-    // Upload the CRC-32 of the asset
-    let crc_asset_name = format!("{file_name}.crc32");
-    let be_bytes = file_crc.to_be_bytes();
-
-    upload_asset_from_reader(release, &crc_asset_name, Cursor::new(be_bytes), auth_token)?;
+    crc32_map.insert(file_name, file_crc);
 
     Ok(())
 }
@@ -188,40 +164,69 @@ fn list_files_json_last(dir_path: impl AsRef<Path>) -> Result<Vec<DirEntry>> {
     Ok(default_files)
 }
 
-pub fn update_release_from_directory(dir_path: impl AsRef<Path>, release: &Release, auth_token: &str) -> Result<()> {
+/// Reads the JSON file containing the CRC-32 hashes of each existing file within the release.
+pub fn read_existing_asset_crc32s(release_files: &[ReleaseAsset], auth_token: &str) -> Result<HashMap<String, u32>> {
+    match release_files.iter().filter(|asset| asset.file_name == ASSET_CRC_FILENAME).next() {
+        Some(crc32_asset) => {
+            let resp = set_headers(ureq::get(&crc32_asset.url), auth_token)
+                .set("Accept", "application/octet-stream")
+                .call()?;
+
+            let json_str = resp.into_string()?;
+            Ok(serde_json::from_str(&json_str)?)
+        },
+        None => Ok(HashMap::new())
+    }
+}
+
+pub fn write_asset_crc32s(release: &Release, asset_crc32s: &HashMap<String, u32>, auth_token: &str) -> Result<()> {
+    let json_buf = serde_json::to_vec(&asset_crc32s)?;
+    let mut json_reader = Cursor::new(json_buf);
+
+    upload_asset_from_reader(release, ASSET_CRC_FILENAME, &mut json_reader, auth_token)?;
+    Ok(())
+}
+
+pub fn update_release_from_directory(dir_path: impl AsRef<Path>, release: &Release, auth_token: &str, delete_nonexisting: bool) -> Result<()> {
     let release_files = get_assets(release, auth_token)?;
-    let mut assets_no_file_match: HashSet<String> = release_files.iter()
-        .filter(|asset| !asset.file_name.ends_with(".crc32"))
-        .map(|asset| asset.file_name.clone())
-        .collect();
+    info!("Getting CRC32 of files in release");
+    let mut crc32_map = read_existing_asset_crc32s(&release_files, auth_token)?;
 
     for file in list_files_json_last(&dir_path).context("Failed to list files")? {
         info!("Processing file {:?}", file.path());
-        if file.path().extension() == Some(OsStr::new("crc32")) {
-            warn!("The crc32 of each file is automatically generated and should not be included in this directory, skipping!");
+        if file.path().file_name() == Some(OsStr::new(ASSET_CRC_FILENAME)) {
+            warn!("A file was found in the assets folder with name {ASSET_CRC_FILENAME}, conflicting with the asset CRC-32 file");
+            warn!("This file will be skipped");
             continue;
         }
 
         let path = file.path();
-        let file_name = path.file_name().ok_or(anyhow!("File had no valid file name"))?;
+        let file_name = match path.file_name() {
+            Some(name) => name,
+            None => { error!("File had no file name"); continue } 
+        };
 
-        assets_no_file_match.remove(file_name.to_string_lossy().as_ref());
-        upload_or_overwrite(path, &release_files, release, auth_token)?;
+        if let Err(err) = upload_or_overwrite(&path, &release_files, &mut crc32_map, release, auth_token) {
+            error!("Failed to upload/overwrite {file_name:?}: {err}");
+        }
     }
 
     for file in release_files {
-        // If the given file is a checksum, only delete it if the file it is a checksum for does not exist.
-        let effective_name = if file.file_name.ends_with(".crc32") {
-            &file.file_name[0..file.file_name.len() - 6]
-        }   else    {
-            &file.file_name
-        };
-
-        if !dir_path.as_ref().join(&effective_name).exists() {
+        if delete_nonexisting && !dir_path.as_ref().join(&file.file_name).exists() {
             info!("Deleting {} from release", file.file_name);
+            if let Err(err) = delete_asset(&file, release, auth_token) {
+                error!("Failed to remove from release: {err}");
+            }
+            crc32_map.remove(&file.file_name);
+        }
+
+        if file.file_name.ends_with(".crc32") {
+            warn!("Removing legacy CRC32 file {}", file.file_name);
             delete_asset(&file, release, auth_token)?;
         }
     }
 
+    info!("Uploading digests file to release");
+    write_asset_crc32s(release, &crc32_map, auth_token).context("Failed to upload CRC32's file");
     Ok(())
 }
