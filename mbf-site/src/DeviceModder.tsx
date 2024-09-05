@@ -13,6 +13,7 @@ import { AndroidManifest } from './AndroidManifest';
 import { Log } from './Logging';
 import { wrapOperation } from './SyncStore';
 import { OpenLogsButton } from './components/OpenLogsButton';
+import { lte as semverLte } from 'semver';
 
 interface DeviceModderProps {
     device: Adb,
@@ -446,19 +447,38 @@ interface IncompatibleLoaderProps {
 }
 
 function NotSupported({ version, quit, device }: { version: string, quit: () => void, device: Adb }) {
+    const isLegacy = isVersionLegacy(version);
+
     return <div className='container mainContainer'>
         <h1>Unsupported Version</h1>
         <p className='warning'>Read this message in full before asking for help if needed!</p>
 
-        <p>You have Beat Saber v{trimGameVersion(version)} installed, but this version has no support for mods!</p>
-        <p>Normally, MBF would attempt to downgrade (un-update) your Beat Saber version to a version with mod support, but this is only possible if you have the latest version of Beat Saber installed.</p>
-        <p>Please uninstall Beat Saber using the button below, then reinstall the latest version of Beat Saber using the Meta store.</p>
+        {/* Some legacy versions can be modded but MBF does not support anything on the old Unity version*/}
+        <p>You have Beat Saber v{trimGameVersion(version)} installed, but this version has no support for {isLegacy ? "modding with MBF" : "mods"}!</p>
+        {isLegacy && <>
+            <p>While your version might work with other modding tools, it is <b>very strongly recommended</b> that you uninstall Beat Saber and update
+        to the latest moddable version.</p>
+
+            <p className="warning">Modding with versions 1.28.0 or below is <em>no longer supported by BSMG</em> - it's an ancient version and nobody should be using it anymore. Please, please, <em>PLEASE</em> update to the latest version of the game.</p>
+        </>}
+
+        {!isLegacy && <>
+            <p>Normally, MBF would attempt to downgrade (un-update) your Beat Saber version to a version with mod support, but this is only possible if you have the latest version of Beat Saber installed.</p>
+            <p>Please uninstall Beat Saber using the button below, then reinstall the latest version of Beat Saber using the Meta store.</p>
+        </>}
 
         <button onClick={async () => {
             await uninstallBeatSaber(device);
             quit();
         }}>Uninstall Beat Saber</button>
     </div>
+}
+
+
+// Works out if the passed Beat Saber version is legacy (QuestLoader - not MBF supported), i.e. v1.28.0 or less.
+function isVersionLegacy(version: string): boolean {
+    const sem_version = version.split('_')[0];
+    return semverLte(sem_version, "1.28.0");
 }
 
 function NoDiffAvailable({ version }: { version: string }) {
