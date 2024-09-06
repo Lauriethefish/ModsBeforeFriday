@@ -49,7 +49,7 @@ impl<'r, R: Read + Seek> AxmlReader<'r, R> {
             return Err(anyhow!("Expected string pool after first XML tag"));
         }
         let post_string_pool = data.read_u32::<LE>()? as u64 + data.stream_position()? - 8;
-        let (string_pool, _was_utf8) = load_string_pool(data).context("Failed to load string pool")?;
+        let (string_pool, _was_utf8) = load_string_pool(data).context("Loading string pool")?;
         data.seek(SeekFrom::Start(post_string_pool))?;
 
         let c_type = ChunkType::parse(data.read_u32::<LE>()?);

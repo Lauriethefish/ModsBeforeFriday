@@ -93,7 +93,7 @@ pub fn get_apk_path() -> Result<Option<String>> {
     let pm_output = Command::new("pm")
         .args(["path", APK_ID])
         .output()
-        .context("Failed to get APK path")?;
+        .context("Working out APK path")?;
     if 8 > pm_output.stdout.len() {
         // App not installed
         Ok(None)
@@ -150,7 +150,7 @@ impl log::Log for ResponseLogger {
 
 fn write_response(response: Response) -> Result<()> {
     let mut lock = std::io::stdout().lock();
-    serde_json::to_writer(&mut lock, &response).context("Failed to serialize response")?;
+    serde_json::to_writer(&mut lock, &response).context("Serializing JSON response")?;
     writeln!(lock)?;
     Ok(())
 }

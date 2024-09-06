@@ -150,7 +150,7 @@ fn list_files_json_last(dir_path: impl AsRef<Path>) -> Result<Vec<DirEntry>> {
     let mut json_files = Vec::new();
 
     for file_result in std::fs::read_dir(&dir_path)? {
-        let file = file_result.context("Failed to read file details")?;
+        let file = file_result.context("Reading file details")?;
 
         if !file.file_type()?.is_file() {
             continue;
@@ -199,7 +199,7 @@ pub fn update_release_from_directory(dir_path: impl AsRef<Path>,
     info!("Getting CRC32 of files in release");
     let (crc32_asset, mut crc32_map) = read_existing_asset_crc32s(&release_files, auth_token)?;
 
-    for file in list_files_json_last(&dir_path).context("Failed to list files")? {
+    for file in list_files_json_last(&dir_path).context("Listing release files")? {
         info!("Processing file {:?}", file.path());
         if file.path().file_name() == Some(OsStr::new(ASSET_CRC_FILENAME)) {
             warn!("A file was found in the assets folder with name {ASSET_CRC_FILENAME}, conflicting with the asset CRC-32 file");
@@ -238,6 +238,6 @@ pub fn update_release_from_directory(dir_path: impl AsRef<Path>,
         delete_asset(&existing_crc_asset, release, auth_token)?;
     }
     info!("Uploading digests file to release");
-    write_asset_crc32s(release, &crc32_map, auth_token).context("Failed to upload CRC32's file");
+    write_asset_crc32s(release, &crc32_map, auth_token).context("Uploading CRC32's file");
     Ok(())
 }

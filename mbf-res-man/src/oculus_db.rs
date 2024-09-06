@@ -21,7 +21,7 @@ pub fn meta_accounts_login(email_addr: &str, password: &str) -> Result<String> {
         ("contact_point_type", "EMAIL_ADDRESS"),
         ("contact_point", email_addr),
         ("password", password)
-    ]).context("Failed to send accounts login POST")?;
+    ]).context("Sending accounts login POST")?;
 
     let access_token_result: serde_json::Value = serde_json::from_reader(resp.into_reader())?;
     extract_access_token(&access_token_result)
@@ -33,7 +33,7 @@ fn get_horizon_access_token(access_token: &str) -> Result<String> {
             ("access_token", access_token),
             ("variables", "{\"app_id\":\"1582076955407037\"}"),
             ("doc_id", "5787825127910775")
-        ]).context("Failed to send get access token POST")?;
+        ]).context("Sending get access token POST")?;
 
     let json_doc: serde_json::Value = serde_json::from_reader(resp.into_reader())?;
 
@@ -53,7 +53,7 @@ fn authenticate_application(access_token: &str, app_id: u64) -> Result<String> {
         .send_form(&[
             ("access_token", access_token),
             ("app_id", &app_id.to_string())
-        ]).context("Failed to send authenticate_application POST")?;
+        ]).context("Sending authenticate_application POST")?;
 
     let access_token_result: serde_json::Value = serde_json::from_reader(resp.into_reader())?;
     extract_access_token(&access_token_result)
@@ -62,10 +62,10 @@ fn authenticate_application(access_token: &str, app_id: u64) -> Result<String> {
 pub fn get_quest_access_token(email: &str, password: &str) -> Result<String> {
     let access_token = meta_accounts_login(email, password).context("Accounts login failed")?;
     info!("Account login succeeded");
-    let horizon_access_token = get_horizon_access_token(&access_token).context("Failed to get horizon token")?;
+    let horizon_access_token = get_horizon_access_token(&access_token).context("Getting horizon token")?;
     info!("Successfully obtained horizon access token");
     let quest_access_token = authenticate_application(&horizon_access_token, 1481000308606657)
-        .context("Failed to authenticate application")?;
+        .context("Authenticating application")?;
 
     Ok(quest_access_token)
 }

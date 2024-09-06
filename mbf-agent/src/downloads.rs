@@ -203,7 +203,7 @@ pub fn download_with_attempts(cfg: &DownloadConfig, mut to: impl Write + Seek, u
                         ureq::Error::Status(code, _resp) => return Err(anyhow!("Request failed as got status {code} from server.")),
                         ureq::Error::Transport(transport_err) => {
                             if dl_failed {
-                                return Err(transport_err).context("Failed to make request after all attempts exhausted");
+                                return Err(transport_err).context("Downloading file: all attempts exhausted");
                             }
 
                             // Error occured due to internet connection, can make another attempt
@@ -236,7 +236,7 @@ pub fn download_file_with_attempts(cfg: &DownloadConfig, to: impl AsRef<Path>, u
         .write(true)
         .truncate(true)
         .create(true)
-        .open(to).context("Failed to create destination file")?;
+        .open(to).context("Creating destination file")?;
 
     download_with_attempts(cfg, writer, url)
 }

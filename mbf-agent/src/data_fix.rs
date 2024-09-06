@@ -5,10 +5,10 @@ use anyhow::{Context, Result, anyhow};
 pub fn fix_colour_schemes(path: impl AsRef<Path>) -> Result<()> {
     let mut data_file_buf = Vec::with_capacity(8192);
     File::open(&path)
-        .context("Failed to open player data file for reading")?
+        .context("Opening player data file for reading")?
         .read_to_end(&mut data_file_buf)?;
 
-    let mut player_data: serde_json::Value = serde_json::from_slice(&data_file_buf).context("Player data was invalid JSON")?;
+    let mut player_data: serde_json::Value = serde_json::from_slice(&data_file_buf).context("Parsing PlayerData.dat as JSON")?;
 
     let local_players = player_data.get_mut("localPlayers")
         .ok_or(anyhow!("No localPlayers array found"))?
@@ -26,12 +26,12 @@ pub fn fix_colour_schemes(path: impl AsRef<Path>) -> Result<()> {
 
 
     let output_str = serde_json::to_string(&player_data)
-        .context("Failed to write player data")?;
+        .context("Converting player data back to JSON")?;
 
     let mut writer = OpenOptions::new()
         .write(true)
         .truncate(true)
-        .open(&path).context("Failed to open player data file for writing")?;
+        .open(&path).context("Opening PlayerData.dat for writing.")?;
     writer.write_all(output_str.as_bytes())?;
 
     Ok(())

@@ -128,7 +128,7 @@ impl<T: Read + Seek> ZipFile<T> {
             .create(true)
             .write(true)
             .open(to)
-            .context("Failed to create extracted file")?;
+            .context("Creating extracted file")?;
 
         self.read_file_contents(name, &mut handle)?;
         Ok(())
@@ -146,7 +146,7 @@ impl<T: Read + Seek> ZipFile<T> {
         for entry_name in entries.iter() {
             let extract_path = to.join(entry_name);
             if let Some(parent) = extract_path.parent() {
-                std::fs::create_dir_all(parent).context("Failed to create directory to extract ZIP file")?;
+                std::fs::create_dir_all(parent).context("Creating directory to extract ZIP file")?;
             }
 
             let mut handle = std::fs::OpenOptions::new()
@@ -154,10 +154,10 @@ impl<T: Read + Seek> ZipFile<T> {
                 .create(true)
                 .write(true)
                 .open(extract_path)
-                .context("Failed to create extracted file")?;
+                .context("Creating extracted file")?;
 
             self.read_file_contents(entry_name, &mut handle)
-                .context("Failed to extract file")?;
+                .context("Reading file contents into extracted file")?;
         }
 
         Ok(())
@@ -248,12 +248,12 @@ impl<T: Read + Seek> ZipFile<T> {
 
         dst_archive.file.seek(SeekFrom::Start(dst_archive.end_of_entries_offset as u64))?;
         let mut buf_writer = BufWriter::new(&mut dst_archive.file);
-        lfh.write(&mut buf_writer).context("Failed to save local file header")?;
+        lfh.write(&mut buf_writer).context("Writing local file header")?;
         let lfh_length = buf_writer.stream_position()? - dst_archive.end_of_entries_offset as u64;
 
         // Copy the contents of the entry to the other archive (no need to decompress and recompress)
         std::io::copy(&mut buf_reader.take(lfh.compressed_len as u64), &mut buf_writer)
-            .context("Failed to copy content of entry")?;
+            .context("Copying content of entry")?;
 
         dst_archive.end_of_entries_offset = (lfh.compressed_len as u64 + lfh_length + dst_archive.end_of_entries_offset as u64)
             .try_into().context("ZIP file too large")?;
@@ -363,7 +363,7 @@ impl ZipFile<File> {
                 let mut buf_writer = BufWriter::new(&mut self.file);
 
                 let mut encoder = deflate::Encoder::new(&mut buf_writer);
-                let crc = copy_to_with_crc(contents, &mut encoder).context("Failed to write/compress file data")?;
+                let crc = copy_to_with_crc(contents, &mut encoder).context("Writing/compressing file data")?;
                 encoder.finish().into_result()?;
 
                 // Update the offset for the next file to be written
@@ -372,7 +372,7 @@ impl ZipFile<File> {
                 crc
             },
             FileCompression::Store => { 
-                let crc = copy_to_with_crc(contents, &mut self.file).context("Failed to write file data")?;
+                let crc = copy_to_with_crc(contents, &mut self.file).context("Writing file data")?;
                 // Update the offset for the next file to be written
                 self.end_of_entries_offset = self.file.stream_position()?.try_into().context("ZIP file too large")?;
 
@@ -400,7 +400,7 @@ impl ZipFile<File> {
 
         // Write the local header with the known length/CRC
         self.file.seek(SeekFrom::Start(lfh_offset))?;
-        local_header.write(&mut BufWriter::new(&mut self.file)).context("Failed to write local file header")?;
+        local_header.write(&mut BufWriter::new(&mut self.file)).context("Writing local file header")?;
 
 
         let central_dir_header = CentDirHeader {
@@ -452,7 +452,7 @@ impl ZipFile<File> {
         // Add signature
         self.file.seek(SeekFrom::Start(self.end_of_entries_offset as u64))?;
         signing::write_v2_signature(&mut self.file, priv_key, cert, &cd_bytes, eocd.clone())
-            .context("Failed to sign APK")?;
+            .context("Signing APK")?;
 
         eocd.cent_dir_offset = self.file.stream_position()?.try_into().context("APK file too big")?;
         self.file.write_all(&cd_bytes)?;
@@ -473,7 +473,7 @@ impl ZipFile<File> {
         self.file.seek(SeekFrom::Start(self.end_of_entries_offset as u64))?;
 
         for cd_header in self.entries.values() {
-            cd_header.write(&mut self.file).context("Failed to save central directory header")?;
+            cd_header.write(&mut self.file).context("Saving central directory header")?;
         }
 
         let eocd = EndOfCentDir {
@@ -483,7 +483,7 @@ impl ZipFile<File> {
             comment: Vec::new(),
         };
 
-        eocd.write(&mut self.file).context("Failed to save end of central directory")?;
+        eocd.write(&mut self.file).context("Saving end of central directory")?;
         return Ok(())
     }
 }

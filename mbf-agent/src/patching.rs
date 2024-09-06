@@ -27,23 +27,23 @@ pub fn mod_current_apk(temp_path: &Path, app_info: &AppInfo, manifest_mod: Strin
         None
     }   else    {
         info!("Downloading unstripped libunity.so (this could take a minute)");
-        save_libunity(res_cache, temp_path, &app_info.version).context("Failed to save libunity.so")?
+        save_libunity(res_cache, temp_path, &app_info.version).context("Preparing libunity.so")?
     };
 
-    kill_app().context("Failed to kill Beat Saber")?;
+    kill_app().context("Killing Beat Saber")?;
 
     info!("Copying APK to temporary location");
     let temp_apk_path = temp_path.join("mbf-tmp.apk");
-    std::fs::copy(&app_info.path, &temp_apk_path).context("Failed to copy APK to temp")?;
+    std::fs::copy(&app_info.path, &temp_apk_path).context("Copying APK to temp")?;
 
     info!("Saving OBB files");
     let obb_backup = temp_path.join("obbs");
     std::fs::create_dir_all(&obb_backup)?;
     let obb_backups = save_obbs(Path::new(APP_OBB_PATH), &obb_backup)
-        .context("Failed to save OBB files")?;
+        .context("Saving OBB files")?;
 
     patch_and_reinstall(libunity_path, &temp_apk_path, obb_backups, manifest_mod, manifest_only, vr_splash_path)
-        .context("Failed to patch and reinstall APK")?;
+        .context("Patching and reinstalling APK")?;
     Ok(())
 }
 
@@ -58,25 +58,25 @@ pub fn downgrade_and_mod_apk(temp_path: &Path,
     // Download libunity.so *for the downgraded version*
     info!("Downloading unstripped libunity.so (this could take a minute)");
     let libunity_path = save_libunity(res_cache, temp_path, &diffs.to_version)
-        .context("Failed to save libunity.so")?;
+        .context("Saving libunity.so")?;
 
     // Download the diff files
     let diffs_path = temp_path.join("diffs");
-    std::fs::create_dir_all(&diffs_path).context("Failed to create diffs directory")?;
+    std::fs::create_dir_all(&diffs_path).context("Creating diffs directory")?;
     info!("Downloading diffs needed to downgrade Beat Saber (this could take a LONG time, make a cup of tea)");
-    download_diffs(&diffs_path, &diffs).context("Failed to download diffs")?;
+    download_diffs(&diffs_path, &diffs).context("Downloading diffs")?;
 
-    kill_app().context("Failed to kill Beat Saber")?;
+    kill_app().context("Killing Beat Saber")?;
 
     // Copy the APK to temp, downgrading it in the process.
     info!("Downgrading APK");
     let temp_apk_path = temp_path.join("mbf-downgraded.apk");
     apply_diff(Path::new(&app_info.path), &temp_apk_path, &diffs.apk_diff, &diffs_path)
-        .context("Failed to apply diff to APK")?;
+        .context("Applying diff to APK")?;
 
     // Downgrade the obb files, copying them to a temporary directory in the process.
     let obb_backup_dir = temp_path.join("obbs");
-    std::fs::create_dir_all(&obb_backup_dir).context("Failed to create OBB backup directory")?;
+    std::fs::create_dir_all(&obb_backup_dir).context("Creating OBB backup directory")?;
     let mut obb_backup_paths = Vec::new();
     for obb_diff in &diffs.obb_diffs {
         let obb_path = Path::new(APP_OBB_PATH).join(&obb_diff.file_name);
@@ -87,17 +87,17 @@ pub fn downgrade_and_mod_apk(temp_path: &Path,
         let obb_backup_path = obb_backup_dir.join(&obb_diff.output_file_name);
 
         info!("Downgrading obb {}", obb_diff.file_name);
-        apply_diff(&obb_path,&obb_backup_path, obb_diff, &diffs_path).context("Failed to apply diff to OBB")?;
+        apply_diff(&obb_path,&obb_backup_path, obb_diff, &diffs_path).context("Applying diff to OBB")?;
         obb_backup_paths.push(obb_backup_path);
     }
 
     // Beat Saber DLC asset files do not have the .obb suffix.
     // If there are any DLC, then these have been deleted by the patching process so we return true so that the user can later be informed of this.
     let contains_dlc = has_file_with_no_extension(APP_OBB_PATH)
-        .context("Failed to check for DLC")?;
+        .context("Checking for DLC")?;
 
     patch_and_reinstall(libunity_path, &temp_apk_path, obb_backup_paths, manifest_mod, false, vr_splash_path)
-        .context("Failed to patch and reinstall APK")?;
+        .context("Patching and reinstall APK")?;
     Ok(contains_dlc)
 }
 
@@ -131,11 +131,11 @@ fn patch_and_reinstall(libunity_path: Option<PathBuf>,
     manifest_only: bool,
     vr_splash_path: Option<&str>) -> Result<()> {
     info!("Patching APK");
-    patch_apk_in_place(&temp_apk_path, libunity_path, manifest_mod, manifest_only, vr_splash_path).context("Failed to patch APK")?;
+    patch_apk_in_place(&temp_apk_path, libunity_path, manifest_mod, manifest_only, vr_splash_path).context("Patching APK")?;
 
     if Path::new(PLAYER_DATA_PATH).exists() {
         info!("Backing up player data");
-        backup_player_data().context("Failed to backup player data")?;
+        backup_player_data().context("Backing up player data")?;
     }   else    {
         info!("No player data to backup");
     }
@@ -148,12 +148,12 @@ fn patch_and_reinstall(libunity_path: Option<PathBuf>,
         }
     }
 
-    reinstall_modded_app(&temp_apk_path).context("Failed to reinstall modded APK")?;
+    reinstall_modded_app(&temp_apk_path).context("Reinstalling modded APK")?;
     std::fs::remove_file(temp_apk_path)?;
 
     info!("Restoring OBB files");
     restore_obb_files(Path::new(APP_OBB_PATH), obb_paths)
-        .context("Failed to restore OBB files")?;
+        .context("Restoring OBB files")?;
 
     // Player data is not restored back to the `files` directory as we cannot correctly set its permissions so that BS can access it.
     // (which causes a black screen that can only be fixed by manually deleting the file)
@@ -184,12 +184,12 @@ fn reinstall_modded_app(temp_apk_path: &Path) -> Result<()> {
     Command::new("pm")
         .args(["uninstall", APK_ID])
         .output()
-        .context("Failed to uninstall vanilla APK")?;
+        .context("Uninstalling vanilla APK")?;
 
     Command::new("pm")
         .args(["install", &temp_apk_path.to_string_lossy()])
         .output()
-        .context("Failed to install modded APK")?;
+        .context("Installing modded APK")?;
 
     info!("Granting external storage permission");
     Command::new("appops")
@@ -222,7 +222,7 @@ fn apply_diff(from_path: &Path,
     let patch = qbsdiff::Bspatch::new(&diff_content)
         .context("Diff file was invalid")?;
 
-    let file_content = read_file_vec(from_path).context("Failed to read diff file")?;
+    let file_content = read_file_vec(from_path).context("Reading diff file from disk")?;
 
     // Verify the CRC32 hash of the file content.
     info!("Verifying installation is unmodified");
@@ -270,7 +270,7 @@ fn download_diff_retry(diff: &Diff, to_dir: impl AsRef<Path>) -> Result<()> {
     let output_path = to_dir.as_ref().join(&diff.diff_name);
 
     downloads::download_file_with_attempts(&crate::get_dl_cfg(), &output_path, &url)
-        .context("Failed to download diff file")?;
+        .context("Downloading diff file")?;
     Ok(())
 }
 
@@ -282,7 +282,7 @@ fn save_libunity(res_cache: &ResCache, temp_path: impl AsRef<Path>, version: &st
 
     let libunity_path = temp_path.as_ref().join("libunity.so");
     downloads::download_file_with_attempts(&crate::get_dl_cfg(), &libunity_path, &url)
-        .context("Failed to download unstripped libunity.so")?;
+        .context("Downloading unstripped libunity.so")?;
 
     Ok(Some(libunity_path))
 }
@@ -349,8 +349,8 @@ pub fn get_modloader_status() -> Result<InstallStatus> {
         // Load the existing modloader into memory
         let mut existing_loader_bytes = Vec::<u8>::new();
         std::fs::File::open(loader_path)
-            .context("Failed to open modloader to check if up to date")?
-            .read_to_end(&mut existing_loader_bytes).context("Failed to read existing modloader")?;
+            .context("Opening existing modloader (to read) to check if up to date")?
+            .read_to_end(&mut existing_loader_bytes).context("Reading existing modloader")?;
 
         // Check if it's all up-to-date
         if existing_loader_bytes == MODLOADER {
@@ -372,13 +372,13 @@ fn patch_apk_in_place(path: impl AsRef<Path>,
         .read(true)
         .write(true)
         .open(path)
-        .context("Failed to open temporary APK in order to patch it")?;
+        .context("Opening temporary APK for writing")?;
         
     let mut zip = ZipFile::open(file).unwrap();
     zip.set_store_alignment(STORE_ALIGNMENT);
 
     info!("Applying manifest mods");
-    patch_manifest(&mut zip, manifest_mod).context("Failed to patch manifest")?;
+    patch_manifest(&mut zip, manifest_mod).context("Patching manifest")?;
 
     let (priv_key, cert) = signing::load_cert_and_priv_key(DEBUG_CERT_PEM);
 
@@ -396,7 +396,7 @@ fn patch_apk_in_place(path: impl AsRef<Path>,
         info!("Adding unstripped libunity.so (this may take up to a minute)");
         match libunity_path {
             Some(unity_path) => {
-                let mut unity_stream = File::open(unity_path).context("Failed to open unstripped libunity.so")?;
+                let mut unity_stream = File::open(unity_path).context("Opening unstripped libunity.so")?;
                 zip.write_file(LIB_UNITY_PATH, &mut unity_stream, FileCompression::Deflate)?;
             },
             None => warn!("No unstripped unity added to the APK! This might cause issues later")
@@ -405,13 +405,13 @@ fn patch_apk_in_place(path: impl AsRef<Path>,
 
     if let Some(splash_path) = vr_splash_path {
         info!("Applying custom splash screen");
-        let mut vr_splash_file = std::fs::File::open(splash_path).context("Failed to open vr splash image")?;
+        let mut vr_splash_file = std::fs::File::open(splash_path).context("Opening vr splash image")?;
 
         zip.write_file("assets/vr_splash.png", &mut vr_splash_file, FileCompression::Store)?;
     }
 
     info!("Signing");
-    zip.save_and_sign_v2(&cert, &priv_key).context("Failed to save/sign APK")?;
+    zip.save_and_sign_v2(&cert, &priv_key).context("Saving/signing APK")?;
 
     Ok(())
 }
@@ -427,7 +427,7 @@ fn add_modded_tag(to: &mut ZipFile<File>, tag: ModTag) -> Result<()> {
 
 pub fn get_modloader_installed(apk: &mut ZipFile<File>) -> Result<Option<ModLoader>> {
     if apk.contains_file(MOD_TAG_PATH) {
-        let tag_data = apk.read_file(MOD_TAG_PATH).context("Failed to read mod tag")?;
+        let tag_data = apk.read_file(MOD_TAG_PATH).context("Reading mod tag")?;
         let mod_tag: ModTag = match serde_json::from_slice(&tag_data) {
             Ok(tag) => tag,
             Err(err) => {
@@ -476,15 +476,15 @@ fn patch_manifest(zip: &mut ZipFile<File>, additional_properties: String) -> Res
     let mut data_output = Cursor::new(Vec::new());
     let mut axml_writer = AxmlWriter::new(&mut data_output);
 
-    axml::xml_to_axml(&mut axml_writer, &mut xml_reader).context("Failed to convert XML back to AXML")?;
-    axml_writer.finish().context("Failed to save AXML manifest")?;
+    axml::xml_to_axml(&mut axml_writer, &mut xml_reader).context("Converting XML back to (binary) AXML")?;
+    axml_writer.finish().context("Saving AXML (binary) manifest")?;
 
     zip.delete_file("AndroidManifest.xml");
     zip.write_file(
         "AndroidManifest.xml",
         &mut data_output,
         FileCompression::Deflate
-    ).context("Failed to write modified manifest")?;
+    ).context("Writing modified manifest")?;
 
     Ok(())
 }

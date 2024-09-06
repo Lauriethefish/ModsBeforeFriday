@@ -13,7 +13,7 @@ const ADB_EXE_PATH: &str = "adb";
 fn invoke_adb(args: impl IntoIterator<Item = impl AsRef<OsStr>>) -> Result<Output> {
     let output = Command::new(ADB_EXE_PATH)
         .args(args)
-        .output().context("Failed to invoke ADB executable")?;
+        .output().context("Invoking ADB executable")?;
 
     if output.status.success() {
         Ok(output)
@@ -33,7 +33,7 @@ fn get_trimmed_string(from: Vec<u8>) -> String {
 // Returns None if the app is not installed.
 pub fn get_package_version(package_id: &str) -> Result<Option<String>> {
     let output = invoke_adb(&["shell", "dumpsys", "package", package_id])
-        .context("Failed to run dumpsys")?;
+        .context("Running dumpsys")?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
 
@@ -54,7 +54,7 @@ pub fn get_package_version(package_id: &str) -> Result<Option<String>> {
 // Downloads the APK for the app with the specified package ID to the specified location
 pub fn download_apk(package_id: &str, to: &str) -> Result<()> {
     let path_output = invoke_adb(&["shell", "pm", "path", package_id])
-        .context("Failed to get package location")?;
+        .context("Getting package location")?;
 
     let app_path = get_trimmed_string(path_output.stdout)[8..].to_string();
 

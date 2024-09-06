@@ -42,7 +42,7 @@ pub fn handle_request(request: Request) -> Result<Response> {
 
 fn run_mod_action(statuses: HashMap<String, bool>) -> Result<Response> {
     let mut mod_manager = ModManager::new(&get_app_version_only()?);
-    mod_manager.load_mods().context("Failed to load installed mods")?;
+    mod_manager.load_mods().context("Loading installed mods")?;
 
     let mut error = String::new();
 
@@ -94,7 +94,7 @@ fn handle_get_mod_status(override_core_mod_url: Option<String>) -> Result<Respon
         Some(app_info) => {
             info!("Loading installed mods");
             let mut mod_manager = ModManager::new(&app_info.version);
-            mod_manager.load_mods().context("Failed to load installed mods")?;
+            mod_manager.load_mods().context("Loading installed mods")?;
             
             (
                 get_core_mods_info(&app_info.version, &mod_manager, override_core_mod_url, &res_cache, app_info.loader_installed.is_some())?,
@@ -164,7 +164,7 @@ fn get_core_mods_info(apk_version: &str, mod_manager: &ModManager, override_core
         (Vec::new(), false)
     }   else    {
         let diff_index = mbf_res_man::external_res::get_diff_index(res_cache)
-        .context("Failed to get downgrading information")?;
+        .context("Fetching downgrading information")?;
 
         let newer_than_latest = is_version_newer_than_latest_diff(apk_version, &diff_index);
         (diff_index.into_iter()
@@ -253,13 +253,13 @@ fn is_version_newer_than_latest_diff(apk_version: &str, diffs: &[VersionDiffs]) 
 }
 
 fn get_app_info() -> Result<Option<AppInfo>> {
-    let apk_path = match crate::get_apk_path().context("Failed to find APK path")? {
+    let apk_path = match crate::get_apk_path().context("Finding APK path")? {
         Some(path) => path,
         None => return Ok(None)
     };
 
     let apk_reader = std::fs::File::open(&apk_path)?;
-    let mut apk = ZipFile::open(apk_reader).context("Failed to read APK as ZIP")?;
+    let mut apk = ZipFile::open(apk_reader).context("Reading APK as ZIP")?;
 
     let modloader = patching::get_modloader_installed(&mut apk)?;
     let obb_present = patching::check_obb_present()?;
@@ -280,9 +280,9 @@ fn get_app_info() -> Result<Option<AppInfo>> {
 fn get_app_version_only() -> Result<String> {
     let dumpsys_output = Command::new("dumpsys")
         .args(["package", APK_ID])
-        .output().context("Failed to invoke dumpsys")?;
+        .output().context("Invoking dumpsys")?;
     let dumpsys_stdout = String::from_utf8(dumpsys_output.stdout)
-        .context("Failed to convert dumpsys output to UTF-8")?;
+        .context("Converting dumpsys output to UTF-8")?;
 
     let version_offset = match dumpsys_stdout.find("versionName=") {
         Some(offset) => offset,
@@ -305,22 +305,22 @@ fn axml_bytes_to_xml_string(bytes: &[u8]) -> Result<String> {
         .perform_indent(true)
         .create_writer(Cursor::new(&mut xml_output));
 
-    axml::axml_to_xml(&mut xml_writer, &mut axml_reader).context("Failed to convert AXML to XML")?;
+    axml::axml_to_xml(&mut xml_writer, &mut axml_reader).context("Converting AXML to XML")?;
 
     Ok(String::from_utf8(xml_output)
         .expect("XML output should be valid UTF-8"))
 }
 
 fn get_manifest_info_and_xml(apk: &mut ZipFile<File>) -> Result<(ManifestInfo, String)> {
-    let manifest = apk.read_file("AndroidManifest.xml").context("Failed to read manifest")?;
+    let manifest = apk.read_file("AndroidManifest.xml").context("Reading manifest file from APK")?;
 
     // Decode various important information from the manifest
     let mut manifest_reader = Cursor::new(&manifest);
     let mut axml_reader = AxmlReader::new(&mut manifest_reader)?;
-    let manifest_info = ManifestInfo::read(&mut axml_reader).context("Failed to read manifest")?;
+    let manifest_info = ManifestInfo::read(&mut axml_reader).context("Parsing manifest from AXML")?;
 
     // Re-read the manifest as a full XML document.
-    let xml_str = axml_bytes_to_xml_string(&manifest).context("Failed to convert manifest to XML")?;
+    let xml_str = axml_bytes_to_xml_string(&manifest).context("Converting manifest to readable XML")?;
 
     Ok((manifest_info, xml_str))
 }
@@ -418,11 +418,11 @@ fn attempt_file_copy(from_path: PathBuf, file_ext: String, mod_manager: ModManag
             Some(copy_ext) => {
                 info!("Copying to {}", copy_ext.destination);
                 let dest_folder = Path::new(&copy_ext.destination);
-                std::fs::create_dir_all(dest_folder).context("Failed to create destination folder")?;
+                std::fs::create_dir_all(dest_folder).context("Creating destination folder for file copy")?;
                 let dest_path = dest_folder.join(from_path.file_name().unwrap());
 
                 // Rename is not used as these may be in separate volumes.
-                std::fs::copy(&from_path, &dest_path).context("Failed to copy file")?;
+                std::fs::copy(&from_path, &dest_path).context("Copying mod file copy extension")?;
                 std::fs::remove_file(&from_path)?;
 
                 return Ok(ImportResultType::ImportedFileCopy {
@@ -445,7 +445,7 @@ fn attempt_song_import(from_path: PathBuf) -> Result<ImportResultType> {
         let extract_path = Path::new(SONGS_PATH).join(from_path.file_stem().expect("Must have file stem"));
 
         if extract_path.exists() {
-            std::fs::remove_dir_all(&extract_path).context("Failed to delete existing song")?;
+            std::fs::remove_dir_all(&extract_path).context("Deleting existing song")?;
         }
 
         std::fs::create_dir_all(&extract_path)?;
@@ -483,7 +483,7 @@ fn handle_quick_fix(override_core_mod_url: Option<String>, wipe_existing_mods: b
     let mut mod_manager = ModManager::new(&app_info.version);
     if wipe_existing_mods {
         info!("Wiping all existing mods");
-        mod_manager.wipe_all_mods().context("Failed to wipe existing mods")?;
+        mod_manager.wipe_all_mods().context("Wiping existing mods")?;
     }
     mod_manager.load_mods()?; // Should load no mods.
 
@@ -511,7 +511,7 @@ fn handle_fix_player_data() -> Result<Response> {
 
         info!("Removing (potentially faulty) PlayerData.dat in game files");
         debug!("(removing {PLAYER_DATA_PATH})");
-        std::fs::remove_file(PLAYER_DATA_PATH).context("Failed to delete faulty player data")?;
+        std::fs::remove_file(PLAYER_DATA_PATH).context("Deleting faulty player data")?;
         if Path::new(PLAYER_DATA_BAK_PATH).exists() {
             std::fs::remove_file(PLAYER_DATA_BAK_PATH)?;
         }
@@ -540,17 +540,17 @@ fn handle_patch(downgrade_to: Option<String>,
     // Either downgrade or just patch the current APK depending on the caller's choice.
     let patching_result = if let Some(to_version) = &downgrade_to {
         let diff_index = mbf_res_man::external_res::get_diff_index(&res_cache)
-            .context("Failed to get diff index to downgrade")?;
+            .context("Getting diff index to downgrade")?;
         let version_diffs = diff_index.into_iter()
             .filter(|diff| diff.from_version == app_info.version && &diff.to_version == to_version)
             .next()
             .ok_or(anyhow!("No diff existed to go from {} to {}", app_info.version, to_version))?;
 
         patching::downgrade_and_mod_apk(Path::new(TEMP_PATH), &app_info, version_diffs, manifest_mod, vr_splash_path.as_deref(), &res_cache)
-            .context("Failed to downgrade and patch APK")
+            .context("Downgrading and patching APK")
     }   else {
         patching::mod_current_apk(Path::new(TEMP_PATH), &app_info, manifest_mod, repatch, vr_splash_path.as_deref(), &res_cache)
-            .context("Failed to patch APK").map(|_| false) // Modding the currently installed APK will never remove DLC as they are restored automatically.
+            .context("Patching APK").map(|_| false) // Modding the currently installed APK will never remove DLC as they are restored automatically.
     };
 
     // No matter what, make sure that all temporary files are gone.
@@ -559,16 +559,15 @@ fn handle_patch(downgrade_to: Option<String>,
         std::fs::remove_file(splash_path)?;
     }
 
-    let removed_dlc = patching_result.context("Failed to patch game")?;
-
-    patching::install_modloader().context("Failed to save modloader")?;
+    let removed_dlc = patching_result?;
+    patching::install_modloader().context("Installing external modloader")?;
 
     let new_app_version = downgrade_to.unwrap_or(app_info.version);
     let mut mod_manager = ModManager::new(&new_app_version);
     
     if !repatch {
         info!("Wiping all existing mods");
-        mod_manager.wipe_all_mods().context("Failed to wipe existing mods")?;
+        mod_manager.wipe_all_mods().context("Wiping existing mods")?;
         mod_manager.load_mods()?; // Should load no mods.
     
         match install_core_mods(&res_cache, &mut mod_manager, get_app_info()?
@@ -577,7 +576,7 @@ fn handle_patch(downgrade_to: Option<String>,
                 Err(err) => if allow_no_core_mods {
                     warn!("Failed to install core mods: {err}")
                 }   else    {
-                    return Err(err).context("Failed to install core mods")
+                    return Err(err).context("Installing core mods")
                 }
             }
     }
@@ -617,7 +616,7 @@ fn install_core_mods(res_cache: &ResCache, mod_manager: &mut ModManager, app_inf
         info!("Downloading {} v{}", core_mod.id, core_mod.version);
 
         let core_mod_vec = downloads::download_to_vec_with_attempts(&crate::get_dl_cfg(), &core_mod.download_url)
-            .context("Failed to download core mod")?;
+            .context("Downloading core mod")?;
         let result = mod_manager.try_load_new_mod(Cursor::new(core_mod_vec));
         // Delete the temporary file either way
         result?;
@@ -625,7 +624,7 @@ fn install_core_mods(res_cache: &ResCache, mod_manager: &mut ModManager, app_inf
     }
 
     info!("Installing core mods");
-    mod_manager.load_mods().context("Failed to load core mods - is one invalid? If so, this is a BIG problem")?;
+    mod_manager.load_mods().context("Loading core mods - is one invalid? If so, this is a BIG problem")?;
     for core_mod in &core_mods.mods {
         mod_manager.install_mod(&core_mod.id)?;
     }
@@ -637,7 +636,7 @@ fn install_core_mods(res_cache: &ResCache, mod_manager: &mut ModManager, app_inf
 fn handle_get_downgraded_manifest(version: String) -> Result<Response> {
     info!("Downloading manifest AXML file");
     let manifest_bytes = mbf_res_man::external_res::get_manifest_axml(mbf_res_man::default_agent::get_agent(), version)
-        .context("Failed to GET AndroidManifest.xml")?;
+        .context("HTTP GET for downgraded AndroidManifest.xml")?;
     info!("Converting into readable XML");
     let manifest_xml = axml_bytes_to_xml_string(&manifest_bytes)?;
 

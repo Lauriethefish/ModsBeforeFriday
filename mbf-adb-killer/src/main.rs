@@ -13,7 +13,7 @@ use anyhow::{Context, Result};
 
 fn main() -> Result<()> {
     let listener = TcpListener::bind("localhost:25898")
-        .context("Failed to bind to port, is the mbf-adb-killer already running")?;
+        .context("Binding to port, is the mbf-adb-killer already running")?;
 
     loop {
         let (tcp_stream, addr) = listener.accept()?;

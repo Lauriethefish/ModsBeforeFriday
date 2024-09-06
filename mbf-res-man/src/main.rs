@@ -54,17 +54,17 @@ fn download_installed_bs() -> Result<String> {
     };
 
     let version_path = Path::new(BS_VERSIONS_PATH).join(&bs_version);
-    std::fs::create_dir_all(&version_path).context("Failed to create output path")?;
+    std::fs::create_dir_all(&version_path).context("Creating output directory")?;
 
     info!("Downloading APK");
     let apk_output_path = version_path.join(format!("{APK_ID}.apk"));
 
     adb::download_apk(APK_ID, &apk_output_path.to_string_lossy())
-        .context("Failed to download APK")?;
+        .context("Downloading APK")?;
 
     info!("Downloading OBB file(s)");
 
-    adb::download_obbs(APK_ID, &version_path).context("Failed to download OBBs")?;
+    adb::download_obbs(APK_ID, &version_path).context("Downloading OBBs")?;
     Ok(bs_version)
 }
 
@@ -73,7 +73,7 @@ fn download_installed_bs() -> Result<String> {
 fn find_bs_ver_beginning_with(bs_version: &str) -> Result<PathBuf> {
     let mut matching = Vec::new();
     for entry_res in std::fs::read_dir(Path::new(BS_VERSIONS_PATH))
-        .context("Failed to read apk_data folder")? {
+        .context("Reading apk_data folder")? {
 
         // Skip entries where reading the metadata failed.
         if let Ok(entry) = entry_res {
@@ -116,7 +116,7 @@ fn install_bs_version(bs_version: &str, fuzzy_lookup: bool) -> Result<()> {
     let version_path = get_bs_ver_path(bs_version, fuzzy_lookup)?;
 
     let (apk_path, maybe_obb_path) = get_obb_and_apk_path(bs_version, fuzzy_lookup)
-        .context("Failed to get APK and OBB path")?;
+        .context("Getting APK and OBB path")?;
 
     info!("Installing APK");
     adb::install_apk(&apk_path.to_string_lossy())?;
@@ -240,9 +240,9 @@ fn verify_no_existing_diff(index: &mut DiffIndex,
 fn add_diff_to_index(from_version: String, to_version: String, delete_existing: bool) -> Result<()> {
     info!("Preparing to generate diff from {from_version} to {to_version}");
 
-    let mut current_diff_idx = load_current_diffs().context("Failed to load diff index")?;
+    let mut current_diff_idx = load_current_diffs().context("Loading diff index")?;
 
-    verify_no_existing_diff(&mut current_diff_idx, &from_version, &to_version, delete_existing).context("Failed to verify removal of existing diff")?;
+    verify_no_existing_diff(&mut current_diff_idx, &from_version, &to_version, delete_existing).context("Verifying removal of existing diff")?;
 
     let (from_apk, from_obb) = get_obb_and_apk_path(&from_version, false).context("Getting APK/OBB path for original version")?;
     let (to_apk, to_obb) = get_obb_and_apk_path(&to_version, false).context("Getting APK/OBB path for downgraded version")?;
@@ -256,11 +256,11 @@ fn add_diff_to_index(from_version: String, to_version: String, delete_existing: 
 
     info!("Generating diff for APK");
     let apk_diff = diff_builder::generate_diff(from_apk, to_apk, Path::new(DIFFS_PATH)
-        .join(apk_diff_name)).context("Failed to generate diff for APK")?;
+        .join(apk_diff_name)).context("Generating diff for APK")?;
     
     info!("Generating diff for OBB");
     let obb_diff = diff_builder::generate_diff(from_obb.unwrap(), to_obb.unwrap(), Path::new(DIFFS_PATH)
-        .join(obb_diff_name)).context("Failed to generate diff for OBB")?;
+        .join(obb_diff_name)).context("Generating diff for OBB")?;
 
     info!("Adding to diff index");
     current_diff_idx.push(VersionDiffs {
@@ -269,7 +269,7 @@ fn add_diff_to_index(from_version: String, to_version: String, delete_existing: 
         from_version,
         to_version,
     });
-    save_diff_index(current_diff_idx).context("Failed to save diff index")?;
+    save_diff_index(current_diff_idx).context("Saving diff index")?;
 
     Ok(())
 }
@@ -288,7 +288,7 @@ fn get_latest_moddable_bs() -> Result<String> {
     info!("Working out latest moddable version");
 
     let core_mods = crate::external_res::fetch_core_mods(&get_res_cache()?, None)
-        .context("Failed to GET core mod index")?;
+        .context("Downloading (HTTP GET) core mod index")?;
 
     let latest_ver = core_mods.into_keys().max_by(|version_a, version_b|
         bs_ver_to_semver(version_a).cmp(&bs_ver_to_semver(version_b)));
@@ -356,7 +356,7 @@ fn update_manifests() -> Result<()> {
         let apk_path = folder.path().join(format!("{APK_ID}.apk"));
         let apk_handle = std::fs::File::open(apk_path).context("No APK found for BS version")?;
         let mut apk_zip = ZipFile::open(apk_handle).context("APK wasn't a valid ZIP file")?;
-        let manifest_contents = apk_zip.read_file("AndroidManifest.xml").context("Failed to read manifest")?;
+        let manifest_contents = apk_zip.read_file("AndroidManifest.xml").context("Reading manifest")?;
 
         let mut out_handle = std::fs::OpenOptions::new()
             .create(true)
@@ -413,7 +413,7 @@ fn merge_obb(version: String, out_path: impl AsRef<Path>) -> Result<()> {
 
     info!("Copying APK to destination");
     std::fs::copy(&apk_path, out_path.as_ref())
-        .context("Failed to copy APK to destination path")?;
+        .context("Copying APK to destination path")?;
     
     let apk_file = OpenOptions::new()
         .read(true)
@@ -428,11 +428,11 @@ fn merge_obb(version: String, out_path: impl AsRef<Path>) -> Result<()> {
         .context("OBB was not valid ZIP archive")?;
 
     info!("Copying entries from OBB into APK");
-    obb_zip.copy_all_entries_to(&mut apk_zip).context("Failed to copy over OBB entries")?;
+    obb_zip.copy_all_entries_to(&mut apk_zip).context("Copying over over OBB entries")?;
 
     const CERT_PEM: &[u8] = include_bytes!("../../mbf-agent/src/debug_cert.pem");
     let (cert, priv_key) = mbf_zip::signing::load_cert_and_priv_key(CERT_PEM);
-    apk_zip.save_and_sign_v2(&priv_key, &cert).context("Failed to sign/save APK")?;
+    apk_zip.save_and_sign_v2(&priv_key, &cert).context("Signing/saving APK")?;
     Ok(())
 }
 
@@ -613,7 +613,7 @@ fn main() -> Result<()> {
             let access_token = get_or_load_access_token(cli.access_token)?;
 
             let min_version_semver = match min_version {
-                Some(version_string) => semver::Version::parse(&version_string).context("Failed to parse provided version string")?,
+                Some(version_string) => semver::Version::parse(&version_string).context("Parsing provided version string")?,
                 None => semver::Version::new(0, 0, 0)
             };
 

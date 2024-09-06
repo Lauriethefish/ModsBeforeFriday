@@ -61,14 +61,14 @@ pub fn get_manifest_axml(agent: &ureq::Agent, version: String) -> Result<Vec<u8>
 
     let resp = agent.get(&manifest_url)
         .call()
-        .context("Failed to make request to fetch manifest")?;
+        .context("Fetching manifest for BS ver")?;
 
     if resp.status() == 404 {
         return Err(anyhow!("Could not find an AXML manifest for version {version} (404). Report this so that one can be added"));
     }
 
     let mut buffer = Vec::new();
-    resp.into_reader().read_to_end(&mut buffer).context("Failed to read response")?;
+    resp.into_reader().read_to_end(&mut buffer).context("Reading response")?;
 
     Ok(buffer)
 }

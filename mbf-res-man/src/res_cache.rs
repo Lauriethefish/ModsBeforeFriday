@@ -107,9 +107,9 @@ impl<'agent> ResCache<'agent> {
 
         let cached_path = self.cache_root.join(cached_file_name);
         if cached_path.exists() {
-            let cache_last_modified = std::fs::metadata(&cached_path).context("Failed to get metadata on cached file")?
+            let cache_last_modified = std::fs::metadata(&cached_path).context("Getting metadata on cached file")?
                 .modified()
-                .context("Failed to get cache last modified")?;
+                .context("Getting cached file last modified")?;
 
             request = request.set("If-Modified-Since", &httpdate::fmt_http_date(cache_last_modified));
         }
@@ -121,7 +121,7 @@ impl<'agent> ResCache<'agent> {
             request = request.set("If-None-Match", &cached_etag);
         }
 
-        let resp = request.call().context("Failed to GET file")?;
+        let resp = request.call().context("HTTP GET to get file to cache")?;
         if let Some(etag) = resp.header("ETag") {
             debug!("Got ETag {etag} for {cached_file_name}");
             etag_cache.insert(cached_file_name.to_owned(), etag.to_owned());
@@ -135,7 +135,7 @@ impl<'agent> ResCache<'agent> {
             let mut cache_handle = std::fs::OpenOptions::new()
                 .create(true)
                 .write(true)
-                .truncate(true).open(&cached_path).context("Failed to open cache file for writing: is the directory writable?")?;
+                .truncate(true).open(&cached_path).context("Opening cache file for writing: is the directory writable?")?;
 
             std::io::copy(&mut resp.into_reader(), &mut cache_handle).context("Copying response to cache")?;
         }   else {
@@ -152,7 +152,7 @@ impl<'agent> ResCache<'agent> {
         let mut cache_handle = self.get_cached(url, cached_file_name)?;
 
         let mut buf = Vec::new();
-        cache_handle.read_to_end(&mut buf).context("Failed to read file from cache")?;
+        cache_handle.read_to_end(&mut buf).context("Reading file from cache")?;
 
         Ok(buf)
     }

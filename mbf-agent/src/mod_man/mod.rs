@@ -63,7 +63,7 @@ impl ModManager {
     // Removes a directory and all its files recursively, if that directory already exists.
     fn remove_dir_if_exists(path: impl AsRef<Path>) -> Result<()> {
         if path.as_ref().exists() {
-            std::fs::remove_dir_all(path).context("Failed to remove directory")?;
+            std::fs::remove_dir_all(path)?;
         }
 
         Ok(())
@@ -100,7 +100,7 @@ impl ModManager {
         OpenOptions::new()
             .create(true)
             .write(true)
-            .open(NOMEDIA_PATH).context("Failed to create nomedia file")?;
+            .open(NOMEDIA_PATH).context("Creating nomedia file")?;
     
         Ok(())
     }
@@ -141,7 +141,7 @@ impl ModManager {
         // Load mods in legacy folder.
         // This is done last as loading the new qmods extracts them to the mods directory,
         // so the code above would lead to the mods being loaded again.
-        self.check_mods_installed().context("Failed to check if mods are installed")?;
+        self.check_mods_installed().context("Checking if mods are installed")?;
         match self.load_old_qmods() {
             // If we had old QMODs loaded in this stage, then recheck if all mods are installed again, since the random load order of the legacy QMODs may mean
             // that if a dependency of a mod existed, it might not have been loaded
@@ -168,11 +168,11 @@ impl ModManager {
         warn!("Migrating mods from legacy folder");
         let mut found_qmod = false;
         for stat_result in std::fs::read_dir(OLD_QMODS_DIR)
-            .context("Failed to read old QMODs directory")? {
+            .context("Reading old QMODs directory")? {
             let stat = stat_result?;
 
             let mod_stream = std::fs::File::open(stat.path())
-                .context("Failed to open legacy mod")?;
+                .context("Opening legacy mod")?;
             debug!("Migrating {:?}", stat.path());
 
             // Attempt to load a mod from each file
@@ -183,7 +183,7 @@ impl ModManager {
 
             // Delete the file either way
             found_qmod = true;
-            std::fs::remove_file(stat.path()).context("Failed to delete legacy mod")?;
+            std::fs::remove_file(stat.path()).context("Deleting legacy mod")?;
         }
         std::fs::remove_dir(OLD_QMODS_DIR)?;
 
@@ -197,12 +197,12 @@ impl ModManager {
         }
 
         let mut json_data = Vec::new();
-        std::fs::File::open(manifest_path).context("Failed to open manifest")?
-            .read_to_end(&mut json_data).context("Failed to read manifest")?;
+        std::fs::File::open(manifest_path).context("Opening manifest (mod.json) in mod folder.")?
+            .read_to_end(&mut json_data).context("Reading manifest")?;
 
-        let manifest = self.load_manifest_from_slice(&json_data).context("Failed to parse manifest")?;
+        let manifest = self.load_manifest_from_slice(&json_data).context("Parsing manifest as JSON")?;
         Ok(Mod {
-            files_exist: Self::check_if_mod_files_exist(&manifest).context("Failed to check if mod files exist when loading mod")?,
+            files_exist: Self::check_if_mod_files_exist(&manifest).context("Checking if mod files exist when loading mod")?,
             manifest,
             installed: None, // Must call update_mods_status
             loaded_from: from,
@@ -217,7 +217,7 @@ impl ModManager {
         match manifest_value.get("_QPVersion") {
             Some(serde_json::Value::String(schema_ver)) => {
                 let sem_version = semver::Version::parse(&schema_ver)
-                    .context("Failed to parse specified QMOD schema version")?;
+                    .context("Parsing specified QMOD schema (sem)version")?;
 
                 if sem_version > MAX_SCHEMA_VERSION {
                     return Err(anyhow!("QMOD specified schema version {sem_version} which was newer than the maximum supported version {MAX_SCHEMA_VERSION}. Is MBF out of date, or did the mod developer make a mistake?"));
@@ -257,7 +257,7 @@ impl ModManager {
 
         for mod_id in self.mods.keys() {
             let mut checked_in_pass = HashSet::new();
-            self.check_mod_installed(mod_id, &mut checked_in_pass).context("Failed to check if individual mod was installed.")?;
+            self.check_mod_installed(mod_id, &mut checked_in_pass).context("Checking if individual mod was installed")?;
         }
 
         Ok(())
@@ -305,7 +305,7 @@ impl ModManager {
                     if !match dep_ref.installed {
                         None => {
                             drop(dep_ref);
-                            self.check_mod_installed(&dependency.id, checked_in_path).context("Failed to check if dependency was installed")?
+                            self.check_mod_installed(&dependency.id, checked_in_path).context("Checking if dependency was installed")?
                         },
                         Some(installed) => installed
                     }  {
@@ -389,18 +389,18 @@ impl ModManager {
             let dest_path = Path::new(&file_copy.destination);
             match dest_path.parent() {
                 Some(parent) => std::fs::create_dir_all(parent)
-                    .context("Failed to create destination directory for file copy")?,
+                    .context("Creating destination directory for file copy")?,
                 None => {}
             }
 
             if Path::new(&file_copy.destination).exists() {
                 std::fs::remove_file(&file_copy.destination)
-                    .context("Failed to remove existing copied file")?;
+                    .context("Removing existing copied file")?;
             }
 
             debug!("Installing file copy {file_path_in_mod:?} to {}", file_copy.destination);
             std::fs::copy(file_path_in_mod, &file_copy.destination)
-                .context("Failed to copy stated file copy")?;
+                .context("Copying stated file copy to destination")?;
         }
         to_install.installed = Some(true);
         to_install.files_exist = true;
@@ -443,7 +443,7 @@ impl ModManager {
             let dest_path = Path::new(&copy.destination);
             if dest_path.exists() {
                 debug!("Removing file copy at destination {dest_path:?}");
-                std::fs::remove_file(dest_path).context("Failed to delete copied file")?;
+                std::fs::remove_file(dest_path).context("Deleting copied file")?;
             }
         }
         to_remove.installed = Some(false);
@@ -492,7 +492,7 @@ impl ModManager {
 
         info!("Downloading dependency from {}", link);
         let dependency_bytes = downloads::download_to_vec_with_attempts(&crate::get_dl_cfg(), &link)
-            .context("Failed to download dependency")?;
+            .context("Downloading dependency")?;
 
         self.try_load_new_mod(Cursor::new(dependency_bytes))?;
         self.install_mod(&dep.id)?;
@@ -506,7 +506,7 @@ impl ModManager {
 
         let json_data = zip.read_file("mod.json").context("Mod had no mod.json manifest")?;
         let loaded_mod_manifest = self.load_manifest_from_slice(&json_data)
-            .context("Failed to parse manifest")?;
+            .context("Parsing manifest")?;
 
         debug!("Early load of new mod, ID {}, version: {}, author: {}", loaded_mod_manifest.id, loaded_mod_manifest.version, loaded_mod_manifest.author);
 
@@ -529,8 +529,8 @@ impl ModManager {
         info!("Extracting {} v{}", loaded_mod_manifest.id, loaded_mod_manifest.version);
         let extract_path = self.get_mod_extract_path(&loaded_mod_manifest);
         debug!("Extract path: {extract_path:?}");
-        std::fs::create_dir_all(&extract_path).context("Failed to create extract path")?;
-        zip.extract_to_directory(&extract_path).context("Failed to extract QMOD file")?;
+        std::fs::create_dir_all(&extract_path).context("Creating extract directory")?;
+        zip.extract_to_directory(&extract_path).context("Extracting QMOD file")?;
 
         // Insert the mod into the HashMap of loaded mods, and now it is ready to be manipulated by the mod manager!
         let loaded_mod = Mod {
@@ -543,7 +543,7 @@ impl ModManager {
         self.mods.insert(id.clone(), Rc::new(RefCell::new(loaded_mod)));
 
         let mut checked_in_pass = HashSet::new();
-        self.check_mod_installed(&id, &mut checked_in_pass).context("Failed to check whether new mod was installed")?;
+        self.check_mod_installed(&id, &mut checked_in_pass).context("Checking whether new mod was installed")?;
         Ok(id)
     }
 
@@ -698,9 +698,9 @@ fn copy_stated_files(mod_folder: impl AsRef<Path>, files: &[String], to: impl As
         debug!("Copying {file_name} to {copy_to:?}");
 
         if copy_to.exists() {
-            std::fs::remove_file(&copy_to).context("Failed to remove existing mod file")?;
+            std::fs::remove_file(&copy_to).context("Removing existing mod file")?;
         }
-        std::fs::copy(file_location, copy_to).context("Failed to copy SO")?;
+        std::fs::copy(file_location, copy_to).context("Copying SO for mod")?;
     }
 
     Ok(())

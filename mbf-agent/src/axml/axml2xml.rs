@@ -41,7 +41,7 @@ type XmlName<'a> = xml::name::Name<'a>;
 pub fn axml_to_xml<W: std::io::Write,R: std::io::Read + std::io::Seek>
     (writer: &mut xml::EventWriter<W>, reader: &mut AxmlReader<R>) -> Result<()> {
     use xml::writer::XmlEvent;
-    let res_ids = ResourceIds::load().context("Failed to load resource IDs")?;
+    let res_ids = ResourceIds::load().context("Loading resource IDs")?;
 
     // AXML uses a series of StartNamespace elements before a opening tag to indicate that
     // this tag declares namespaces. This Vec contains the content of any StartNamespace chunks
@@ -119,7 +119,7 @@ pub fn xml_to_axml<W: std::io::Write,
 R: std::io::Read>
     (writer: &mut AxmlWriter<W>, reader: &mut xml::EventReader<R>) -> Result<()> {
     use xml::reader::XmlEvent;
-    let res_ids = ResourceIds::load().context("Failed to load resource IDs")?;
+    let res_ids = ResourceIds::load().context("Loading resource IDs")?;
 
     // A list of the namespaces declared by each element in the tree.
     // Will be empty if an element declares no namespaces

@@ -136,7 +136,7 @@ fn download_binaries(access_token: &str, apk_binary: &AndroidBinary, to: impl As
 
     download_and_warn_on_err(&apk_binary.id, apk_path, access_token);
 
-    let obb_info = get_obb_info(apk_binary, access_token).context("Failed to get OBB information")?;
+    let obb_info = get_obb_info(apk_binary, access_token).context("Getting OBB information")?;
     if let Some(obb) = obb_info {
         let obb_path = to.as_ref().join(format!("{}{}", obb.obb_filename, suffix));
         info!("Downloading OBB");

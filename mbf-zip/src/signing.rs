@@ -131,7 +131,7 @@ fn write_signature_block(apk: &mut File, apk_digest: &[u8], cert: &Certificate, 
     signed_data_digest.update(&signed_data);
 
     let signature = priv_key.sign(Pkcs1v15Sign::new::<Sha256>(), &signed_data_digest.finalize())
-        .context("Failed to sign data")?;
+        .context("Signing data")?;
 
     let public_key_info = rasn::der::encode(&cert.tbs_certificate.subject_public_key_info)
         .expect("Failed to encode public key");
