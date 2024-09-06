@@ -95,7 +95,7 @@ fn handle_get_mod_status(override_core_mod_url: Option<String>) -> Result<Respon
             mod_manager.load_mods().context("Failed to load installed mods")?;
             
             (
-                get_core_mods_info(&app_info.version, &mod_manager, override_core_mod_url, &res_cache)?,
+                get_core_mods_info(&app_info.version, &mod_manager, override_core_mod_url, &res_cache, app_info.loader_installed.is_some())?,
                 get_mod_models(mod_manager)?
             )
         },
@@ -125,7 +125,7 @@ fn get_mod_models(mut mod_manager: ModManager) -> Result<Vec<ModModel>> {
 }
 
 fn get_core_mods_info(apk_version: &str, mod_manager: &ModManager, override_core_mod_url: Option<String>,
-    res_cache: &ResCache) -> Result<Option<CoreModsInfo>> {
+    res_cache: &ResCache, is_patched: bool) -> Result<Option<CoreModsInfo>> {
     // Fetch the core mods from the resources repo
     info!("Fetching core mod index");
     let core_mods = match mbf_res_man::external_res::fetch_core_mods(
@@ -151,17 +151,25 @@ fn get_core_mods_info(apk_version: &str, mod_manager: &ModManager, override_core
 
         minor.parse::<i64>().expect("Invalid version in core mod index") >= 35
     }).collect();
+    let is_version_supported = supported_versions.iter().any(|ver| ver == apk_version);
 
-    let diff_index = mbf_res_man::external_res::get_diff_index(res_cache)
+    // If the app is patched and not vanilla, then it's not possible to downgrade it even if a diff is available for the corresponding vanilla APK
+    // Therefore, we can skip fetching the diff index, which will help startup times.
+
+    let (downgrade_versions, newer_than_latest_diff) = if is_patched {
+        // While technically newer_than_latest_diff is true, our app is patched already so we couldn't downgrade it
+        // even if there was a diff available.
+        (Vec::new(), false)
+    }   else    {
+        let diff_index = mbf_res_man::external_res::get_diff_index(res_cache)
         .context("Failed to get downgrading information")?;
 
-    let is_version_supported = supported_versions.iter().any(|ver| ver == apk_version);
-    let newer_than_latest_diff = is_version_newer_than_latest_diff(apk_version, &diff_index);
-
-    let downgrade_versions: Vec<String> = diff_index.into_iter()
-        .filter(|diff| diff.from_version == apk_version)
-        .map(|diff| diff.to_version)
-        .collect();
+        let newer_than_latest = is_version_newer_than_latest_diff(apk_version, &diff_index);
+        (diff_index.into_iter()
+            .filter(|diff| diff.from_version == apk_version)
+            .map(|diff| diff.to_version)
+            .collect(), newer_than_latest)
+    };
 
     Ok(Some(CoreModsInfo {
         supported_versions,
