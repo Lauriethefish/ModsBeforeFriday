@@ -7,6 +7,7 @@ import CodeIcon from '../icons/code.svg';
 import BugIcon from '../icons/debug.svg';
 import CheckboxEmpty from '../icons/checkbox-empty.svg';
 import CheckboxFilled from '../icons/checkbox-filled.svg';
+import UpdateIcon from '../icons/update-icon.svg';
 
 export function ModRepoCard({ mod, onInstall, update, isFlagged, setFlagged }: 
     { 
@@ -45,7 +46,7 @@ export function ModRepoCard({ mod, onInstall, update, isFlagged, setFlagged }:
 
                 <button className="installMod" onClick={onInstall}>
                     {update ? "Update" : "Install"}
-                    <img src={DownloadIcon} />
+                    <img src={update ? UpdateIcon : DownloadIcon} />
                 </button>
             </div>
         </div>
