@@ -13,7 +13,7 @@ use mbf_zip::ZipFile;
 use crate::mod_man::ModManager;
 use crate::requests::{AppInfo, CoreModsInfo, ImportResultType, InstallStatus, ModModel, Request, Response};
 use anyhow::{anyhow, Context, Result};
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 use mbf_res_man::res_cache::{JsonPullError, ResCache};
 use xml::EmitterConfig;
 
@@ -509,7 +509,8 @@ fn handle_fix_player_data() -> Result<Response> {
         info!("Backing up player data");
         patching::backup_player_data()?;
 
-        info!("Removing (potentially faulty) PlayerData.dat at {}", PLAYER_DATA_PATH);
+        info!("Removing (potentially faulty) PlayerData.dat in game files");
+        debug!("(removing {PLAYER_DATA_PATH})");
         std::fs::remove_file(PLAYER_DATA_PATH).context("Failed to delete faulty player data")?;
         if Path::new(PLAYER_DATA_BAK_PATH).exists() {
             std::fs::remove_file(PLAYER_DATA_BAK_PATH)?;

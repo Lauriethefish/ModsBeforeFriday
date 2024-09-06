@@ -42,7 +42,7 @@ pub fn mod_current_apk(temp_path: &Path, app_info: &AppInfo, manifest_mod: Strin
     let obb_backups = save_obbs(Path::new(APP_OBB_PATH), &obb_backup)
         .context("Failed to save OBB files")?;
 
-    patch_and_reinstall(libunity_path, &temp_apk_path, temp_path, obb_backups, manifest_mod, manifest_only, vr_splash_path)
+    patch_and_reinstall(libunity_path, &temp_apk_path, obb_backups, manifest_mod, manifest_only, vr_splash_path)
         .context("Failed to patch and reinstall APK")?;
     Ok(())
 }
@@ -96,7 +96,7 @@ pub fn downgrade_and_mod_apk(temp_path: &Path,
     let contains_dlc = has_file_with_no_extension(APP_OBB_PATH)
         .context("Failed to check for DLC")?;
 
-    patch_and_reinstall(libunity_path, &temp_apk_path, temp_path, obb_backup_paths, manifest_mod, false, vr_splash_path)
+    patch_and_reinstall(libunity_path, &temp_apk_path, obb_backup_paths, manifest_mod, false, vr_splash_path)
         .context("Failed to patch and reinstall APK")?;
     Ok(contains_dlc)
 }
@@ -126,12 +126,11 @@ pub fn kill_app() -> Result<()> {
 
 fn patch_and_reinstall(libunity_path: Option<PathBuf>,
     temp_apk_path: &Path,
-    temp_path: &Path,
     obb_paths: Vec<PathBuf>,
     manifest_mod: String,
     manifest_only: bool,
     vr_splash_path: Option<&str>) -> Result<()> {
-    info!("Patching APK at {:?}", temp_path);
+    info!("Patching APK");
     patch_apk_in_place(&temp_apk_path, libunity_path, manifest_mod, manifest_only, vr_splash_path).context("Failed to patch APK")?;
 
     if Path::new(PLAYER_DATA_PATH).exists() {
