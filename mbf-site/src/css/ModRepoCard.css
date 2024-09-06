@@ -15,6 +15,7 @@
 }
 
 .auxOptions {
+    margin-top: auto !important;
     display: flex;
     flex-direction: row;
     align-items: end;
@@ -99,10 +100,11 @@
 
 .mod-repo-card-info {
     display: flex;
-    height: 100%;
     flex-direction: column;
+    height: 100%;
     gap: 0.1em;
 }
+
 .mod-repo-card-info>* {
     margin: 0.2em;
 }
