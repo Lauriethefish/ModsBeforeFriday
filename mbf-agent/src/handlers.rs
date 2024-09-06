@@ -392,7 +392,7 @@ fn handle_import(from_path: impl AsRef<Path> + Debug, override_filename: Option<
 // Attempts to import the given path as a QMOD
 // The file will be deleted if this results in a success.
 fn handle_import_qmod(mut mod_manager: ModManager, from_path: PathBuf) -> Result<ImportResultType> {
-    info!("Loading {from_path:?} as a QMOD");
+    debug!("Loading {from_path:?} as a QMOD");
     let id = mod_manager.try_load_new_mod(std::fs::File::open(&from_path)?)?;
     std::fs::remove_file(from_path)?; // Delete temporary file.
 

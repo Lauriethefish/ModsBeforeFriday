@@ -398,6 +398,7 @@ impl ModManager {
                     .context("Failed to remove existing copied file")?;
             }
 
+            debug!("Installing file copy {file_path_in_mod:?} to {}", file_copy.destination);
             std::fs::copy(file_path_in_mod, &file_copy.destination)
                 .context("Failed to copy stated file copy")?;
         }
@@ -435,6 +436,7 @@ impl ModManager {
         for copy in &to_remove.manifest.file_copies {
             let dest_path = Path::new(&copy.destination);
             if dest_path.exists() {
+                debug!("Removing file copy at destination {dest_path:?}");
                 std::fs::remove_file(dest_path).context("Failed to delete copied file")?;
             }
         }
@@ -500,6 +502,8 @@ impl ModManager {
         let loaded_mod_manifest = self.load_manifest_from_slice(&json_data)
             .context("Failed to parse manifest")?;
 
+        debug!("Early load of new mod, ID {}, version: {}, author: {}", loaded_mod_manifest.id, loaded_mod_manifest.version, loaded_mod_manifest.author);
+
         // Check that upgrading the mod to the new version is actually safe...
         let id = loaded_mod_manifest.id.clone();
         if let Err(msg) = self.check_dependency_compatibility(&id, &loaded_mod_manifest.version) {
@@ -518,6 +522,7 @@ impl ModManager {
         // Extract the mod to the mods folder
         info!("Extracting {} v{}", loaded_mod_manifest.id, loaded_mod_manifest.version);
         let extract_path = self.get_mod_extract_path(&loaded_mod_manifest);
+        debug!("Extract path: {extract_path:?}");
         std::fs::create_dir_all(&extract_path).context("Failed to create extract path")?;
         zip.extract_to_directory(&extract_path).context("Failed to extract QMOD file")?;
 
@@ -657,11 +662,13 @@ fn delete_file_names(file_paths: &[String], exclude: HashSet<String>, within: im
     for path in file_paths {
         let file_name = get_so_name(path);
         if exclude.contains(file_name) {
+            debug!("Keeping lib {file_name} as it's used by another mod");
             continue;
         }
 
         let stored_path = within.as_ref().join(file_name);
         if stored_path.exists() {
+            debug!("Removing {file_name}");
             std::fs::remove_file(stored_path)?;
         }
     }
@@ -681,6 +688,8 @@ fn copy_stated_files(mod_folder: impl AsRef<Path>, files: &[String], to: impl As
 
         let file_name = file.split('/').last().unwrap();
         let copy_to = to.as_ref().join(file_name);
+
+        debug!("Copying {file_name} to {copy_to:?}");
 
         if copy_to.exists() {
             std::fs::remove_file(&copy_to).context("Failed to remove existing mod file")?;
