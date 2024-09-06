@@ -81,9 +81,7 @@ export function ModRepoBrowser(props: ModRepoBrowserProps) {
                             update={displayInfo.needUpdate}
                             onInstall={() => {
                                 onDownload([displayInfo.mod]);
-                                if(flagged.includes(displayInfo)) {
-                                    unflag(displayInfo);
-                                }
+                                unflag(displayInfo);
                             }}
                             isFlagged={flagged.find(mod => mod.mod.id === displayInfo.mod.id) !== undefined}
                             setFlagged={isFlagged => {
