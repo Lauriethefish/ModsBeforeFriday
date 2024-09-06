@@ -107,8 +107,8 @@ class Wrapper():
         args.disable = None
 
         for file in args.files:
-            subprocess.run(['adb', 'push', file, f'/data/local/tmp/mbf-upload/{os.path.basename(args["file"])}'])
-            self.send_payload('Import', from_path=f'/data/local/tmp/mbf-upload/{os.path.basename(self.file)}')
+            subprocess.run(['adb', 'push', file, f'/data/local/tmp/mbf/uploads/{os.path.basename(args["file"])}'])
+            self.send_payload('Import', from_path=f'/data/local/tmp/mbf/uploads/{os.path.basename(self.file)}')
 
             if 'imported_id' in self.import_result['result']:
                 args.enable += [self.import_result['result']['imported_id']]

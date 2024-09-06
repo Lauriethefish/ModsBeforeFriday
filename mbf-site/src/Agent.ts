@@ -6,7 +6,7 @@ import { toast } from 'react-toastify';
 import { Log } from './Logging';
 
 const AgentPath: string = "/data/local/tmp/mbf-agent";
-const UploadsPath: string = "/data/local/tmp/mbf-uploads/";
+const UploadsPath: string = "/data/local/tmp/mbf/uploads/";
 
 // Converts the provided byte array into a ReadableStream that can be fed into ADB.
 function readableStreamFromByteArray(array: Uint8Array): ReadableStream<Uint8Array> {

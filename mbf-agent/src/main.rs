@@ -11,11 +11,11 @@ use crate::requests::Request;
 use anyhow::{Context, Result};
 use const_format::formatcp;
 use downloads::DownloadConfig;
-use log::{error, Level};
+use log::{debug, error, warn, Level};
 use mbf_res_man::res_cache::ResCache;
 use requests::Response;
 use serde::{Deserialize, Serialize};
-use std::{io::{BufRead, BufReader, Write}, panic, process::Command, sync};
+use std::{io::{BufRead, BufReader, Write}, panic, path::Path, process::Command, sync};
 
 #[cfg(feature = "request_timing")]
 use log::info;
@@ -41,9 +41,29 @@ pub const DATA_BACKUP_PATH: &str = "/sdcard/ModsBeforeFriday/PlayerData.backup.d
 pub const OLD_QMODS_DIR: &str = "/sdcard/ModsBeforeFriday/Mods";
 
 pub const SONGS_PATH: &str = formatcp!("/sdcard/ModData/{APK_ID}/Mods/SongCore/CustomLevels");
-pub const DOWNLOADS_PATH: &str = "/data/local/tmp/mbf-downloads";
-pub const TEMP_PATH: &str = "/data/local/tmp/mbf-tmp";
-pub const RES_CACHE_PATH: &str = "/data/local/tmp/mbf-res-cache";
+pub const DOWNLOADS_PATH: &str = "/data/local/tmp/mbf/downloads";
+pub const TEMP_PATH: &str = "/data/local/tmp/mbf/tmp";
+pub const RES_CACHE_PATH: &str = "/data/local/tmp/mbf/res-cache";
+pub const LEGACY_DIRS: &[&str] = &[
+    "/data/local/tmp/mbf-downloads",
+    "/data/local/tmp/mbf-res-cache",
+    "/data/local/tmp/mbf-tmp",
+    "/data/local/tmp/mbf-uploads"
+];
+
+/// Attempts to delete legacy directories no longer used by MBF to free up space
+/// Logs on failure
+pub fn try_delete_legacy_dirs() {
+    for dir in LEGACY_DIRS {
+        if Path::new(dir).exists() {
+            match std::fs::remove_dir_all(dir) {
+                Ok(_) => debug!("Successfully removed legacy dir {dir}"),
+                Err(err) => warn!("Failed to remove legacy dir {dir}: {err}")
+            }
+        }
+    }
+}
+
 
 static DOWNLOAD_CFG: sync::OnceLock<DownloadConfig> = sync::OnceLock::new();
 

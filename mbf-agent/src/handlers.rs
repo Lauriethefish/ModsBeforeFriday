@@ -84,6 +84,8 @@ fn run_mod_action(statuses: HashMap<String, bool>) -> Result<Response> {
 }
 
 fn handle_get_mod_status(override_core_mod_url: Option<String>) -> Result<Response> {
+    crate::try_delete_legacy_dirs();
+
     info!("Searching for Beat Saber app");
     let app_info = get_app_info()?;
     let res_cache = crate::load_res_cache()?;
