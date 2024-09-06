@@ -418,7 +418,13 @@ impl ModManager {
                 continue;
             }
 
-            for lib_path in other_mod.borrow()
+            // Only retain libs for installed mods.
+            let other_mod_ref = other_mod.borrow();
+            if !other_mod_ref.installed() {
+                continue;
+            }
+
+            for lib_path in other_mod_ref
                 .manifest
                 .library_files
                 .iter() 
