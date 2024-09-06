@@ -16,7 +16,7 @@ fn extract_access_token(access_token_result: &serde_json::Value) -> Result<Strin
 }
 
 pub fn meta_accounts_login(email_addr: &str, password: &str) -> Result<String> {
-    let resp = crate::external_res::get_agent().post(&format!("{META_GRAPH_BASE_URL}/accounts_login")).send_form(&[
+    let resp = crate::default_agent::get_agent().post(&format!("{META_GRAPH_BASE_URL}/accounts_login")).send_form(&[
         ("access_token", "FRL|778542610035039|2e189079414d3a6e5642a789322b1940"),
         ("contact_point_type", "EMAIL_ADDRESS"),
         ("contact_point", email_addr),
@@ -28,7 +28,7 @@ pub fn meta_accounts_login(email_addr: &str, password: &str) -> Result<String> {
 }
 
 fn get_horizon_access_token(access_token: &str) -> Result<String> {
-    let resp = crate::external_res::get_agent().post(&format!("{META_GRAPH_BASE_URL}/graphql"))
+    let resp = crate::default_agent::get_agent().post(&format!("{META_GRAPH_BASE_URL}/graphql"))
         .send_form(&[
             ("access_token", access_token),
             ("variables", "{\"app_id\":\"1582076955407037\"}"),
@@ -49,7 +49,7 @@ fn get_horizon_access_token(access_token: &str) -> Result<String> {
 
 // Authenticates as the given application ID, and returns the authenticated access token.
 fn authenticate_application(access_token: &str, app_id: u64) -> Result<String> {
-    let resp = crate::external_res::get_agent().post(&format!("{OCULUS_GRAPH_BASE_URL}/authenticate_application"))
+    let resp = crate::default_agent::get_agent().post(&format!("{OCULUS_GRAPH_BASE_URL}/authenticate_application"))
         .send_form(&[
             ("access_token", access_token),
             ("app_id", &app_id.to_string())
@@ -114,7 +114,7 @@ pub struct Application {
 
 // Lists all of the available versions of the given app ID
 pub fn list_app_versions(access_token: &str, app_id: &str) -> Result<Vec<AndroidBinary>> {
-    let resp = crate::external_res::get_agent().post(&format!("{OCULUS_GRAPH_BASE_URL}/graphql"))
+    let resp = crate::default_agent::get_agent().post(&format!("{OCULUS_GRAPH_BASE_URL}/graphql"))
         .send_form(&[
             ("access_token", access_token),
             ("doc_id", "2885322071572384"),
@@ -130,7 +130,7 @@ pub fn list_app_versions(access_token: &str, app_id: &str) -> Result<Vec<Android
 
 // Gets to corresponding obb binary for the given android binary, if there is one.
 pub fn get_obb_binary(access_token: &str, android_binary_id: &str) -> Result<Option<ObbBinary>> {
-    let resp = crate::external_res::get_agent().post(&format!("{OCULUS_GRAPH_BASE_URL}/graphql"))
+    let resp = crate::default_agent::get_agent().post(&format!("{OCULUS_GRAPH_BASE_URL}/graphql"))
     .send_form(&[
         ("access_token", access_token),
         ("doc_id", "24072064135771905"),
@@ -145,7 +145,7 @@ pub fn get_obb_binary(access_token: &str, android_binary_id: &str) -> Result<Opt
 
 // Starts a request to download the binary with the given binary ID.
 pub fn download_binary(access_token: &str, binary_id: &str) -> Result<Box<dyn Read>> {
-    Ok(crate::external_res::get_agent().get(OCULUS_BINARY_DOWNLOAD_URL)
+    Ok(crate::default_agent::get_agent().get(OCULUS_BINARY_DOWNLOAD_URL)
         .query("access_token", access_token)
         .query("id", binary_id)
         .call()?

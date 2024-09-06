@@ -4,7 +4,7 @@ use anyhow::{Context, Result, anyhow};
 use log::{info, warn};
 use crate::{axml::{self, AxmlWriter}, data_fix::fix_colour_schemes, downloads, requests::{AppInfo, InstallStatus, ModLoader}, ModTag, APK_ID, APP_OBB_PATH, DATAKEEPER_PATH, DATA_BACKUP_PATH, PLAYER_DATA_PATH};
 use mbf_zip::{signing, FileCompression, ZipFile, ZIP_CRC};
-use mbf_res_man::{external_res, models::{Diff, VersionDiffs}};
+use mbf_res_man::{external_res, models::{Diff, VersionDiffs}, res_cache::ResCache};
 
 const DEBUG_CERT_PEM: &[u8] = include_bytes!("debug_cert.pem");
 const LIB_MAIN: &[u8] = include_bytes!("../libs/libmain.so");
@@ -22,12 +22,12 @@ const STORE_ALIGNMENT: u16 = 4;
 
 // Mods the currently installed version of the given app and reinstalls it, without doing any downgrading.
 // If `manifest_only` is true, patching will only overwrite the manifest and will not add a modloader.
-pub fn mod_current_apk(temp_path: &Path, app_info: &AppInfo, manifest_mod: String, manifest_only: bool, vr_splash_path: Option<&str>) -> Result<()> {
+pub fn mod_current_apk(temp_path: &Path, app_info: &AppInfo, manifest_mod: String, manifest_only: bool, vr_splash_path: Option<&str>, res_cache: &ResCache, ) -> Result<()> {
     let libunity_path = if manifest_only {
         None
     }   else    {
         info!("Downloading unstripped libunity.so (this could take a minute)");
-        save_libunity(temp_path, &app_info.version).context("Failed to save libunity.so")?
+        save_libunity(res_cache, temp_path, &app_info.version).context("Failed to save libunity.so")?
     };
 
     kill_app().context("Failed to kill Beat Saber")?;
@@ -53,10 +53,11 @@ pub fn downgrade_and_mod_apk(temp_path: &Path,
     app_info: &AppInfo,
     diffs: VersionDiffs,
     manifest_mod: String,
-    vr_splash_path: Option<&str>) -> Result<bool> {
+    vr_splash_path: Option<&str>,
+    res_cache: &ResCache) -> Result<bool> {
     // Download libunity.so *for the downgraded version*
     info!("Downloading unstripped libunity.so (this could take a minute)");
-    let libunity_path = save_libunity(temp_path, &diffs.to_version)
+    let libunity_path = save_libunity(res_cache, temp_path, &diffs.to_version)
         .context("Failed to save libunity.so")?;
 
     // Download the diff files
@@ -274,8 +275,8 @@ fn download_diff_retry(diff: &Diff, to_dir: impl AsRef<Path>) -> Result<()> {
     Ok(())
 }
 
-fn save_libunity(temp_path: impl AsRef<Path>, version: &str) -> Result<Option<PathBuf>> {
-    let url = match external_res::get_libunity_url(APK_ID, version)? {
+fn save_libunity(res_cache: &ResCache, temp_path: impl AsRef<Path>, version: &str) -> Result<Option<PathBuf>> {
+    let url = match external_res::get_libunity_url(res_cache, APK_ID, version)? {
         Some(url) => url,
         None => return Ok(None) // No libunity for this version
     };

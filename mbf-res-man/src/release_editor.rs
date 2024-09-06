@@ -51,7 +51,7 @@ fn read_asset_details(asset: &serde_json::Value) -> ReleaseAsset {
 pub fn get_assets(release: &Release, auth_token: &str) -> Result<Vec<ReleaseAsset>> {
     let req_path = format!("{API_ROOT}/repos/{}/{}/releases/{}", release.repo.owner, release.repo.repo, release.id);
 
-    let resp = set_headers(crate::external_res::get_agent()
+    let resp = set_headers(crate::default_agent::get_agent()
         .get(&req_path), auth_token).call()?;
 
     let document: serde_json::Value = serde_json::from_reader(resp.into_reader())?;
@@ -68,7 +68,7 @@ pub fn get_assets(release: &Release, auth_token: &str) -> Result<Vec<ReleaseAsse
 pub fn get_latest_release(repo: Repo, auth_token: &str) -> Result<Release> {
     let req_path = format!("{API_ROOT}/repos/{}/{}/releases/latest", repo.owner, repo.repo);
 
-    let resp = set_headers(crate::external_res::get_agent()
+    let resp = set_headers(crate::default_agent::get_agent()
         .get(&req_path), auth_token).call()?;
 
     let document: serde_json::Value = serde_json::from_reader(resp.into_reader())?;
@@ -83,7 +83,7 @@ pub fn get_latest_release(repo: Repo, auth_token: &str) -> Result<Release> {
 pub fn delete_asset(asset: &ReleaseAsset, release: &Release, auth_token: &str) -> Result<()> {
     let req_path = format!("{API_ROOT}/repos/{}/{}/releases/assets/{}", release.repo.owner, release.repo.repo, asset.id);
 
-    set_headers(crate::external_res::get_agent()
+    set_headers(crate::default_agent::get_agent()
         .delete(&req_path), auth_token).call()?;
 
     Ok(())
@@ -96,7 +96,7 @@ pub fn upload_asset_from_reader(release: &Release, file_name: &str, mut content:
     let length = content.stream_position()?;
     content.seek(SeekFrom::Start(0))?;
 
-    let resp = set_headers(crate::external_res::get_agent()
+    let resp = set_headers(crate::default_agent::get_agent()
         .post(&req_path)
         .query("name", file_name), auth_token)
         .set("Content-Type", "application/octet-stream")

@@ -2,6 +2,7 @@ apk_data/diffs
 apk_data/versions
 apk_data/manifests
 apk_data/crc_cache.json
+res_cache/
 target/
 GITHUB_TOKEN.txt
 META_TOKEN.txt

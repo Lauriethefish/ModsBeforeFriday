@@ -12,6 +12,7 @@ use mbf_zip::ZipFile;
 use models::{DiffIndex, VersionDiffs};
 use oculus_db::{get_obb_binary, AndroidBinary};
 use release_editor::Repo;
+use res_cache::ResCache;
 use semver::{Op, Version};
 use version_grabber::SemiSemVer;
 
@@ -23,15 +24,24 @@ mod release_editor;
 mod oculus_db;
 mod hash_cache;
 mod version_grabber;
+mod res_cache;
+mod default_agent;
 
 const APK_ID: &str = "com.beatgames.beatsaber";
 const APK_DATA_DIR: &str = "apk_data";
 const BS_VERSIONS_PATH: &str = formatcp!("{APK_DATA_DIR}/versions");
 const DIFFS_PATH: &str = formatcp!("{APK_DATA_DIR}/diffs");
+const RES_CACHE_PATH: &str = formatcp!("res_cache");
 const MANIFESTS_PATH: &str = formatcp!("{APK_DATA_DIR}/manifests");
 const DIFF_INDEX_PATH: &str = formatcp!("{DIFFS_PATH}/index.json");
+
 const CRC32_CACHE_PATH: &str = formatcp!("{APK_DATA_DIR}/crc_cache.json");
 const META_TOKEN_PATH: &str = "META_TOKEN.txt";
+
+fn get_res_cache() -> Result<ResCache<'static>> {
+    std::fs::create_dir_all(RES_CACHE_PATH)?;
+    Ok(ResCache::new(RES_CACHE_PATH.into(), default_agent::get_agent()))
+}
 
 // Downloads the installed version of Beat Saber to BS_VERSIONS_PATH
 fn download_installed_bs() -> Result<String> {
@@ -277,7 +287,7 @@ fn bs_ver_to_semver(bs_ver: &str) -> semver::Version {
 fn get_latest_moddable_bs() -> Result<String> {
     info!("Working out latest moddable version");
 
-    let core_mods = crate::external_res::fetch_core_mods(None)
+    let core_mods = crate::external_res::fetch_core_mods(&get_res_cache()?, None)
         .context("Failed to GET core mod index")?;
 
     let latest_ver = core_mods.into_keys().max_by(|version_a, version_b|

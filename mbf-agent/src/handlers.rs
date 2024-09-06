@@ -14,7 +14,7 @@ use crate::mod_man::ModManager;
 use crate::requests::{AppInfo, CoreModsInfo, ImportResultType, InstallStatus, ModModel, Request, Response};
 use anyhow::{anyhow, Context, Result};
 use log::{error, info, warn};
-use mbf_res_man::external_res::JsonPullError;
+use mbf_res_man::res_cache::{JsonPullError, ResCache};
 use xml::EmitterConfig;
 
 
@@ -86,6 +86,7 @@ fn run_mod_action(statuses: HashMap<String, bool>) -> Result<Response> {
 fn handle_get_mod_status(override_core_mod_url: Option<String>) -> Result<Response> {
     info!("Searching for Beat Saber app");
     let app_info = get_app_info()?;
+    let res_cache = crate::load_res_cache()?;
 
     let (core_mods, installed_mods) = match &app_info {
         Some(app_info) => {
@@ -94,7 +95,7 @@ fn handle_get_mod_status(override_core_mod_url: Option<String>) -> Result<Respon
             mod_manager.load_mods().context("Failed to load installed mods")?;
             
             (
-                get_core_mods_info(&app_info.version, &mod_manager, override_core_mod_url)?,
+                get_core_mods_info(&app_info.version, &mod_manager, override_core_mod_url, &res_cache)?,
                 get_mod_models(mod_manager)?
             )
         },
@@ -123,16 +124,18 @@ fn get_mod_models(mut mod_manager: ModManager) -> Result<Vec<ModModel>> {
         .collect())
 }
 
-fn get_core_mods_info(apk_version: &str, mod_manager: &ModManager, override_core_mod_url: Option<String>) -> Result<Option<CoreModsInfo>> {
+fn get_core_mods_info(apk_version: &str, mod_manager: &ModManager, override_core_mod_url: Option<String>,
+    res_cache: &ResCache) -> Result<Option<CoreModsInfo>> {
     // Fetch the core mods from the resources repo
     info!("Fetching core mod index");
-    let core_mods = match mbf_res_man::external_res::fetch_core_mods(override_core_mod_url) {
+    let core_mods = match mbf_res_man::external_res::fetch_core_mods(
+        res_cache, override_core_mod_url) {
         Ok(mods) => mods,
         Err(JsonPullError::FetchError(fetch_err)) => {
             error!("Failed to fetch core mod index: assuming no internet connection: {fetch_err:?}");
             return Ok(None);
         },
-        Err(JsonPullError::ParseError(err)) => return Err(err)
+        Err(JsonPullError::ParseError(err)) => return Err(err.into())
     };
 
     // Check that all core mods are installed with an appropriate version
@@ -149,7 +152,8 @@ fn get_core_mods_info(apk_version: &str, mod_manager: &ModManager, override_core
         minor.parse::<i64>().expect("Invalid version in core mod index") >= 35
     }).collect();
 
-    let diff_index = mbf_res_man::external_res::get_diff_index().context("Failed to get downgrading information")?;
+    let diff_index = mbf_res_man::external_res::get_diff_index(res_cache)
+        .context("Failed to get downgrading information")?;
 
     let is_version_supported = supported_versions.iter().any(|ver| ver == apk_version);
     let newer_than_latest_diff = is_version_newer_than_latest_diff(apk_version, &diff_index);
@@ -464,6 +468,7 @@ fn handle_remove_mod(id: String) -> Result<Response> {
 fn handle_quick_fix(override_core_mod_url: Option<String>, wipe_existing_mods: bool) -> Result<Response> {
     let app_info = get_app_info()?
         .ok_or(anyhow!("Cannot quick fix when app is not installed"))?;
+    let res_cache = crate::load_res_cache()?;
 
     let mut mod_manager = ModManager::new(&app_info.version);
     if wipe_existing_mods {
@@ -473,7 +478,7 @@ fn handle_quick_fix(override_core_mod_url: Option<String>, wipe_existing_mods: b
     mod_manager.load_mods()?; // Should load no mods.
 
     // Reinstall missing core mods and overwrite the modloader with the one contained within the executable.
-    install_core_mods(&mut mod_manager, app_info, override_core_mod_url)?;
+    install_core_mods(&res_cache, &mut mod_manager, app_info, override_core_mod_url)?;
     patching::install_modloader()?;
     Ok(Response::Mods {
         installed_mods: get_mod_models(mod_manager)?
@@ -517,22 +522,23 @@ fn handle_patch(downgrade_to: Option<String>,
     vr_splash_path: Option<String>) -> Result<Response> {
     let app_info = get_app_info()?
         .ok_or(anyhow!("Cannot patch when app not installed"))?;
+    let res_cache = crate::load_res_cache()?;
 
     std::fs::create_dir_all(TEMP_PATH)?;
 
     // Either downgrade or just patch the current APK depending on the caller's choice.
     let patching_result = if let Some(to_version) = &downgrade_to {
-        let diff_index = mbf_res_man::external_res::get_diff_index()
+        let diff_index = mbf_res_man::external_res::get_diff_index(&res_cache)
             .context("Failed to get diff index to downgrade")?;
         let version_diffs = diff_index.into_iter()
             .filter(|diff| diff.from_version == app_info.version && &diff.to_version == to_version)
             .next()
             .ok_or(anyhow!("No diff existed to go from {} to {}", app_info.version, to_version))?;
 
-        patching::downgrade_and_mod_apk(Path::new(TEMP_PATH), &app_info, version_diffs, manifest_mod, vr_splash_path.as_deref())
+        patching::downgrade_and_mod_apk(Path::new(TEMP_PATH), &app_info, version_diffs, manifest_mod, vr_splash_path.as_deref(), &res_cache)
             .context("Failed to downgrade and patch APK")
     }   else {
-        patching::mod_current_apk(Path::new(TEMP_PATH), &app_info, manifest_mod, repatch, vr_splash_path.as_deref())
+        patching::mod_current_apk(Path::new(TEMP_PATH), &app_info, manifest_mod, repatch, vr_splash_path.as_deref(), &res_cache)
             .context("Failed to patch APK").map(|_| false) // Modding the currently installed APK will never remove DLC as they are restored automatically.
     };
 
@@ -554,7 +560,7 @@ fn handle_patch(downgrade_to: Option<String>,
         mod_manager.wipe_all_mods().context("Failed to wipe existing mods")?;
         mod_manager.load_mods()?; // Should load no mods.
     
-        match install_core_mods(&mut mod_manager, get_app_info()?
+        match install_core_mods(&res_cache, &mut mod_manager, get_app_info()?
             .ok_or(anyhow!("Beat Saber should be installed after patching"))?, override_core_mod_url) {
                 Ok(_) => info!("Successfully installed all core mods"),
                 Err(err) => if allow_no_core_mods {
@@ -575,9 +581,10 @@ fn mark_all_core_mods(mod_manager: &ModManager, core_mods: &[CoreMod]) {
     }
 }
 
-fn install_core_mods(mod_manager: &mut ModManager, app_info: AppInfo, override_core_mod_url: Option<String>) -> Result<()> {
+fn install_core_mods(res_cache: &ResCache, mod_manager: &mut ModManager, app_info: AppInfo, override_core_mod_url: Option<String>) -> Result<()> {
     info!("Preparing core mods");
-    let core_mod_index = mbf_res_man::external_res::fetch_core_mods(override_core_mod_url)?;
+    let core_mod_index = mbf_res_man::external_res::fetch_core_mods(
+        &res_cache, override_core_mod_url)?;
 
     let core_mods = core_mod_index.get(&app_info.version)
         .ok_or(anyhow!("No core mods existed for {}", app_info.version))?;
@@ -618,7 +625,7 @@ fn install_core_mods(mod_manager: &mut ModManager, app_info: AppInfo, override_c
 
 fn handle_get_downgraded_manifest(version: String) -> Result<Response> {
     info!("Downloading manifest AXML file");
-    let manifest_bytes = mbf_res_man::external_res::get_manifest_axml(version)
+    let manifest_bytes = mbf_res_man::external_res::get_manifest_axml(mbf_res_man::default_agent::get_agent(), version)
         .context("Failed to GET AndroidManifest.xml")?;
     info!("Converting into readable XML");
     let manifest_xml = axml_bytes_to_xml_string(&manifest_bytes)?;
