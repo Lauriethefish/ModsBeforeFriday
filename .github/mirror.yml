@@ -2,6 +2,8 @@
 #
 # A second repository for nightly builds is necessary because only one github pages domain can be associated
 # with a particular repository.
+# Currently disabled as it seems to fail to push for some reason (internal git error)
+# Going to push manually to the nightly from now on.
 
 name: "Mirror to nightly repo"
 on:
