@@ -122,14 +122,14 @@ impl<'agent> ResCache<'agent> {
         }
 
         let resp = request.call().context("HTTP GET to get file to cache")?;
-        if let Some(etag) = resp.header("ETag") {
-            debug!("Got ETag {etag} for {cached_file_name}");
-            etag_cache.insert(cached_file_name.to_owned(), etag.to_owned());
-            drop(etag_cache_ref);
-            self.save_etag_cache()?;
-        }
-
         if resp.status() != 304 { // If cached file out of date. (or no cache)
+            if let Some(etag) = resp.header("ETag") {
+                debug!("Got ETag {etag} for {cached_file_name}");
+                etag_cache.insert(cached_file_name.to_owned(), etag.to_owned());
+                drop(etag_cache_ref);
+                self.save_etag_cache()?;
+            }
+
             debug!("No cache, downloading {url} to {cached_file_name}");
             // Copy response body into cache
             let mut cache_handle = std::fs::OpenOptions::new()
@@ -139,6 +139,7 @@ impl<'agent> ResCache<'agent> {
 
             std::io::copy(&mut resp.into_reader(), &mut cache_handle).context("Copying response to cache")?;
         }   else {
+            // If using cache, ETag should be the same so no need to check it again.
             debug!("Using cached file {cached_file_name} for {url}");
         }
         
