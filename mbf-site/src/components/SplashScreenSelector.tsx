@@ -25,7 +25,8 @@ export function SplashScreenSelector({ selected, onSelected }:
                 }}
             />Select splash screen
         </button>
-        {selected !== null && <span className="hoverStrikethrough" style={{ fontSize: "small" }} onClick={() => onSelected(null)}>  (Using <code className="codeBox">{selected.name}</code> as splash)</span>}
+        {selected !== null && <span className="hoverStrikethrough" style={{ fontSize: "small" }} onClick={() => onSelected(null)}>
+<br/>(Using <code className="codeBox">{selected.name}</code> as splash)</span>}
         <br/>
     </>
 }
