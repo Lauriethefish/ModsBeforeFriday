@@ -6,6 +6,7 @@ use log::{debug, error, info, warn};
 pub use manifest::*;
 
 use anyhow::{Context, Result, anyhow};
+use mbf_res_man::{external_res, models::{ModRepo, ModRepoMod}, res_cache::ResCache};
 use mbf_zip::ZipFile;
 use semver::Version;
 
@@ -43,20 +44,26 @@ impl Mod {
     }
 }
 
-pub struct ModManager {
+pub struct ModManager<'cache> {
     mods: HashMap<String, Rc<RefCell<Mod>>>,
     schema: JSONSchema,
-    qmods_dir: String
+    qmods_dir: String,
+    game_version: String,
+    res_cache: &'cache ResCache<'cache>,
+    mod_repo: Option<ModRepo>
 }
 
-impl ModManager {
-    pub fn new(game_version: &str) -> Self {    
+impl<'cache> ModManager<'cache> {
+    pub fn new(game_version: String, res_cache: &'cache ResCache) -> Self {    
         Self {
             mods: HashMap::new(),
             schema: JSONSchema::options()
                 .compile(&serde_json::from_str::<serde_json::Value>(QMOD_SCHEMA).expect("QMOD schema was not valid JSON"))
                 .expect("QMOD schema was not a valid JSON schema"),
-            qmods_dir: crate::QMODS_DIR.replace('$', game_version) // Each game version stores its QMODs in a different directory.
+            qmods_dir: crate::QMODS_DIR.replace('$', &game_version), // Each game version stores its QMODs in a different directory.
+            game_version,
+            res_cache,
+            mod_repo: None,
         }
     }
 
@@ -67,6 +74,16 @@ impl ModManager {
         }
 
         Ok(())
+    }
+
+    // Downloads (or loads from the cache), the mod repo and assigns it to self.mod_repo
+    // After returning Ok, this means that self.mod_repo is definitely Some(...)
+    fn get_or_load_mod_repo(&mut self) -> Result<&ModRepo> {
+        if self.mod_repo.is_none() {
+            self.mod_repo = Some(external_res::get_mod_repo(&self.res_cache).context("Downloading mod repo")?)
+        }
+
+        Ok(self.mod_repo.as_ref().expect("Just loaded mod repo"))
     }
 
     // Removes ALL mod and library files and deletes ALL mods from the current game.
@@ -484,10 +501,69 @@ impl ModManager {
         Ok(())
     }
 
+    // Checks the mod repository for the latest dependency matching `dep`
+    // Returns the URL of the dependency if found
+    // Gives None if the mod repository could not be accessed, or no matching mod was found in the repository.
+    fn try_get_dep_from_mod_repo(&mut self, dep: &ModDependency) -> Option<String> {
+        let mut latest_dep: Option<ModRepoMod> = None;
+        let mut update_with_latest = |repo_mod: &ModRepoMod| {
+            if repo_mod.id == dep.id && dep.version_range.matches(&repo_mod.version) {
+                // Check if the current latest mod is newer than this one, stop if so
+                match latest_dep.as_ref() {
+                    Some(existing_latest) => if existing_latest.version > repo_mod.version {
+                        return;
+                    },
+                    None => {}
+                }
+
+                latest_dep = Some(repo_mod.clone())
+            }
+        };
+
+        // Borrow checker limitation: get_or_load_mod_repo returns an immutable reference but the borrow
+        // checker still treats self as being mutably borrowed, so we can't access the game version.
+        let game_ver_clone = self.game_version.clone();
+
+        match self.get_or_load_mod_repo() {
+            Ok(mod_repo) => {
+                // Consider both global mods, which work on any game version, and the game version specific mods for our version
+
+                if let Some(global_mods) = mod_repo.get("global") {
+                    global_mods.iter().for_each(&mut update_with_latest);
+                }
+
+                if let Some(version_mods) = mod_repo.get(&game_ver_clone) {
+                    version_mods.iter().for_each(&mut update_with_latest);
+                }
+
+                match latest_dep {
+                    Some(dep) => {
+                        info!("Found download URL for {} v{} in mod repo", dep.id, dep.version);
+                        Some(dep.download)
+                    },
+                    None => {
+                        debug!("Mod repo had no matching dependency for {} range {}", dep.id, dep.version_range);
+                        None
+                    }
+                }
+            },
+            Err(err) => {
+                warn!("Could not check for latest {} range {} from mod repo: {err}", dep.id, dep.version_range);
+                None
+            }
+        }
+    }
+
     fn install_dependency(&mut self, dep: &ModDependency) -> Result<()> {
-        let link = match &dep.mod_link {
-            Some(link) => link,
-            None => return Err(anyhow!("Could not download dependency {}: no link given", dep.id))
+        // First check if we can find a copy of the dependency in the mod repo, since this is the preferred option
+        // The mod repo will likely have a more up-to-date version of the dependency than the dependency downloadIfMissing
+        let link = if let Some(dep_url) = self.try_get_dep_from_mod_repo(dep) {
+            dep_url
+        }   else {
+            match &dep.mod_link {
+                Some(link) => link.clone(),
+                None => return Err(anyhow!("Could not download dependency {}: no link given and could not find in mod repo", dep.id))
+            }
         };
 
         info!("Downloading dependency from {}", link);

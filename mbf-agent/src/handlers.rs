@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::manifest::ManifestInfo;
-use crate::{axml, data_fix, downloads, APK_ID, DATAKEEPER_PATH, DOWNLOADS_PATH, PLAYER_DATA_BAK_PATH, PLAYER_DATA_PATH, SONGS_PATH, TEMP_PATH};
+use crate::{axml, data_fix, downloads, load_res_cache, APK_ID, DATAKEEPER_PATH, DOWNLOADS_PATH, PLAYER_DATA_BAK_PATH, PLAYER_DATA_PATH, SONGS_PATH, TEMP_PATH};
 use crate::{axml::AxmlReader, patching};
 use mbf_res_man::models::{CoreMod, VersionDiffs};
 use mbf_zip::ZipFile;
@@ -41,7 +41,9 @@ pub fn handle_request(request: Request) -> Result<Response> {
 }
 
 fn run_mod_action(statuses: HashMap<String, bool>) -> Result<Response> {
-    let mut mod_manager = ModManager::new(&get_app_version_only()?);
+    let res_cache = load_res_cache()?;
+
+    let mut mod_manager = ModManager::new(get_app_version_only()?, &res_cache);
     mod_manager.load_mods().context("Loading installed mods")?;
 
     let mut error = String::new();
@@ -93,7 +95,7 @@ fn handle_get_mod_status(override_core_mod_url: Option<String>) -> Result<Respon
     let (core_mods, installed_mods) = match &app_info {
         Some(app_info) => {
             info!("Loading installed mods");
-            let mut mod_manager = ModManager::new(&app_info.version);
+            let mut mod_manager = ModManager::new(app_info.version.clone(), &res_cache);
             mod_manager.load_mods().context("Loading installed mods")?;
             
             (
@@ -338,7 +340,8 @@ fn handle_import_mod_url(from_url: String) -> Result<Response> {
 
 fn handle_import(from_path: impl AsRef<Path> + Debug, override_filename: Option<String>) -> Result<Response> {
     // Load the installed mods.
-    let mut mod_manager = ModManager::new(&get_app_version_only()?);
+    let res_cache = load_res_cache()?;
+    let mut mod_manager = ModManager::new(get_app_version_only()?, &res_cache);
     mod_manager.load_mods()?;
 
     let filename = match override_filename {
@@ -466,7 +469,8 @@ fn attempt_song_import(from_path: PathBuf) -> Result<ImportResultType> {
 }
 
 fn handle_remove_mod(id: String) -> Result<Response> {
-    let mut mod_manager = ModManager::new(&get_app_version_only()?);
+    let res_cache = load_res_cache()?;
+    let mut mod_manager = ModManager::new(get_app_version_only()?, &res_cache);
     mod_manager.load_mods()?;
     mod_manager.remove_mod(&id)?;
 
@@ -480,7 +484,7 @@ fn handle_quick_fix(override_core_mod_url: Option<String>, wipe_existing_mods: b
         .ok_or(anyhow!("Cannot quick fix when app is not installed"))?;
     let res_cache = crate::load_res_cache()?;
 
-    let mut mod_manager = ModManager::new(&app_info.version);
+    let mut mod_manager = ModManager::new(app_info.version.clone(), &res_cache);
     if wipe_existing_mods {
         info!("Wiping all existing mods");
         mod_manager.wipe_all_mods().context("Wiping existing mods")?;
@@ -563,7 +567,7 @@ fn handle_patch(downgrade_to: Option<String>,
     patching::install_modloader().context("Installing external modloader")?;
 
     let new_app_version = downgrade_to.unwrap_or(app_info.version);
-    let mut mod_manager = ModManager::new(&new_app_version);
+    let mut mod_manager = ModManager::new(new_app_version, &res_cache);
     
     if !repatch {
         info!("Wiping all existing mods");

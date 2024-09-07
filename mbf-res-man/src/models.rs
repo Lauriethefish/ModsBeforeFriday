@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use semver::Version;
 use serde::{Deserialize, Serialize};
 
@@ -42,4 +44,23 @@ pub struct Diff {
     pub output_file_name: String,
     pub output_crc: u32,
     pub output_size: usize
+}
+
+/// The mod repo served on mods.bsquest.xyz
+/// Key is full Beat Saber version incl. non-semver portion, value is a list of mods for the version.
+pub type ModRepo = HashMap<String, Vec<ModRepoMod>>;
+
+/// A particular mod within the mod repo.
+#[derive(Clone, Deserialize)]
+pub struct ModRepoMod {
+    //name: String,
+    pub id: String,
+    pub version: Version,
+    pub download: String,
+    // Fields not currently needed, as the mods repo is used just for fetching dependencies. The frontend, however, also uses the mod repo, but fetches it separately.
+    //source: String,
+    //author: String,
+    //cover: Option<String>,
+    //modloader: String,
+    //description: String
 }

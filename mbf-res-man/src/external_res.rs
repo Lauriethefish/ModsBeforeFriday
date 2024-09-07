@@ -1,6 +1,6 @@
 //! Collection of types used to read the BMBF resources repository to fetch core mod information.
 use log::info;
-use crate::{models::{Diff, DiffIndex, VersionedCoreMods}, res_cache::{JsonPullError, ResCache}};
+use crate::{models::{Diff, DiffIndex, ModRepo, VersionedCoreMods}, res_cache::{JsonPullError, ResCache}};
 use std::collections::HashMap;
 use anyhow::{Context, Result, anyhow};
 
@@ -71,5 +71,12 @@ pub fn get_manifest_axml(agent: &ureq::Agent, version: String) -> Result<Vec<u8>
     resp.into_reader().read_to_end(&mut buffer).context("Reading response")?;
 
     Ok(buffer)
+}
+
+const MOD_REPO_URL: &str = "https://mods.bsquest.xyz/mods.json";
+
+/// Gets the mods repository used to search for dependency download URLs.
+pub fn get_mod_repo(res_cache: &ResCache) -> Result<ModRepo> {
+    Ok(res_cache.get_json_cached(MOD_REPO_URL, "mod_repo.json")?)
 }
 
