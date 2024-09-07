@@ -86,6 +86,9 @@ export function DeviceModder(props: DeviceModderProps) {
         return <div className='container mainContainer'>
             <h1>Beat Saber is not installed</h1>
             <p>Please install Beat Saber from the store and then refresh the page.</p>
+            <h3>Think you have Beat Saber installed?</h3>
+            <p>Sometimes, it looks like Beat Saber is installed in your headset, when it actually isn't (a bug in the Meta software).</p>
+            <p>This can be fixed by going to the main <b>Applications</b> menu inside your Quest, clicking the 3 dots next to Beat Saber, and clicking <b>Uninstall</b>. Finally, reinstall Beat Saber from the Meta store and refresh this page to try again.</p>
         </div>
     } else if (modStatus.core_mods === null) {
         return <div className='container mainContainer'>
