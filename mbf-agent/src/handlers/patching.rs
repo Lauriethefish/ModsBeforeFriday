@@ -4,7 +4,7 @@ use std::path::Path;
 
 use log::{info, warn};
 
-use crate::{mod_man::ModManager, patching, requests::Response};
+use crate::{mod_man::ModManager, patching, paths, requests::Response};
 use anyhow::{Context, anyhow, Result};
 
 /// Handles `GetDowngradedManifest` [Requests](requests::Request).
@@ -35,7 +35,7 @@ pub(super) fn handle_patch(downgrade_to: Option<String>,
         .ok_or(anyhow!("Cannot patch when app not installed"))?;
     let res_cache = crate::load_res_cache()?;
 
-    std::fs::create_dir_all(crate::TEMP_PATH)?;
+    std::fs::create_dir_all(paths::TEMP)?;
 
     // Either downgrade or just patch the current APK depending on the caller's choice.
     let patching_result = if let Some(to_version) = &downgrade_to {
@@ -46,15 +46,15 @@ pub(super) fn handle_patch(downgrade_to: Option<String>,
             .next()
             .ok_or(anyhow!("No diff existed to go from {} to {}", app_info.version, to_version))?;
 
-        patching::downgrade_and_mod_apk(Path::new(crate::TEMP_PATH), &app_info, version_diffs, manifest_mod, vr_splash_path.as_deref(), &res_cache)
+        patching::downgrade_and_mod_apk(Path::new(paths::TEMP), &app_info, version_diffs, manifest_mod, vr_splash_path.as_deref(), &res_cache)
             .context("Downgrading and patching APK")
     }   else {
-        patching::mod_current_apk(Path::new(crate::TEMP_PATH), &app_info, manifest_mod, repatch, vr_splash_path.as_deref(), &res_cache)
+        patching::mod_current_apk(Path::new(paths::TEMP), &app_info, manifest_mod, repatch, vr_splash_path.as_deref(), &res_cache)
             .context("Patching APK").map(|_| false) // Modding the currently installed APK will never remove DLC as they are restored automatically.
     };
 
     // No matter what, make sure that all temporary files are gone.
-    std::fs::remove_dir_all(crate::TEMP_PATH)?;
+    std::fs::remove_dir_all(paths::TEMP)?;
     if let Some(splash_path) = vr_splash_path {
         std::fs::remove_file(splash_path)?;
     }

@@ -6,10 +6,10 @@ mod mod_man;
 mod handlers;
 mod data_fix;
 mod downloads;
+mod paths;
 
 use crate::requests::Request;
 use anyhow::{Context, Result};
-use const_format::formatcp;
 use downloads::DownloadConfig;
 use log::{debug, error, warn, Level};
 use mbf_res_man::res_cache::ResCache;
@@ -17,44 +17,18 @@ use requests::Response;
 use serde::{Deserialize, Serialize};
 use std::{io::{BufRead, BufReader, Write}, panic, path::Path, process::Command, sync};
 
+/// The ID of the APK file that MBF manages.
+pub const APK_ID: &str = "com.beatgames.beatsaber";
+
 #[cfg(feature = "request_timing")]
 use log::info;
 #[cfg(feature = "request_timing")]
 use std::time::Instant;
 
-// Directories accessed by the agent, in one place so that they can be easily changed.
-pub const APK_ID: &str = "com.beatgames.beatsaber";
-// `$` is replaced with the game version
-pub const QMODS_DIR: &str = formatcp!("/sdcard/ModData/{APK_ID}/Packages/$");
-pub const NOMEDIA_PATH: &str = formatcp!("/sdcard/ModData/{APK_ID}/.nomedia");
-pub const MODLOADER_DIR: &str = formatcp!("/sdcard/ModData/{APK_ID}/Modloader");
-pub const LATE_MODS_DIR: &str = formatcp!("{MODLOADER_DIR}/mods");
-pub const EARLY_MODS_DIR: &str = formatcp!("{MODLOADER_DIR}/early_mods");
-pub const LIBS_DIR: &str = formatcp!("{MODLOADER_DIR}/libs");
-pub const APP_DATA_PATH: &str = formatcp!("/sdcard/Android/data/{APK_ID}/files");
-pub const PLAYER_DATA_PATH: &str = formatcp!("{APP_DATA_PATH}/PlayerData.dat");
-pub const PLAYER_DATA_BAK_PATH: &str = formatcp!("{APP_DATA_PATH}/PlayerData.dat.bak");
-pub const APP_OBB_PATH: &str = formatcp!("/sdcard/Android/obb/{APK_ID}/");
-
-pub const DATAKEEPER_PATH: &str = "/sdcard/ModData/com.beatgames.beatsaber/Mods/datakeeper/PlayerData.dat";
-pub const DATA_BACKUP_PATH: &str = "/sdcard/ModsBeforeFriday/PlayerData.backup.dat";
-pub const OLD_QMODS_DIR: &str = "/sdcard/ModsBeforeFriday/Mods";
-
-pub const SONGS_PATH: &str = formatcp!("/sdcard/ModData/{APK_ID}/Mods/SongCore/CustomLevels");
-pub const DOWNLOADS_PATH: &str = "/data/local/tmp/mbf/downloads";
-pub const TEMP_PATH: &str = "/data/local/tmp/mbf/tmp";
-pub const RES_CACHE_PATH: &str = "/data/local/tmp/mbf/res-cache";
-pub const LEGACY_DIRS: &[&str] = &[
-    "/data/local/tmp/mbf-downloads",
-    "/data/local/tmp/mbf-res-cache",
-    "/data/local/tmp/mbf-tmp",
-    "/data/local/tmp/mbf-uploads"
-];
-
 /// Attempts to delete legacy directories no longer used by MBF to free up space
 /// Logs on failure
 pub fn try_delete_legacy_dirs() {
-    for dir in LEGACY_DIRS {
+    for dir in paths::LEGACY_DIRS {
         if Path::new(dir).exists() {
             match std::fs::remove_dir_all(dir) {
                 Ok(_) => debug!("Successfully removed legacy dir {dir}"),
@@ -84,8 +58,8 @@ pub fn get_dl_cfg() -> &'static DownloadConfig<'static> {
 /// Creates a ResCache for downloading files using mbf_res_man
 /// This should be reused where possible.
 pub fn load_res_cache() -> Result<ResCache<'static>> {
-    std::fs::create_dir_all(RES_CACHE_PATH).expect("Failed to create resource cache folder");
-    Ok(ResCache::new(RES_CACHE_PATH.into(),
+    std::fs::create_dir_all(paths::RES_CACHE).expect("Failed to create resource cache folder");
+    Ok(ResCache::new(paths::RES_CACHE.into(),
         mbf_res_man::default_agent::get_agent()))
 }
 

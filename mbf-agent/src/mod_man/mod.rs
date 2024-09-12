@@ -10,7 +10,7 @@ use mbf_res_man::{external_res, models::{ModRepo, ModRepoMod}, res_cache::ResCac
 use mbf_zip::ZipFile;
 use semver::Version;
 
-use crate::{downloads, EARLY_MODS_DIR, LATE_MODS_DIR, LIBS_DIR, NOMEDIA_PATH, OLD_QMODS_DIR};
+use crate::{downloads, paths};
 
 const QMOD_SCHEMA: &str = include_str!("qmod_schema.json");
 const MAX_SCHEMA_VERSION: Version = Version::new(1, 2, 0);
@@ -60,7 +60,7 @@ impl<'cache> ModManager<'cache> {
             schema: JSONSchema::options()
                 .compile(&serde_json::from_str::<serde_json::Value>(QMOD_SCHEMA).expect("QMOD schema was not valid JSON"))
                 .expect("QMOD schema was not a valid JSON schema"),
-            qmods_dir: crate::QMODS_DIR.replace('$', &game_version), // Each game version stores its QMODs in a different directory.
+            qmods_dir: paths::QMODS.replace('$', &game_version), // Each game version stores its QMODs in a different directory.
             game_version,
             res_cache,
             mod_repo: None,
@@ -90,10 +90,10 @@ impl<'cache> ModManager<'cache> {
     pub fn wipe_all_mods(&mut self) -> Result<()> {
         // Wipe absolutely everything: clean slate
         self.mods.clear();
-        Self::remove_dir_if_exists(OLD_QMODS_DIR)?;
-        Self::remove_dir_if_exists(LATE_MODS_DIR)?;
-        Self::remove_dir_if_exists(EARLY_MODS_DIR)?;
-        Self::remove_dir_if_exists(LIBS_DIR)?;
+        Self::remove_dir_if_exists(paths::OLD_QMODS)?;
+        Self::remove_dir_if_exists(paths::LATE_MODS)?;
+        Self::remove_dir_if_exists(paths::EARLY_MODS)?;
+        Self::remove_dir_if_exists(paths::LIBS)?;
         Self::remove_dir_if_exists(&self.qmods_dir)?;
         self.create_mods_dir()?; // Make sure the mods directories exist afterwards
         Ok(())
@@ -111,13 +111,13 @@ impl<'cache> ModManager<'cache> {
     /// and the Packages directory that stores the extracted QMODs for the current game version.
     fn create_mods_dir(&self) -> Result<()> {
         std::fs::create_dir_all(&self.qmods_dir)?;
-        std::fs::create_dir_all(LATE_MODS_DIR)?;
-        std::fs::create_dir_all(EARLY_MODS_DIR)?;
-        std::fs::create_dir_all(LIBS_DIR)?;
+        std::fs::create_dir_all(paths::LATE_MODS)?;
+        std::fs::create_dir_all(paths::EARLY_MODS)?;
+        std::fs::create_dir_all(paths::LIBS)?;
         OpenOptions::new()
             .create(true)
             .write(true)
-            .open(NOMEDIA_PATH).context("Creating nomedia file")?;
+            .open(paths::MODDATA_NOMEDIA).context("Creating nomedia file")?;
     
         Ok(())
     }
@@ -178,13 +178,13 @@ impl<'cache> ModManager<'cache> {
     /// Will do nothing if the old mods directory does not exist.
     /// Returns true if any old QMODs were found
     fn load_old_qmods(&mut self) -> Result<bool> {
-        if !Path::new(OLD_QMODS_DIR).exists() {
+        if !Path::new(paths::OLD_QMODS).exists() {
             return Ok(false);
         }
 
         warn!("Migrating mods from legacy folder");
         let mut found_qmod = false;
-        for stat_result in std::fs::read_dir(OLD_QMODS_DIR)
+        for stat_result in std::fs::read_dir(paths::OLD_QMODS)
             .context("Reading old QMODs directory")? {
             let stat = stat_result?;
 
@@ -202,7 +202,7 @@ impl<'cache> ModManager<'cache> {
             found_qmod = true;
             std::fs::remove_file(stat.path()).context("Deleting legacy mod")?;
         }
-        std::fs::remove_dir(OLD_QMODS_DIR)?;
+        std::fs::remove_dir(paths::OLD_QMODS)?;
 
         Ok(found_qmod)
     }
@@ -341,9 +341,9 @@ impl<'cache> ModManager<'cache> {
     /// file copies, mod, late_mod and lib files in their expected destinations,
     /// .. and updates this in the Mod structure.
     fn check_if_mod_files_exist(manifest: &ModInfo) -> Result<bool> {
-        Ok(files_exist_in_dir(EARLY_MODS_DIR, manifest.mod_files.iter())?
-            && files_exist_in_dir(LATE_MODS_DIR, manifest.late_mod_files.iter())?
-            && files_exist_in_dir(LIBS_DIR, manifest.library_files.iter())?
+        Ok(files_exist_in_dir(paths::EARLY_MODS, manifest.mod_files.iter())?
+            && files_exist_in_dir(paths::LATE_MODS, manifest.late_mod_files.iter())?
+            && files_exist_in_dir(paths::LIBS, manifest.library_files.iter())?
             && manifest.file_copies.iter().map(|copy| &copy.destination)
                 .all(|dest| Path::new(dest).exists()))
     }
@@ -392,9 +392,9 @@ impl<'cache> ModManager<'cache> {
     /// Installs a mod without handling dependencies
     /// i.e. just copies the necessary files.
     fn install_unchecked(&self, to_install: &mut Mod) -> Result<()> {
-        copy_stated_files(&to_install.loaded_from, &to_install.manifest.mod_files, EARLY_MODS_DIR)?;
-        copy_stated_files(&to_install.loaded_from, &to_install.manifest.library_files, LIBS_DIR)?;
-        copy_stated_files(&to_install.loaded_from, &to_install.manifest.late_mod_files, LATE_MODS_DIR)?;
+        copy_stated_files(&to_install.loaded_from, &to_install.manifest.mod_files, paths::EARLY_MODS)?;
+        copy_stated_files(&to_install.loaded_from, &to_install.manifest.library_files, paths::LIBS)?;
+        copy_stated_files(&to_install.loaded_from, &to_install.manifest.late_mod_files, paths::LATE_MODS)?;
 
         for file_copy in &to_install.manifest.file_copies {
             let file_path_in_mod = to_install.loaded_from.join(&file_copy.name);
@@ -451,10 +451,10 @@ impl<'cache> ModManager<'cache> {
         }
 
         let mut to_remove = (**self.mods.get(id).unwrap()).borrow_mut();
-        delete_file_names(&to_remove.manifest.mod_files, HashSet::new(), EARLY_MODS_DIR)?;
-        delete_file_names(&to_remove.manifest.late_mod_files, HashSet::new(), LATE_MODS_DIR)?;
+        delete_file_names(&to_remove.manifest.mod_files, HashSet::new(), paths::EARLY_MODS)?;
+        delete_file_names(&to_remove.manifest.late_mod_files, HashSet::new(), paths::LATE_MODS)?;
         // Only delete libraries not in use (!)
-        delete_file_names(&to_remove.manifest.library_files, retained_libs, LIBS_DIR)?;
+        delete_file_names(&to_remove.manifest.library_files, retained_libs, paths::LIBS)?;
         
         for copy in &to_remove.manifest.file_copies {
             let dest_path = Path::new(&copy.destination);

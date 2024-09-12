@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use crate::{data_fix, mod_man::ModManager, patching, requests::Response};
+use crate::{data_fix, mod_man::ModManager, patching, paths, requests::Response};
 use anyhow::{Context, Result, anyhow};
 use log::{debug, info, warn};
 
@@ -39,21 +39,21 @@ pub(super) fn handle_fix_player_data() -> Result<Response> {
     patching::kill_app()?; // Kill app, in case it's still stuck in a hanging state
 
     let mut did_work = false;
-    if Path::new(crate::DATAKEEPER_PATH).exists() {
+    if Path::new(paths::DATAKEEPER_PLAYER_DATA).exists() {
         info!("Fixing color scheme issues");
-        data_fix::fix_colour_schemes(crate::DATAKEEPER_PATH)?;
+        data_fix::fix_colour_schemes(paths::DATAKEEPER_PLAYER_DATA)?;
         did_work = true;
     }
     
-    if Path::new(crate::PLAYER_DATA_PATH).exists() {
+    if Path::new(paths::PLAYER_DATA).exists() {
         info!("Backing up player data");
         patching::backup_player_data()?;
 
         info!("Removing (potentially faulty) PlayerData.dat in game files");
-        debug!("(removing {})", crate::PLAYER_DATA_PATH);
-        std::fs::remove_file(crate::PLAYER_DATA_PATH).context("Deleting faulty player data")?;
-        if Path::new(crate::PLAYER_DATA_BAK_PATH).exists() {
-            std::fs::remove_file(crate::PLAYER_DATA_BAK_PATH)?;
+        debug!("(removing {})", paths::PLAYER_DATA);
+        std::fs::remove_file(paths::PLAYER_DATA).context("Deleting faulty player data")?;
+        if Path::new(paths::PLAYER_DATA_BAK).exists() {
+            std::fs::remove_file(paths::PLAYER_DATA_BAK)?;
         }
         did_work = true;
     }   else {

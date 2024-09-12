@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use crate::{downloads, mod_man::ModManager, requests::{self, ImportResultType, Response}};
+use crate::{downloads, mod_man::ModManager, paths, requests::{self, ImportResultType, Response}};
 use anyhow::{Context, Result, anyhow};
 use log::{debug, info, warn};
 use mbf_zip::ZipFile;
@@ -10,8 +10,8 @@ use mbf_zip::ZipFile;
 /// # Returns
 /// The [Response](requests::Response) to the request (variant `ImportResult`)
 pub(super) fn handle_import_mod_url(from_url: String) -> Result<Response> {
-    std::fs::create_dir_all(crate::DOWNLOADS_PATH)?;
-    let download_path = Path::new(crate::DOWNLOADS_PATH).join("import_from_url");
+    std::fs::create_dir_all(paths::MBF_DOWNLOADS)?;
+    let download_path = Path::new(paths::MBF_DOWNLOADS).join("import_from_url");
 
     info!("Downloading {}", from_url);
     let filename: Option<String> = downloads::download_file_with_attempts(&crate::get_dl_cfg(), &download_path, &from_url)?;
@@ -161,7 +161,7 @@ fn attempt_song_import(from_path: PathBuf) -> Result<ImportResultType> {
     let mut zip = ZipFile::open(song_handle).context("Song was invalid ZIP file")?;
 
     if zip.contains_file("info.dat") || zip.contains_file("Info.dat") {
-        let extract_path = Path::new(crate::SONGS_PATH).join(from_path.file_stem().expect("Must have file stem"));
+        let extract_path = Path::new(paths::CUSTOM_LEVELS).join(from_path.file_stem().expect("Must have file stem"));
 
         if extract_path.exists() {
             std::fs::remove_dir_all(&extract_path).context("Deleting existing song")?;
