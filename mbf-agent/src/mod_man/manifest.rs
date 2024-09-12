@@ -76,7 +76,7 @@ impl Default for ModInfo {
             file_copies: Default::default(),
             copy_extensions: Default::default(),
             modloader: Some("Scotland2".into()),
-            late_mod_files: Default::default()
+            late_mod_files: Default::default(),
         }
     }
 }

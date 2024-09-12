@@ -3,15 +3,23 @@
 use std::{fs::File, io::Cursor};
 
 use log::{error, info, warn};
-use mbf_res_man::{models::{CoreMod, VersionDiffs}, res_cache::{self, ResCache}};
+use mbf_res_man::{
+    models::{CoreMod, VersionDiffs},
+    res_cache::{self, ResCache},
+};
 use mbf_zip::ZipFile;
 
-use crate::{axml::{self, AxmlReader}, manifest::ManifestInfo, mod_man::ModManager, patching, requests::{self, CoreModsInfo, Response}};
-use anyhow::{Result, Context};
-
+use crate::{
+    axml::{self, AxmlReader},
+    manifest::ManifestInfo,
+    mod_man::ModManager,
+    patching,
+    requests::{self, CoreModsInfo, Response},
+};
+use anyhow::{Context, Result};
 
 /// Handles `GetModStatus` [Requests](requests::Request).
-/// 
+///
 /// # Returns
 /// The [Response](requests::Response) to the request (variant `ModStatus`)
 pub(super) fn handle_get_mod_status(override_core_mod_url: Option<String>) -> Result<Response> {
@@ -26,30 +34,36 @@ pub(super) fn handle_get_mod_status(override_core_mod_url: Option<String>) -> Re
             info!("Loading installed mods");
             let mut mod_manager = ModManager::new(app_info.version.clone(), &res_cache);
             mod_manager.load_mods().context("Loading installed mods")?;
-            
+
             (
-                get_core_mods_info(&app_info.version, &mod_manager, override_core_mod_url, &res_cache, app_info.loader_installed.is_some())?,
-                super::mod_management::get_mod_models(mod_manager)?
+                get_core_mods_info(
+                    &app_info.version,
+                    &mod_manager,
+                    override_core_mod_url,
+                    &res_cache,
+                    app_info.loader_installed.is_some(),
+                )?,
+                super::mod_management::get_mod_models(mod_manager)?,
             )
-        },
+        }
         None => {
             warn!("Beat Saber is not installed!");
             (None, Vec::new())
         }
     };
 
-    Ok(Response::ModStatus { 
+    Ok(Response::ModStatus {
         app_info,
         core_mods,
         modloader_install_status: patching::get_modloader_status()?,
-        installed_mods
+        installed_mods,
     })
 }
 
 pub(super) fn get_app_info() -> Result<Option<requests::AppInfo>> {
     let apk_path = match crate::get_apk_path().context("Finding APK path")? {
         Some(path) => path,
-        None => return Ok(None)
+        None => return Ok(None),
     };
 
     let apk_reader = std::fs::File::open(&apk_path)?;
@@ -64,20 +78,24 @@ pub(super) fn get_app_info() -> Result<Option<requests::AppInfo>> {
         version: manifest_info.package_version,
         obb_present,
         path: apk_path,
-        manifest_xml
-    }))    
+        manifest_xml,
+    }))
 }
 
 fn get_manifest_info_and_xml(apk: &mut ZipFile<File>) -> Result<(ManifestInfo, String)> {
-    let manifest = apk.read_file("AndroidManifest.xml").context("Reading manifest file from APK")?;
+    let manifest = apk
+        .read_file("AndroidManifest.xml")
+        .context("Reading manifest file from APK")?;
 
     // Decode various important information from the manifest
     let mut manifest_reader = Cursor::new(&manifest);
     let mut axml_reader = AxmlReader::new(&mut manifest_reader)?;
-    let manifest_info = ManifestInfo::read(&mut axml_reader).context("Parsing manifest from AXML")?;
+    let manifest_info =
+        ManifestInfo::read(&mut axml_reader).context("Parsing manifest from AXML")?;
 
     // Re-read the manifest as a full XML document.
-    let xml_str = axml_bytes_to_xml_string(&manifest).context("Converting manifest to readable XML")?;
+    let xml_str =
+        axml_bytes_to_xml_string(&manifest).context("Converting manifest to readable XML")?;
 
     Ok((manifest_info, xml_str))
 }
@@ -94,37 +112,49 @@ pub(super) fn axml_bytes_to_xml_string(bytes: &[u8]) -> Result<String> {
 
     axml::axml_to_xml(&mut xml_writer, &mut axml_reader).context("Converting AXML to XML")?;
 
-    Ok(String::from_utf8(xml_output)
-        .expect("XML output should be valid UTF-8"))
+    Ok(String::from_utf8(xml_output).expect("XML output should be valid UTF-8"))
 }
 
-fn get_core_mods_info(apk_version: &str, mod_manager: &ModManager, override_core_mod_url: Option<String>,
-    res_cache: &ResCache, is_patched: bool) -> Result<Option<CoreModsInfo>> {
+fn get_core_mods_info(
+    apk_version: &str,
+    mod_manager: &ModManager,
+    override_core_mod_url: Option<String>,
+    res_cache: &ResCache,
+    is_patched: bool,
+) -> Result<Option<CoreModsInfo>> {
     // Fetch the core mods from the resources repo
     info!("Fetching core mod index");
-    let core_mods = match mbf_res_man::external_res::fetch_core_mods(
-        res_cache, override_core_mod_url) {
-        Ok(mods) => mods,
-        Err(res_cache::JsonPullError::FetchError(fetch_err)) => {
-            error!("Failed to fetch core mod index: assuming no internet connection: {fetch_err:?}");
-            return Ok(None);
-        },
-        Err(res_cache::JsonPullError::ParseError(err)) => return Err(err.into())
-    };
+    let core_mods =
+        match mbf_res_man::external_res::fetch_core_mods(res_cache, override_core_mod_url) {
+            Ok(mods) => mods,
+            Err(res_cache::JsonPullError::FetchError(fetch_err)) => {
+                error!(
+                "Failed to fetch core mod index: assuming no internet connection: {fetch_err:?}"
+            );
+                return Ok(None);
+            }
+            Err(res_cache::JsonPullError::ParseError(err)) => return Err(err.into()),
+        };
 
     // Check that all core mods are installed with an appropriate version
     let all_core_mods_installed = match core_mods.get(apk_version) {
         Some(core_mods) => get_core_mods_install_status(&core_mods.mods, mod_manager),
-        None => requests::InstallStatus::Missing
+        None => requests::InstallStatus::Missing,
     };
 
-    let supported_versions: Vec<String> = core_mods.into_keys().filter(|version| {
-        let mut iter = version.split('.');
-        let _major = iter.next().unwrap();
-        let minor = iter.next().unwrap();
+    let supported_versions: Vec<String> = core_mods
+        .into_keys()
+        .filter(|version| {
+            let mut iter = version.split('.');
+            let _major = iter.next().unwrap();
+            let minor = iter.next().unwrap();
 
-        minor.parse::<i64>().expect("Invalid version in core mod index") >= 35
-    }).collect();
+            minor
+                .parse::<i64>()
+                .expect("Invalid version in core mod index")
+                >= 35
+        })
+        .collect();
     let is_version_supported = supported_versions.iter().any(|ver| ver == apk_version);
 
     // If the app is patched and not vanilla, then it's not possible to downgrade it even if a diff is available for the corresponding vanilla APK
@@ -134,22 +164,26 @@ fn get_core_mods_info(apk_version: &str, mod_manager: &ModManager, override_core
         // While technically newer_than_latest_diff is true, our app is patched already so we couldn't downgrade it
         // even if there was a diff available.
         (Vec::new(), false)
-    }   else    {
+    } else {
         let diff_index = mbf_res_man::external_res::get_diff_index(res_cache)
-        .context("Fetching downgrading information")?;
+            .context("Fetching downgrading information")?;
 
         let newer_than_latest = is_version_newer_than_latest_diff(apk_version, &diff_index);
-        (diff_index.into_iter()
-            .filter(|diff| diff.from_version == apk_version)
-            .map(|diff| diff.to_version)
-            .collect(), newer_than_latest)
+        (
+            diff_index
+                .into_iter()
+                .filter(|diff| diff.from_version == apk_version)
+                .map(|diff| diff.to_version)
+                .collect(),
+            newer_than_latest,
+        )
     };
 
     Ok(Some(CoreModsInfo {
         supported_versions,
         core_mod_install_status: all_core_mods_installed,
         downgrade_versions,
-        is_awaiting_diff: newer_than_latest_diff && !is_version_supported
+        is_awaiting_diff: newer_than_latest_diff && !is_version_supported,
     }))
 }
 
@@ -169,9 +203,11 @@ fn is_version_newer_than_latest_diff(apk_version: &str, diffs: &[VersionDiffs]) 
     // Iterate through the diffs to check if the APK version is at or below their version
     for diff in diffs {
         match try_parse_bs_ver_as_semver(&diff.from_version) {
-            Some(diff_version) => if sem_apk_ver <= diff_version {
-                return false; // If it is, then this is not an "awaiting diff" situation
-            },
+            Some(diff_version) => {
+                if sem_apk_ver <= diff_version {
+                    return false; // If it is, then this is not an "awaiting diff" situation
+                }
+            }
             None => {}
         }
     }
@@ -182,15 +218,21 @@ fn is_version_newer_than_latest_diff(apk_version: &str, diffs: &[VersionDiffs]) 
 }
 
 fn try_parse_bs_ver_as_semver(version: &str) -> Option<semver::Version> {
-    let version_segment = version.split('_').next().expect("Split iterator always returns at least one string");
+    let version_segment = version
+        .split('_')
+        .next()
+        .expect("Split iterator always returns at least one string");
     semver::Version::parse(version_segment).ok()
 }
 
 // Checks whether all the core mods in the provided slice are present within the mod manager given.
 // Will give InstallStatus::Ready if all core mods are installed and up to date,
-// InstallStatus::NeedUpdate if any core mods are out of date but all are installed, and InstallStatus::Missing if any 
+// InstallStatus::NeedUpdate if any core mods are out of date but all are installed, and InstallStatus::Missing if any
 // of the core mods are not installed or not even present.
-fn get_core_mods_install_status(core_mods: &[CoreMod], mod_man: &ModManager) -> requests::InstallStatus {
+fn get_core_mods_install_status(
+    core_mods: &[CoreMod],
+    mod_man: &ModManager,
+) -> requests::InstallStatus {
     info!("Checking if core mods installed and up to date");
     mark_all_core_mods(mod_man, core_mods);
 
@@ -206,20 +248,25 @@ fn get_core_mods_install_status(core_mods: &[CoreMod], mod_man: &ModManager) -> 
                 if !mod_ref.installed() {
                     warn!("Core mod {} was present (ver {}) but is not installed: needs to be installed", core_mod.id, mod_ref.manifest().version);
                     missing_core_mods = true;
-                }   else if mod_ref.manifest().version < core_mod.version {
-                    warn!("Core mod {} is outdated, latest version: {}, installed version: {}", core_mod.id, core_mod.version, mod_ref.manifest().version);
+                } else if mod_ref.manifest().version < core_mod.version {
+                    warn!(
+                        "Core mod {} is outdated, latest version: {}, installed version: {}",
+                        core_mod.id,
+                        core_mod.version,
+                        mod_ref.manifest().version
+                    );
                     outdated_core_mods = true;
                 }
-            },
-            None => missing_core_mods = true
+            }
+            None => missing_core_mods = true,
         }
     }
 
     if missing_core_mods {
         requests::InstallStatus::Missing
-    }   else if outdated_core_mods {
+    } else if outdated_core_mods {
         requests::InstallStatus::NeedUpdate
-    }   else {
+    } else {
         requests::InstallStatus::Ready
     }
 }

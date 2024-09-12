@@ -4,10 +4,14 @@
 //! - Give a basic response saying that it has killed the ADB server.
 //! - Wait a second
 //! - Restart the ADB server.
-//! 
+//!
 //! This is used by the MBF site (in development mode only) to avoid a developer having to manually kill the ADB server whenever they want to use MBF.
 
-use std::{io::{BufRead, BufReader, BufWriter, Write}, net::TcpListener, process::Command};
+use std::{
+    io::{BufRead, BufReader, BufWriter, Write},
+    net::TcpListener,
+    process::Command,
+};
 
 use anyhow::{Context, Result};
 

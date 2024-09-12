@@ -1,14 +1,14 @@
 //! Module to parse and save the Android binary XML format
 //! Used for modifying the APK manifest
 
-mod reader;
-mod writer;
-mod res_ids;
 mod axml2xml;
+mod reader;
+mod res_ids;
+mod writer;
 
 pub use reader::AxmlReader;
-pub use writer::AxmlWriter;
 pub use res_ids::ResourceIds;
+pub use writer::AxmlWriter;
 const UTF8_FLAG: u32 = 0x00000100;
 pub const ANDROID_NS_URI: &str = "http://schemas.android.com/apk/res/android";
 pub use axml2xml::{axml_to_xml, xml_to_axml};
@@ -19,7 +19,7 @@ pub enum Event {
     /// An event that this implementation does not parse/understand, typically CData
     Unknown {
         contents: Vec<u8>,
-        res_type: u32
+        res_type: u32,
     },
     StartNamespace(Namespace),
     EndNamespace(Namespace),
@@ -32,14 +32,14 @@ pub enum Event {
     EndElement {
         line_num: u32,
         namespace: Option<String>,
-        name: String
-    }
+        name: String,
+    },
 }
 
 #[derive(Debug, Clone)]
 pub struct Namespace {
     pub prefix: Option<String>,
-    pub uri: String
+    pub uri: String,
 }
 
 #[derive(Debug, Clone)]
@@ -47,7 +47,7 @@ pub struct Attribute {
     pub name: String,
     pub namespace: Option<String>,
     pub resource_id: Option<u32>,
-    pub value: AttributeValue
+    pub value: AttributeValue,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -55,7 +55,7 @@ pub enum AttributeValue {
     String(String),
     Boolean(bool),
     Integer(i32),
-    Reference(u32) // Reference ID
+    Reference(u32), // Reference ID
 }
 
 #[derive(Copy, Clone, PartialEq, Debug)]
@@ -66,7 +66,7 @@ enum ChunkType {
     XmlStartNamespace,
     XmlEndNamespace,
     XmlStartElement,
-    XmlEndElement
+    XmlEndElement,
 }
 
 impl ChunkType {
@@ -79,7 +79,7 @@ impl ChunkType {
             0x0100 => Some(Self::XmlStartNamespace),
             0x0101 => Some(Self::XmlEndNamespace),
             0x0102 => Some(Self::XmlStartElement),
-            _ => None
+            _ => None,
         }
     }
 
@@ -87,7 +87,7 @@ impl ChunkType {
         let prefix = match self {
             ChunkType::StringPool => 0x001C,
             ChunkType::XmlResourceMap | ChunkType::Xml => 0x0008,
-            _ => 0x0010
+            _ => 0x0010,
         };
 
         let id = match self {
@@ -110,7 +110,7 @@ enum AttributeTypeId {
     Boolean,
     Hex,
     Reference,
-    String
+    String,
 }
 
 impl AttributeTypeId {
@@ -121,7 +121,7 @@ impl AttributeTypeId {
             0x11 => Some(Self::Hex),
             0x01 => Some(Self::Reference),
             0x03 => Some(Self::String),
-            _ => None
+            _ => None,
         }
     }
 
@@ -131,7 +131,7 @@ impl AttributeTypeId {
             Self::Boolean => 0x12,
             Self::Hex => 0x11,
             Self::Reference => 0x01,
-            Self::String => 0x03
+            Self::String => 0x03,
         };
 
         (basic_type << 24) | 0x000008

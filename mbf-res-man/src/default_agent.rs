@@ -1,5 +1,5 @@
-use std::time::Duration;
 use std::sync::OnceLock;
+use std::time::Duration;
 
 // If no data is read for this period of time during a file download, the download will be failed.
 const REQUEST_TIMEOUT_READ_SECS: u64 = 20;

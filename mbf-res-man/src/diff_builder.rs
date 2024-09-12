@@ -1,9 +1,12 @@
-
-use std::{fs::OpenOptions, io::{BufReader, BufWriter, Read}, path::Path};
-use crc::{Algorithm, Crc};
-use log::info;
 use crate::models::Diff;
 use anyhow::Result;
+use crc::{Algorithm, Crc};
+use log::info;
+use std::{
+    fs::OpenOptions,
+    io::{BufReader, BufWriter, Read},
+    path::Path,
+};
 
 // Reads the contents of a file as a Vec.
 fn read_to_vec(path: impl AsRef<Path>) -> Result<Vec<u8>> {
@@ -28,7 +31,8 @@ fn get_file_name(path: impl AsRef<Path>) -> String {
 pub fn generate_diff(
     from_file: impl AsRef<Path>,
     to_file: impl AsRef<Path>,
-    output_path: impl AsRef<Path>) -> Result<Diff> {
+    output_path: impl AsRef<Path>,
+) -> Result<Diff> {
     let from_bytes = read_to_vec(&from_file)?;
     let to_bytes = read_to_vec(&to_file)?;
 
@@ -37,11 +41,13 @@ pub fn generate_diff(
     let to_crc = mbf_zip::crc_bytes(&to_bytes);
 
     info!("Generating diff (this may take several minutes)");
-    let mut output = BufWriter::new(OpenOptions::new()
-        .create(true)
-        .truncate(true)
-        .write(true)
-        .open(&output_path)?);
+    let mut output = BufWriter::new(
+        OpenOptions::new()
+            .create(true)
+            .truncate(true)
+            .write(true)
+            .open(&output_path)?,
+    );
 
     let _diff_bytes = qbsdiff::Bsdiff::new(&from_bytes, &to_bytes)
         .compression_level(6)

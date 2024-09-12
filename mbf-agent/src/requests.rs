@@ -12,9 +12,8 @@ pub struct AppInfo {
     #[serde(skip_serializing)]
     pub path: String,
     pub version: String,
-    pub manifest_xml: String
+    pub manifest_xml: String,
 }
-
 
 #[derive(Deserialize)]
 #[serde(tag = "type")]
@@ -28,30 +27,29 @@ pub enum Request {
     GetModStatus {
         // If not null, this specifies a core mod JSON to use instead of the default core mods source.
         // This is useful for developers testing a core mod update.
-        override_core_mod_url: Option<String>
+        override_core_mod_url: Option<String>,
     },
     /// Installs or uninstalls any number of mods.
     /// This will also attempt to download and install dependencies, upgrade dependencies and will uninstall any
     /// depending mods of mods that have been disabled.
-    /// 
+    ///
     /// Returns a `ModSyncResult` response.
     SetModsEnabled {
-        statuses: HashMap<String, bool>
+        statuses: HashMap<String, bool>,
     },
-    
-    // TODO: Make these lists to allow importing multiple mods at once?
 
+    // TODO: Make these lists to allow importing multiple mods at once?
     /// Removes the mod with the given ID, which will uninstall dependant mods.
     /// Returns a Mods message containing the mods now installed.
     RemoveMod {
-        id: String
+        id: String,
     },
     /// Imports a mod or file copy from the given path on the quest.
     /// Returns an ImportedMod message containing the mods now installed, and the ID of the one that was imported, if importing a mod.
     /// Returns an ImportedFileCopy message if the file type was copied by a mod copy extension.
     /// Returns an ImportedSong message if the file type was copied to the songs folder.
     Import {
-        from_path: String
+        from_path: String,
     },
     /// Downloads the file from the given URL and then attempts to import it.
     /// Returns an ImportResult message.
@@ -77,14 +75,14 @@ pub enum Request {
         // If this is true, patching will skip adding the modloader and libunity.so and will ONLY change permissions.
         // Patching will also not attempt to reinstall core mods.
         //
-        // TODO: in the future, it might make sense for remodding to detect a change in the libunity.so (harder) 
+        // TODO: in the future, it might make sense for remodding to detect a change in the libunity.so (harder)
         // or libmainloader (easier) so that these can be easily updated.
         remodding: bool,
         // If this is true, patching will not be failed if core mods cannot be found for the version.
         allow_no_core_mods: bool,
         // If not null, this specifies a core mod JSON to use instead of the default core mods source.
         // This is useful for developers testing a core mod update.
-        override_core_mod_url: Option<String>
+        override_core_mod_url: Option<String>,
     },
 
     // Attempts to fix a blackscreen issue by removing PlayerData.dat from `/sdcard/...../files/`.
@@ -95,7 +93,7 @@ pub enum Request {
     FixPlayerData,
     /// Gets a copy of the AndroidManifest.xml for the given Beat Saber version, converted from AXML into an XML string.
     GetDowngradedManifest {
-        version: String
+        version: String,
     },
     /// Reinstalls any core mods that are misssing/out of date and overwrites the modloader in case it is corrupt.
     /// Should fix most issues with any installation.
@@ -105,7 +103,7 @@ pub enum Request {
         // This is useful for developers testing a core mod update.
         override_core_mod_url: Option<String>,
         // If true, this request will delete ALL mods before reinstalling only the core mods.
-        wipe_existing_mods: bool
+        wipe_existing_mods: bool,
     },
 }
 
@@ -115,11 +113,11 @@ pub struct CoreModsInfo {
     pub supported_versions: Vec<String>,
     /// The versions of Beat Saber that can be reached by downgrading the game.
     pub downgrade_versions: Vec<String>,
-    /// True only if the Beat Saber version does not support mods, and the latest diff available in the diff index 
+    /// True only if the Beat Saber version does not support mods, and the latest diff available in the diff index
     /// is intended to start with a Beat Saber version older than the current version.
     /// In these circumstances, the user needs to wait for a diff to be generated.
     pub is_awaiting_diff: bool,
-    pub core_mod_install_status: InstallStatus
+    pub core_mod_install_status: InstallStatus,
 }
 
 /// An enum that represents whether a particular piece of the modded game is:
@@ -130,7 +128,7 @@ pub enum InstallStatus {
     /// Installed but not up to date
     NeedUpdate,
     /// Not installed
-    Missing
+    Missing,
 }
 
 #[derive(Serialize)]
@@ -139,14 +137,14 @@ pub enum LogLevel {
     Warn,
     Info,
     Debug,
-    Trace
+    Trace,
 }
 
 #[derive(Serialize)]
 pub enum ModLoader {
     Scotland2,
     QuestLoader,
-    Unknown
+    Unknown,
 }
 
 #[derive(Serialize)]
@@ -155,7 +153,7 @@ pub enum Response {
     ModStatus {
         // None if Beat Saber is not installed.
         app_info: Option<AppInfo>,
-        
+
         // All mods currently found in the mods folder
         installed_mods: Vec<ModModel>,
 
@@ -163,39 +161,39 @@ pub enum Response {
         // None if an internet connection could not be established.
         core_mods: Option<CoreModsInfo>,
 
-        modloader_install_status: InstallStatus
+        modloader_install_status: InstallStatus,
     },
     Mods {
-        installed_mods: Vec<ModModel>
+        installed_mods: Vec<ModModel>,
     },
     ModSyncResult {
         // The new state of the installed mods after the operation
         installed_mods: Vec<ModModel>,
         // If any of the mods failed to install/uninstall, this will be Some with a string
         // containing a list of the errors generated.
-        failures: Option<String>
+        failures: Option<String>,
     },
     Patched {
         installed_mods: Vec<ModModel>,
-        did_remove_dlc: bool
+        did_remove_dlc: bool,
     },
     ImportResult {
         result: ImportResultType, // The result of importing the file.
-        used_filename: String // The filename that was actually used to determine how to import the mod.
+        used_filename: String, // The filename that was actually used to determine how to import the mod.
     },
     // Sent to relay progress information during the modding process.
     // This will NOT be the final message sent.
     LogMsg {
         message: String,
-        level: LogLevel
+        level: LogLevel,
     },
     FixedPlayerData {
         // True if a PlayerData.dat existed to fix, false if the request did nothing.
-        existed: bool
+        existed: bool,
     },
     DowngradedManifest {
-        manifest_xml: String
-    }
+        manifest_xml: String,
+    },
 }
 
 /// What type of file a file was imported as, and details about the resulting file.
@@ -204,17 +202,17 @@ pub enum Response {
 pub enum ImportResultType {
     ImportedMod {
         installed_mods: Vec<ModModel>,
-        imported_id: String  
+        imported_id: String,
     },
     ImportedFileCopy {
         // The full path where the file was copied to.
         copied_to: String,
         // The mod ID that the file copy belonged to
-        mod_id: String
+        mod_id: String,
     },
     ImportedSong,
     // A non-quest mod was detected (i.e. `.DLL`) and so the import failed.
-    NonQuestModDetected
+    NonQuestModDetected,
 }
 
 /// The trimmed version of the ModInfo type that is sent to the web client.
@@ -227,7 +225,7 @@ pub struct ModModel {
     pub description: Option<String>,
     pub is_enabled: bool,
     // True if the mod is core or if it is a required dependency of another core mod (potentially indirectly.)
-    pub is_core: bool
+    pub is_core: bool,
 }
 
 impl From<&Mod> for ModModel {
@@ -239,7 +237,7 @@ impl From<&Mod> for ModModel {
             game_version: value.manifest().package_version.clone(),
             description: value.manifest().description.clone(),
             is_enabled: value.installed(),
-            is_core: value.is_core()
+            is_core: value.is_core(),
         }
     }
 }

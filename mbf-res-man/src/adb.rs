@@ -1,8 +1,12 @@
 //! Utilities for interacting with the Android Debug Bridge in order to pull versions of Beat Saber from the Quest.
 
-use std::{ffi::OsStr, path::Path, process::{Command, Output}};
+use std::{
+    ffi::OsStr,
+    path::Path,
+    process::{Command, Output},
+};
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{anyhow, Context, Result};
 
 #[cfg(windows)]
 const ADB_EXE_PATH: &str = "adb.exe";
@@ -13,12 +17,14 @@ const ADB_EXE_PATH: &str = "adb";
 fn invoke_adb(args: impl IntoIterator<Item = impl AsRef<OsStr>>) -> Result<Output> {
     let output = Command::new(ADB_EXE_PATH)
         .args(args)
-        .output().context("Invoking ADB executable")?;
+        .output()
+        .context("Invoking ADB executable")?;
 
     if output.status.success() {
         Ok(output)
-    }   else {
-        Err(anyhow!("Invoked ADB and got non-zero exit code. stderr: {}, stdout: {}",
+    } else {
+        Err(anyhow!(
+            "Invoked ADB and got non-zero exit code. stderr: {}, stdout: {}",
             String::from_utf8_lossy(&output.stderr),
             String::from_utf8_lossy(&output.stdout),
         ))
@@ -32,15 +38,15 @@ fn get_trimmed_string(from: Vec<u8>) -> String {
 // Gets the version name of the app with the given package ID installed on the quest.
 // Returns None if the app is not installed.
 pub fn get_package_version(package_id: &str) -> Result<Option<String>> {
-    let output = invoke_adb(&["shell", "dumpsys", "package", package_id])
-        .context("Running dumpsys")?;
+    let output =
+        invoke_adb(&["shell", "dumpsys", "package", package_id]).context("Running dumpsys")?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
 
     // Locate the version within the dumpsys output
     let version_idx = match stdout.find("versionName=") {
         Some(location) => location,
-        None => return Ok(None) // Not installed
+        None => return Ok(None), // Not installed
     };
 
     // Find the next new line at the end of the version name
@@ -48,13 +54,15 @@ pub fn get_package_version(package_id: &str) -> Result<Option<String>> {
     let next_newline = stdout[version_idx..].find('\n').unwrap_or(stdout.len()) + version_idx;
 
     // Trim to remove carriage return (`\r`)
-    Ok(Some(stdout[(version_idx + 12)..next_newline].trim().to_string()))
+    Ok(Some(
+        stdout[(version_idx + 12)..next_newline].trim().to_string(),
+    ))
 }
 
 // Downloads the APK for the app with the specified package ID to the specified location
 pub fn download_apk(package_id: &str, to: &str) -> Result<()> {
-    let path_output = invoke_adb(&["shell", "pm", "path", package_id])
-        .context("Getting package location")?;
+    let path_output =
+        invoke_adb(&["shell", "pm", "path", package_id]).context("Getting package location")?;
 
     let app_path = get_trimmed_string(path_output.stdout)[8..].to_string();
 
@@ -74,7 +82,7 @@ pub fn download_obbs(package_id: &str, to_folder: &Path) -> Result<()> {
 
         invoke_adb(&["pull", &obb_path, &obb_save_path]).context("Downloading OBB")?;
     }
-    
+
     Ok(())
 }
 

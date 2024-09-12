@@ -3,12 +3,15 @@
 
 use std::collections::HashMap;
 
-use crate::{mod_man::ModManager, requests::{ModModel, Response}};
-use anyhow::{Result, Context};
+use crate::{
+    mod_man::ModManager,
+    requests::{ModModel, Response},
+};
+use anyhow::{Context, Result};
 use log::info;
 
 /// Handles `SetModsEnabled` [Requests](crate::requests::Request).
-/// 
+///
 /// # Returns
 /// The [Response] to the request (variant `ModSyncResult`)
 pub(super) fn handle_set_mods_enabled(statuses: HashMap<String, bool>) -> Result<Response> {
@@ -32,12 +35,12 @@ pub(super) fn handle_set_mods_enabled(statuses: HashMap<String, bool>) -> Result
         if new_status && !already_installed {
             match mod_manager.install_mod(&id) {
                 Ok(_) => info!("Installed {id}"),
-                Err(err) => error.push_str(&format!("Failed to install {id}: {err}\n"))
+                Err(err) => error.push_str(&format!("Failed to install {id}: {err}\n")),
             }
-        }   else if !new_status && already_installed {
+        } else if !new_status && already_installed {
             match mod_manager.uninstall_mod(&id) {
                 Ok(_) => info!("Uninstalled {id}"),
-                Err(err) => error.push_str(&format!("Failed to install {id}: {err}\n"))
+                Err(err) => error.push_str(&format!("Failed to install {id}: {err}\n")),
             }
         }
     }
@@ -50,14 +53,14 @@ pub(super) fn handle_set_mods_enabled(statuses: HashMap<String, bool>) -> Result
             }
 
             Some(error)
-        }   else    {
+        } else {
             None
-        }
+        },
     })
 }
 
 /// Handles `RemoveMod` [Requests](crate::requests::Request).
-/// 
+///
 /// # Returns
 /// The [Response] to the request (variant `Mods`)
 pub(super) fn handle_remove_mod(id: String) -> Result<Response> {
@@ -67,7 +70,7 @@ pub(super) fn handle_remove_mod(id: String) -> Result<Response> {
     mod_manager.remove_mod(&id)?;
 
     Ok(Response::Mods {
-        installed_mods: get_mod_models(mod_manager)?
+        installed_mods: get_mod_models(mod_manager)?,
     })
 }
 
@@ -79,7 +82,8 @@ pub(super) fn get_mod_models(mut mod_manager: ModManager) -> Result<Vec<ModModel
     // Therefore, check dependencies of mods again to double-check which are really installed.
     mod_manager.check_mods_installed()?;
 
-    Ok(mod_manager.get_mods()
+    Ok(mod_manager
+        .get_mods()
         .map(|mod_info| ModModel::from(&*(**mod_info).borrow()))
         .collect())
 }

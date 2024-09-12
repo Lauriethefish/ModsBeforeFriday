@@ -1,12 +1,17 @@
-use std::{collections::HashMap, fs::File, io::{BufReader, BufWriter, Cursor, Read, Seek, SeekFrom, Write}, path::Path};
+use anyhow::{anyhow, Context, Result};
 use byteorder::{ReadBytesExt, WriteBytesExt, LE};
-use anyhow::{Result, anyhow, Context};
-use crc::{Crc, Algorithm};
+use crc::{Algorithm, Crc};
 use libflate::deflate;
 use rasn_pkix::Certificate;
 use rsa::RsaPrivateKey;
+use std::{
+    collections::HashMap,
+    fs::File,
+    io::{BufReader, BufWriter, Cursor, Read, Seek, SeekFrom, Write},
+    path::Path,
+};
 
-use self::data::{EndOfCentDir, CentDirHeader, LocalFileHeader};
+use self::data::{CentDirHeader, EndOfCentDir, LocalFileHeader};
 
 mod data;
 pub mod signing;
@@ -15,7 +20,7 @@ pub mod signing;
 pub const VERSION_NEEDED_TO_EXTRACT: u16 = 0x0002;
 
 /// The CRC-32 algorithm used by the ZIP file format.
-pub const ZIP_CRC: Crc<u32> =  Crc::<u32>::new(&Algorithm {
+pub const ZIP_CRC: Crc<u32> = Crc::<u32>::new(&Algorithm {
     width: 32,
     poly: 0x04c11db7,
     init: 0xffffffff,
@@ -35,9 +40,9 @@ pub fn crc_of_stream(mut stream: impl Read) -> Result<u32> {
     loop {
         let read_bytes = stream.read(&mut buffer)?;
         if read_bytes == 0 {
-            break Ok(crc.finalize())
+            break Ok(crc.finalize());
         }
-        
+
         crc.update(&buffer[0..read_bytes])
     }
 }
@@ -54,7 +59,7 @@ pub fn crc_bytes(bytes: &[u8]) -> u32 {
 pub enum FileCompression {
     Deflate,
     Store,
-    Unsupported(u16)
+    Unsupported(u16),
 }
 
 pub struct ZipFile<T: Read + Seek> {
@@ -65,7 +70,7 @@ pub struct ZipFile<T: Read + Seek> {
     // Alignment is preferred for non-compressed files in APKs so that they can be MMAP'd directly into
     // memory, improving performance.
     // Typically, already-compressed media files like PNG use the STORE compression method.
-    store_aligment: u16
+    store_aligment: u16,
 }
 
 impl<T: Read + Seek> ZipFile<T> {
@@ -98,7 +103,7 @@ impl<T: Read + Seek> ZipFile<T> {
 
             entries.insert(cd_record.file_name.clone(), cd_record);
         }
-        
+
         // Read the last LFH to figure out the location of the first byte after the last entry.
         // We could just use the central directory offset here, however this will leave the original signature intact,
         // ... which may not cause any problems but is a waste of space.
@@ -106,10 +111,13 @@ impl<T: Read + Seek> ZipFile<T> {
         let last_header = LocalFileHeader::read(&mut buf_file)?;
 
         Ok(Self {
-            end_of_entries_offset: (buf_file.stream_position()? + last_header.compressed_len as u64).try_into().context("ZIP file too large")?,
+            end_of_entries_offset: (buf_file.stream_position()?
+                + last_header.compressed_len as u64)
+                .try_into()
+                .context("ZIP file too large")?,
             file,
             entries,
-            store_aligment: 1
+            store_aligment: 1,
         })
     }
 
@@ -140,13 +148,16 @@ impl<T: Read + Seek> ZipFile<T> {
 
         // Create a clone of the entry names as a workaround since we need a mutable reference to self in order to extract files
         // TODO: This will use additional memory although the amount of memory used is not likely to be significant
-        let entries = self.entries.iter()
+        let entries = self
+            .entries
+            .iter()
             .map(|(key, _)| key.clone())
             .collect::<Vec<_>>();
         for entry_name in entries.iter() {
             let extract_path = to.join(entry_name);
             if let Some(parent) = extract_path.parent() {
-                std::fs::create_dir_all(parent).context("Creating directory to extract ZIP file")?;
+                std::fs::create_dir_all(parent)
+                    .context("Creating directory to extract ZIP file")?;
             }
 
             let mut handle = std::fs::OpenOptions::new()
@@ -168,20 +179,22 @@ impl<T: Read + Seek> ZipFile<T> {
     // - Reads the local file header of the entry
     // - Leaves the `reader` at the first byte of the entry content.
     // If the entry does not exist, this gives an appropriate error.
-    fn read_lfh_and_seek_to_contents(&mut self, name: &str) -> Result<(LocalFileHeader, &CentDirHeader, BufReader<&mut T>)> {
+    fn read_lfh_and_seek_to_contents(
+        &mut self,
+        name: &str,
+    ) -> Result<(LocalFileHeader, &CentDirHeader, BufReader<&mut T>)> {
         let cd_header = match self.entries.get(name) {
             Some(header) => header,
-            None => return Err(anyhow!("File with name {name} did not exist"))
+            None => return Err(anyhow!("File with name {name} did not exist")),
         };
 
         let mut buf_reader = BufReader::new(&mut self.file);
         buf_reader.seek(SeekFrom::Start(cd_header.local_header_offset as u64))?;
-        let lfh = LocalFileHeader::read(&mut buf_reader)
-            .context("Invalid local file header")?;
+        let lfh = LocalFileHeader::read(&mut buf_reader).context("Invalid local file header")?;
 
         // TODO: Verify CRC32, file name, and other attributes match?
         Ok((lfh, cd_header, buf_reader))
-    }    
+    }
 
     /// Reads the contents of entry with full name `name` and writes them to `write_to`.
     /// Gives an Err if the file does not exist (or the ZIP file header is corrupt)
@@ -189,20 +202,23 @@ impl<T: Read + Seek> ZipFile<T> {
         let (lfh, cdh, mut buf_reader) = self.read_lfh_and_seek_to_contents(name)?;
 
         // Use CDH for compressed length as LFH may have it set to 0 if this archive uses data descriptors.
-        let mut compressed_contents = (&mut buf_reader)
-            .take(cdh.compressed_len as u64);
-        
+        let mut compressed_contents = (&mut buf_reader).take(cdh.compressed_len as u64);
+
         match lfh.compression_method {
             FileCompression::Deflate => {
                 // Limit the bytes to be decompressed
                 let mut decoder = deflate::Decoder::new(compressed_contents);
 
                 std::io::copy(&mut decoder, write_to)?;
-            },
+            }
             FileCompression::Store => {
                 std::io::copy(&mut compressed_contents, write_to)?;
-            },
-            FileCompression::Unsupported(method) => return Err(anyhow!("Compression method `{method}` not supported for reading"))
+            }
+            FileCompression::Unsupported(method) => {
+                return Err(anyhow!(
+                    "Compression method `{method}` not supported for reading"
+                ))
+            }
         };
 
         Ok(())
@@ -216,10 +232,16 @@ impl<T: Read + Seek> ZipFile<T> {
         for (src_name, cd_header) in &self.entries {
             buf_reader.seek(SeekFrom::Start(cd_header.local_header_offset as u64))?;
 
-            let lfh = LocalFileHeader::read(&mut buf_reader)
-                .context("Invalid local file header")?;
+            let lfh =
+                LocalFileHeader::read(&mut buf_reader).context("Invalid local file header")?;
 
-            Self::copy_entry_internal(lfh, &cd_header, &mut buf_reader, src_name.clone(), dst_archive)?;
+            Self::copy_entry_internal(
+                lfh,
+                &cd_header,
+                &mut buf_reader,
+                src_name.clone(),
+                dst_archive,
+            )?;
         }
 
         Ok(())
@@ -227,17 +249,24 @@ impl<T: Read + Seek> ZipFile<T> {
 
     /// Copies the entry in this ZIP file with name `src_name` to `dst_archive` with name `dst_name`.
     /// If the entry already exists, it will be overwritten.
-    pub fn copy_entry(&mut self, src_name: &str, dst_archive: &mut ZipFile<File>, dst_name: String) -> Result<()> {
+    pub fn copy_entry(
+        &mut self,
+        src_name: &str,
+        dst_archive: &mut ZipFile<File>,
+        dst_name: String,
+    ) -> Result<()> {
         let (lfh, cd_header, mut buf_reader) = self.read_lfh_and_seek_to_contents(src_name)?;
 
         Self::copy_entry_internal(lfh, cd_header, &mut buf_reader, dst_name, dst_archive)
     }
 
-    fn copy_entry_internal(mut lfh: LocalFileHeader,
+    fn copy_entry_internal(
+        mut lfh: LocalFileHeader,
         src_cdh: &CentDirHeader,
         buf_reader: &mut BufReader<&mut T>,
         dst_name: String,
-        dst_archive: &mut ZipFile<File>) -> Result<()> {
+        dst_archive: &mut ZipFile<File>,
+    ) -> Result<()> {
         // Update the new position of the LFH in the CDH
         let mut dst_cdh = src_cdh.clone();
         dst_cdh.local_header_offset = dst_archive.end_of_entries_offset;
@@ -246,18 +275,26 @@ impl<T: Read + Seek> ZipFile<T> {
 
         // Locate a position in the destination archive for the new local header.
 
-        dst_archive.file.seek(SeekFrom::Start(dst_archive.end_of_entries_offset as u64))?;
+        dst_archive
+            .file
+            .seek(SeekFrom::Start(dst_archive.end_of_entries_offset as u64))?;
         let mut buf_writer = BufWriter::new(&mut dst_archive.file);
-        lfh.write(&mut buf_writer).context("Writing local file header")?;
+        lfh.write(&mut buf_writer)
+            .context("Writing local file header")?;
         let lfh_length = buf_writer.stream_position()? - dst_archive.end_of_entries_offset as u64;
 
         // Copy the contents of the entry to the other archive (no need to decompress and recompress)
-        std::io::copy(&mut buf_reader.take(lfh.compressed_len as u64), &mut buf_writer)
-            .context("Copying content of entry")?;
+        std::io::copy(
+            &mut buf_reader.take(lfh.compressed_len as u64),
+            &mut buf_writer,
+        )
+        .context("Copying content of entry")?;
 
-        dst_archive.end_of_entries_offset = (lfh.compressed_len as u64 + lfh_length + dst_archive.end_of_entries_offset as u64)
-            .try_into().context("ZIP file too large")?;
-        
+        dst_archive.end_of_entries_offset =
+            (lfh.compressed_len as u64 + lfh_length + dst_archive.end_of_entries_offset as u64)
+                .try_into()
+                .context("ZIP file too large")?;
+
         dst_archive.entries.insert(dst_name, dst_cdh);
 
         Ok(())
@@ -297,7 +334,6 @@ impl ZipFile<File> {
         self.store_aligment = alignment;
     }
 
-    
     // Creates a field used to align the ZIP entry data to store_alignment
     // `data_offset` is what the offset in the ZIP of the first byte of the data would be,
     // with no alignment field.
@@ -316,7 +352,8 @@ impl ZipFile<File> {
         // storing the level of aligment.
         let after_min_len = data_offset + 6;
         // Number of 0 bytes needed after the extra data field's header.
-        let padding_bytes = (self.store_aligment as u64 - (after_min_len % self.store_aligment as u64))
+        let padding_bytes = (self.store_aligment as u64
+            - (after_min_len % self.store_aligment as u64))
             % self.store_aligment as u64;
 
         let mut output_buf: Vec<u8> = Vec::new();
@@ -335,25 +372,30 @@ impl ZipFile<File> {
     }
 
     /// Writes a file to the ZIP with entry name `name` and contents copied from `contents` (which is read until EOF)
-    pub fn write_file(&mut self,
+    pub fn write_file(
+        &mut self,
         name: &str,
         contents: &mut (impl Read + Seek),
-        compression_method: FileCompression) -> Result<()> {
-        self.file.seek(SeekFrom::Start(self.end_of_entries_offset as u64))?;
+        compression_method: FileCompression,
+    ) -> Result<()> {
+        self.file
+            .seek(SeekFrom::Start(self.end_of_entries_offset as u64))?;
 
         let lfh_offset = self.file.stream_position()?;
         // Find the offset of the first byte after the LFH ignoring alignment.
         let unaligned_post_lfh_offset = self.file.stream_position()? + 30 + name.len() as u64;
-        let aligment_field = if compression_method == FileCompression::Store { 
+        let aligment_field = if compression_method == FileCompression::Store {
             self.create_alignment_field(unaligned_post_lfh_offset)?
-        }   else    {
+        } else {
             // No need for alignment fields if using the DEFLATE compression method
             Vec::new()
         };
 
         // Skip the location of the new LFH for now, since we don't know the data size yet.
-        self.file.seek(SeekFrom::Start(unaligned_post_lfh_offset + aligment_field.len() as u64))?;
-        
+        self.file.seek(SeekFrom::Start(
+            unaligned_post_lfh_offset + aligment_field.len() as u64,
+        ))?;
+
         let data_start = self.file.stream_position()?;
 
         // TODO: Alignment for entries created with STORE compression method
@@ -363,28 +405,42 @@ impl ZipFile<File> {
                 let mut buf_writer = BufWriter::new(&mut self.file);
 
                 let mut encoder = deflate::Encoder::new(&mut buf_writer);
-                let crc = copy_to_with_crc(contents, &mut encoder).context("Writing/compressing file data")?;
+                let crc = copy_to_with_crc(contents, &mut encoder)
+                    .context("Writing/compressing file data")?;
                 encoder.finish().into_result()?;
 
                 // Update the offset for the next file to be written
-                self.end_of_entries_offset = buf_writer.stream_position()?.try_into().context("ZIP file too large")?;
+                self.end_of_entries_offset = buf_writer
+                    .stream_position()?
+                    .try_into()
+                    .context("ZIP file too large")?;
 
                 crc
-            },
-            FileCompression::Store => { 
-                let crc = copy_to_with_crc(contents, &mut self.file).context("Writing file data")?;
+            }
+            FileCompression::Store => {
+                let crc =
+                    copy_to_with_crc(contents, &mut self.file).context("Writing file data")?;
                 // Update the offset for the next file to be written
-                self.end_of_entries_offset = self.file.stream_position()?.try_into().context("ZIP file too large")?;
+                self.end_of_entries_offset = self
+                    .file
+                    .stream_position()?
+                    .try_into()
+                    .context("ZIP file too large")?;
 
                 crc
-            },
-            FileCompression::Unsupported(method) => return Err(anyhow!("Compression method `{method}` is not supported"))
+            }
+            FileCompression::Unsupported(method) => {
+                return Err(anyhow!("Compression method `{method}` is not supported"))
+            }
         };
 
         let compressed_len: u32 = (self.end_of_entries_offset as u64 - data_start)
-            .try_into().context("Compressed file length too big for 32 bit ZIP file")?;
-        let uncompressed_len: u32 = contents.stream_position()?
-            .try_into().context("Uncompressed file length too big for 32 bit ZIP file")?;
+            .try_into()
+            .context("Compressed file length too big for 32 bit ZIP file")?;
+        let uncompressed_len: u32 = contents
+            .stream_position()?
+            .try_into()
+            .context("Uncompressed file length too big for 32 bit ZIP file")?;
 
         let local_header = LocalFileHeader {
             version_needed: VERSION_NEEDED_TO_EXTRACT,
@@ -400,8 +456,9 @@ impl ZipFile<File> {
 
         // Write the local header with the known length/CRC
         self.file.seek(SeekFrom::Start(lfh_offset))?;
-        local_header.write(&mut BufWriter::new(&mut self.file)).context("Writing local file header")?;
-
+        local_header
+            .write(&mut BufWriter::new(&mut self.file))
+            .context("Writing local file header")?;
 
         let central_dir_header = CentDirHeader {
             os_version_made_by: 0, // 0 seems to be accepted as a valid OS, TODO: give actual value?
@@ -440,8 +497,15 @@ impl ZipFile<File> {
         }
 
         let mut eocd = EndOfCentDir {
-            cent_dir_records: self.entries.len().try_into().context("Too many ZIP entries")?,
-            cent_dir_size: cd_bytes.len().try_into().context("Central directory too big")?,
+            cent_dir_records: self
+                .entries
+                .len()
+                .try_into()
+                .context("Too many ZIP entries")?,
+            cent_dir_size: cd_bytes
+                .len()
+                .try_into()
+                .context("Central directory too big")?,
             cent_dir_offset: 0, // Can be set after we know the length of the signing block
             comment: Vec::new(),
         };
@@ -450,11 +514,16 @@ impl ZipFile<File> {
         self.file.set_len(self.end_of_entries_offset as u64)?;
 
         // Add signature
-        self.file.seek(SeekFrom::Start(self.end_of_entries_offset as u64))?;
+        self.file
+            .seek(SeekFrom::Start(self.end_of_entries_offset as u64))?;
         signing::write_v2_signature(&mut self.file, priv_key, cert, &cd_bytes, eocd.clone())
             .context("Signing APK")?;
 
-        eocd.cent_dir_offset = self.file.stream_position()?.try_into().context("APK file too big")?;
+        eocd.cent_dir_offset = self
+            .file
+            .stream_position()?
+            .try_into()
+            .context("APK file too big")?;
         self.file.write_all(&cd_bytes)?;
         eocd.write(&mut self.file)?;
 
@@ -470,20 +539,30 @@ impl ZipFile<File> {
         // Remove existing CD and EOCD
         self.file.set_len(self.end_of_entries_offset as u64)?;
 
-        self.file.seek(SeekFrom::Start(self.end_of_entries_offset as u64))?;
+        self.file
+            .seek(SeekFrom::Start(self.end_of_entries_offset as u64))?;
 
         for cd_header in self.entries.values() {
-            cd_header.write(&mut self.file).context("Saving central directory header")?;
+            cd_header
+                .write(&mut self.file)
+                .context("Saving central directory header")?;
         }
 
         let eocd = EndOfCentDir {
-            cent_dir_records: self.entries.len().try_into().context("Too many ZIP entries")?,
-            cent_dir_size: (self.file.stream_position()? - self.end_of_entries_offset as u64).try_into().context("Central directory too big")?,
+            cent_dir_records: self
+                .entries
+                .len()
+                .try_into()
+                .context("Too many ZIP entries")?,
+            cent_dir_size: (self.file.stream_position()? - self.end_of_entries_offset as u64)
+                .try_into()
+                .context("Central directory too big")?,
             cent_dir_offset: self.end_of_entries_offset,
             comment: Vec::new(),
         };
 
-        eocd.write(&mut self.file).context("Saving end of central directory")?;
-        return Ok(())
+        eocd.write(&mut self.file)
+            .context("Saving end of central directory")?;
+        return Ok(());
     }
 }

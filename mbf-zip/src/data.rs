@@ -1,7 +1,7 @@
 use std::io::{Read, Write};
 
+use anyhow::{anyhow, Context, Result};
 use byteorder::{ReadBytesExt, WriteBytesExt, LE};
-use anyhow::{Result, anyhow, Context};
 
 use super::FileCompression;
 
@@ -10,7 +10,7 @@ impl From<u16> for FileCompression {
         match value {
             0 => Self::Store,
             8 => Self::Deflate,
-            other => Self::Unsupported(other)
+            other => Self::Unsupported(other),
         }
     }
 }
@@ -20,7 +20,7 @@ impl Into<u16> for FileCompression {
         match self {
             Self::Store => 0,
             Self::Deflate => 8,
-            Self::Unsupported(other) => other
+            Self::Unsupported(other) => other,
         }
     }
 }
@@ -31,7 +31,7 @@ pub struct EndOfCentDir {
     pub cent_dir_records: u16,
     pub cent_dir_size: u32,
     pub cent_dir_offset: u32,
-    pub comment: Vec<u8>
+    pub comment: Vec<u8>,
 }
 
 // ZIP central directory record
@@ -86,11 +86,11 @@ impl EndOfCentDir {
             cent_dir_records: data.read_u16::<LE>()?,
             cent_dir_size: data.read_u32::<LE>()?,
             cent_dir_offset: data.read_u32::<LE>()?,
-            comment: vec![0u8; data.read_u16::<LE>()? as usize]
+            comment: vec![0u8; data.read_u16::<LE>()? as usize],
         };
 
         data.read_exact(&mut result.comment)?;
-        
+
         if result.cent_dir_records != cd_records_on_disk || start_of_cd_disk != 0 || disk_num != 0 {
             return Err(anyhow!("Multi-disk archives are not supported"));
         }
@@ -109,9 +109,12 @@ impl EndOfCentDir {
         data.write_u16::<LE>(self.cent_dir_records)?;
         data.write_u32::<LE>(self.cent_dir_size)?;
         data.write_u32::<LE>(self.cent_dir_offset)?;
-        data.write_u16::<LE>(self.comment.len()
-            .try_into()
-            .context("File comment longer than max length")?)?;
+        data.write_u16::<LE>(
+            self.comment
+                .len()
+                .try_into()
+                .context("File comment longer than max length")?,
+        )?;
         data.write_all(&self.comment)?;
 
         Ok(())
@@ -140,7 +143,7 @@ impl CentDirHeader {
         let mut comment_buf = vec![0u8; data.read_u16::<LE>()? as usize];
 
         if data.read_u16::<LE>()? != 0 {
-            return Err(anyhow!("Multi-disk archives are not supported"))
+            return Err(anyhow!("Multi-disk archives are not supported"));
         }
 
         let internal_attrs = data.read_u16::<LE>()?;
@@ -168,7 +171,7 @@ impl CentDirHeader {
             // ...but I am yet to find an APK with file names that aren't just UTF-8
             file_name: String::from_utf8(file_name_buf).context("File name was not valid UTF-8")?,
             extra_field: extra_field_buf,
-            comment: String::from_utf8(comment_buf).context("File comment was not valid UTF-8")?
+            comment: String::from_utf8(comment_buf).context("File comment was not valid UTF-8")?,
         })
     }
 
@@ -183,12 +186,24 @@ impl CentDirHeader {
         data.write_u32::<LE>(self.compressed_len)?;
         data.write_u32::<LE>(self.uncompressed_len)?;
 
-        data.write_u16::<LE>(self.file_name.len()
-            .try_into().context("File name longer than max length")?)?;
-        data.write_u16::<LE>(self.extra_field.len()
-            .try_into().context("Extra field longer than max length")?)?;
-        data.write_u16::<LE>(self.comment.len()
-            .try_into().context("Comment longer than max length")?)?;
+        data.write_u16::<LE>(
+            self.file_name
+                .len()
+                .try_into()
+                .context("File name longer than max length")?,
+        )?;
+        data.write_u16::<LE>(
+            self.extra_field
+                .len()
+                .try_into()
+                .context("Extra field longer than max length")?,
+        )?;
+        data.write_u16::<LE>(
+            self.comment
+                .len()
+                .try_into()
+                .context("Comment longer than max length")?,
+        )?;
 
         data.write_u16::<LE>(0)?; // Disk number
         data.write_u16::<LE>(self.internal_attrs)?;
@@ -248,10 +263,18 @@ impl LocalFileHeader {
         data.write_u32::<LE>(self.compressed_len)?;
         data.write_u32::<LE>(self.uncompressed_len)?;
 
-        data.write_u16::<LE>(self.file_name.len()
-            .try_into().context("File name longer than max length")?)?;
-        data.write_u16::<LE>(self.extra_field.len()
-            .try_into().context("Extra field longer than max length")?)?;
+        data.write_u16::<LE>(
+            self.file_name
+                .len()
+                .try_into()
+                .context("File name longer than max length")?,
+        )?;
+        data.write_u16::<LE>(
+            self.extra_field
+                .len()
+                .try_into()
+                .context("Extra field longer than max length")?,
+        )?;
 
         data.write_all(&self.file_name.as_bytes())?;
         data.write_all(&self.extra_field)?;

@@ -1,7 +1,7 @@
 //! Module containing all of the fixed file paths used by MBF, for easy changing throughout the project.
 
-use const_format::formatcp;
 use crate::APK_ID;
+use const_format::formatcp;
 
 /// Directory that QMOD files are stored in.
 /// `$` is replaced with the game version
@@ -28,7 +28,8 @@ pub const PLAYER_DATA_BAK: &str = formatcp!("{ANDROID_APP_FILES}/PlayerData.dat.
 pub const OBB_DIR: &str = formatcp!("/sdcard/Android/obb/{APK_ID}/");
 
 /// Path to the `PlayerData.dat` of the `datakeeper` mod.
-pub const DATAKEEPER_PLAYER_DATA: &str = "/sdcard/ModData/com.beatgames.beatsaber/Mods/datakeeper/PlayerData.dat";
+pub const DATAKEEPER_PLAYER_DATA: &str =
+    "/sdcard/ModData/com.beatgames.beatsaber/Mods/datakeeper/PlayerData.dat";
 /// An auxillary path that `PlayerData.dat` is copied to when modding in case it is corrupted/lost for any other reason.
 pub const AUX_DATA_BACKUP: &str = "/sdcard/ModsBeforeFriday/PlayerData.backup.dat";
 
@@ -45,5 +46,5 @@ pub const LEGACY_DIRS: &[&str] = &[
     "/data/local/tmp/mbf-downloads",
     "/data/local/tmp/mbf-res-cache",
     "/data/local/tmp/mbf-tmp",
-    "/data/local/tmp/mbf-uploads"
+    "/data/local/tmp/mbf-uploads",
 ];

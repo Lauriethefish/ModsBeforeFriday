@@ -1,12 +1,12 @@
-mod requests;
-mod manifest;
 mod axml;
-mod patching;
-mod mod_man;
-mod handlers;
 mod data_fix;
 mod downloads;
+mod handlers;
+mod manifest;
+mod mod_man;
+mod patching;
 mod paths;
+mod requests;
 
 use crate::requests::Request;
 use anyhow::{Context, Result};
@@ -15,7 +15,13 @@ use log::{debug, error, warn, Level};
 use mbf_res_man::res_cache::ResCache;
 use requests::Response;
 use serde::{Deserialize, Serialize};
-use std::{io::{BufRead, BufReader, Write}, panic, path::Path, process::Command, sync};
+use std::{
+    io::{BufRead, BufReader, Write},
+    panic,
+    path::Path,
+    process::Command,
+    sync,
+};
 
 /// The ID of the APK file that MBF manages.
 pub const APK_ID: &str = "com.beatgames.beatsaber";
@@ -32,12 +38,11 @@ pub fn try_delete_legacy_dirs() {
         if Path::new(dir).exists() {
             match std::fs::remove_dir_all(dir) {
                 Ok(_) => debug!("Successfully removed legacy dir {dir}"),
-                Err(err) => warn!("Failed to remove legacy dir {dir}: {err}")
+                Err(err) => warn!("Failed to remove legacy dir {dir}: {err}"),
             }
         }
     }
 }
-
 
 static DOWNLOAD_CFG: sync::OnceLock<DownloadConfig> = sync::OnceLock::new();
 
@@ -59,8 +64,10 @@ pub fn get_dl_cfg() -> &'static DownloadConfig<'static> {
 /// This should be reused where possible.
 pub fn load_res_cache() -> Result<ResCache<'static>> {
     std::fs::create_dir_all(paths::RES_CACHE).expect("Failed to create resource cache folder");
-    Ok(ResCache::new(paths::RES_CACHE.into(),
-        mbf_res_man::default_agent::get_agent()))
+    Ok(ResCache::new(
+        paths::RES_CACHE.into(),
+        mbf_res_man::default_agent::get_agent(),
+    ))
 }
 
 pub fn get_apk_path() -> Result<Option<String>> {
@@ -71,10 +78,12 @@ pub fn get_apk_path() -> Result<Option<String>> {
     if 8 > pm_output.stdout.len() {
         // App not installed
         Ok(None)
-    }   else {
-        Ok(Some(std::str::from_utf8(pm_output.stdout.split_at(8).1)?
-            .trim_end()
-            .to_owned()))
+    } else {
+        Ok(Some(
+            std::str::from_utf8(pm_output.stdout.split_at(8).1)?
+                .trim_end()
+                .to_owned(),
+        ))
     }
 }
 
@@ -84,7 +93,7 @@ struct ModTag {
     patcher_name: String,
     patcher_version: Option<String>,
     modloader_name: String,
-    modloader_version: Option<String>
+    modloader_version: Option<String>,
 }
 
 struct ResponseLogger {}
@@ -98,10 +107,12 @@ impl log::Log for ResponseLogger {
         // Skip logs that are not from mbf_agent, mbf_zip, etc.
         // ...as these are spammy logs from ureq or rustls, and we do nto want them.
         match record.module_path() {
-            Some(module_path) => if !module_path.starts_with("mbf") {
-                return;
-            },
-            None => return
+            Some(module_path) => {
+                if !module_path.starts_with("mbf") {
+                    return;
+                }
+            }
+            None => return,
         }
 
         // Ignore errors, logging should be infallible and we don't want to panic
@@ -112,8 +123,8 @@ impl log::Log for ResponseLogger {
                 Level::Info => requests::LogLevel::Info,
                 Level::Warn => requests::LogLevel::Warn,
                 Level::Error => requests::LogLevel::Error,
-                Level::Trace => requests::LogLevel::Trace
-            }
+                Level::Trace => requests::LogLevel::Trace,
+            },
         });
     }
 
@@ -145,7 +156,9 @@ fn main() -> Result<()> {
 
     // Set a panic hook that writes the panic as a JSON Log
     // (we don't do this in catch_unwind as we get an `Any` there, which doesn't implement Display)
-    panic::set_hook(Box::new(|info| error!("Request failed due to a panic!: {info}")));
+    panic::set_hook(Box::new(|info| {
+        error!("Request failed due to a panic!: {info}")
+    }));
 
     match std::panic::catch_unwind(|| handlers::handle_request(req)) {
         Ok(resp) => match resp {
@@ -157,8 +170,8 @@ fn main() -> Result<()> {
                 }
 
                 write_response(resp)?;
-            },
-            Err(err) => error!("{err:?}")
+            }
+            Err(err) => error!("{err:?}"),
         },
         Err(_) => {} // Panic will be outputted above
     };

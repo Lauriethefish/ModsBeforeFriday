@@ -2,24 +2,24 @@
 //! Although the MBF project is licensed under the GNU Affero General Public License,
 //! this file and any others with the same notice (but NO FILES OTHER THAN THAT) are also available under the MIT License.
 //! Copyright 2024 Laurie ?
-//! 
-//! Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
+//!
+//! Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 //! associated documentation files (the “Software”), to deal in the Software without restriction,
 //! including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
 //! and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-//! 
+//!
 //! The above copyright notice and this permission notice shall be included
 //! in all copies or substantial portions of the Software.
-//! 
+//!
 //! THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
 //! INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
 //! IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-//! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
+//! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 //! OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 use std::io::{Read, Seek, SeekFrom};
 
-use anyhow::{Result, anyhow, Context};
+use anyhow::{anyhow, Context, Result};
 use byteorder::{ReadBytesExt, LE};
 
 use super::{Attribute, AttributeTypeId, AttributeValue, ChunkType, Event, Namespace, UTF8_FLAG};
@@ -32,7 +32,7 @@ pub struct AxmlReader<'r, R: Read + Seek> {
     // Map of resource IDs to resource map indices
     res_map: Vec<u32>,
 
-    end_file_offset: u64
+    end_file_offset: u64,
 }
 
 impl<'r, R: Read + Seek> AxmlReader<'r, R> {
@@ -43,7 +43,7 @@ impl<'r, R: Read + Seek> AxmlReader<'r, R> {
         if ChunkType::parse(data.read_u32::<LE>()?) != Some(ChunkType::Xml) {
             return Err(anyhow!("Initial chunk was not XML"));
         }
-    
+
         let file_size = data.read_u32::<LE>()?;
         if ChunkType::parse(data.read_u32::<LE>()?) != Some(ChunkType::StringPool) {
             return Err(anyhow!("Expected string pool after first XML tag"));
@@ -65,21 +65,21 @@ impl<'r, R: Read + Seek> AxmlReader<'r, R> {
         for _ in 0..res_map_size {
             res_map.push(data.read_u32::<LE>()?);
         }
-        
+
         data.seek(SeekFrom::Start(post_resource_map))?;
 
         Ok(Self {
             data,
             string_pool,
             res_map,
-            end_file_offset: file_size as u64
+            end_file_offset: file_size as u64,
         })
     }
 
     /// Reads the next event from the file.
     pub fn read_next_event(&mut self) -> Result<Option<Event>> {
         if self.data.stream_position()? == self.end_file_offset {
-            return Ok(None)
+            return Ok(None);
         }
 
         let raw_res_type = self.data.read_u32::<LE>()?;
@@ -89,9 +89,11 @@ impl<'r, R: Read + Seek> AxmlReader<'r, R> {
         match ChunkType::parse(raw_res_type) {
             Some(known) => {
                 let result = match known {
-                    ChunkType::StringPool 
-                    | ChunkType::Xml
-                    | ChunkType::XmlResourceMap => return Err(anyhow!("Invalid res type {raw_res_type} for main file contents")),
+                    ChunkType::StringPool | ChunkType::Xml | ChunkType::XmlResourceMap => {
+                        return Err(anyhow!(
+                            "Invalid res type {raw_res_type} for main file contents"
+                        ))
+                    }
                     ChunkType::XmlStartNamespace => Event::StartNamespace(self.read_namespace()?),
                     ChunkType::XmlEndNamespace => Event::EndNamespace(self.read_namespace()?),
                     ChunkType::XmlStartElement => self.read_element()?,
@@ -101,14 +103,17 @@ impl<'r, R: Read + Seek> AxmlReader<'r, R> {
                 // Make sure to seek to the start of the next element
                 // (in case reading this element fails, we can continue from the next element)
                 self.data.seek(SeekFrom::Start(post_ev_offset))?;
-                
+
                 Ok(Some(result))
-            },
+            }
             None => {
                 let mut contents = vec![0u8; length as usize];
                 self.data.read_exact(&mut contents)?;
 
-                Ok(Some(Event::Unknown { contents, res_type: raw_res_type }))
+                Ok(Some(Event::Unknown {
+                    contents,
+                    res_type: raw_res_type,
+                }))
             }
         }
     }
@@ -123,7 +128,7 @@ impl<'r, R: Read + Seek> AxmlReader<'r, R> {
         let ns_idx = self.data.read_i32::<LE>()?;
         let namespace = if ns_idx == -1 {
             None
-        }   else    {
+        } else {
             Some(self.get_pooled_string(ns_idx as u32)?.to_owned())
         };
 
@@ -139,7 +144,7 @@ impl<'r, R: Read + Seek> AxmlReader<'r, R> {
         let class_attr_idx = self.data.read_u16::<LE>()?;
         let style_attr_idx = self.data.read_u16::<LE>()?;
         if id_attr_idx != 0 || class_attr_idx != 0 || style_attr_idx != 0 {
-           return Err(anyhow!("Element indicated presence of style, class or ID attributes, which are not supported"))
+            return Err(anyhow!("Element indicated presence of style, class or ID attributes, which are not supported"));
         }
 
         let mut attributes = Vec::with_capacity(num_attributes as usize);
@@ -151,7 +156,7 @@ impl<'r, R: Read + Seek> AxmlReader<'r, R> {
             attributes,
             name,
             namespace,
-            line_num
+            line_num,
         })
     }
 
@@ -165,10 +170,14 @@ impl<'r, R: Read + Seek> AxmlReader<'r, R> {
 
         let value = match AttributeTypeId::parse(type_id) {
             Some(AttributeTypeId::Boolean) => AttributeValue::Boolean(raw_value > 0),
-            Some(AttributeTypeId::Int) | Some(AttributeTypeId::Hex) => AttributeValue::Integer(raw_value as i32),
-            Some(AttributeTypeId::String) => AttributeValue::String(self.get_pooled_string(raw_value)?.to_string()),
+            Some(AttributeTypeId::Int) | Some(AttributeTypeId::Hex) => {
+                AttributeValue::Integer(raw_value as i32)
+            }
+            Some(AttributeTypeId::String) => {
+                AttributeValue::String(self.get_pooled_string(raw_value)?.to_string())
+            }
             Some(AttributeTypeId::Reference) => AttributeValue::Reference(raw_value),
-            None => return Err(anyhow!("Attribute type ID {type_id} was not recognised"))
+            None => return Err(anyhow!("Attribute type ID {type_id} was not recognised")),
         };
 
         Ok(Attribute {
@@ -188,13 +197,17 @@ impl<'r, R: Read + Seek> AxmlReader<'r, R> {
         let ns_idx = self.data.read_i32::<LE>()?;
         let namespace = if ns_idx == -1 {
             None
-        }   else    {
+        } else {
             Some(self.get_pooled_string(ns_idx as u32)?.to_owned())
         };
 
         let name_idx = self.data.read_u32::<LE>()?;
         let name = self.get_pooled_string(name_idx)?;
-        Ok(Event::EndElement { line_num, namespace, name: name.to_string() })
+        Ok(Event::EndElement {
+            line_num,
+            namespace,
+            name: name.to_string(),
+        })
     }
 
     fn read_namespace(&mut self) -> Result<Namespace> {
@@ -206,18 +219,21 @@ impl<'r, R: Read + Seek> AxmlReader<'r, R> {
 
         let prefix = if prefix_id == 0xFFFFFFFF {
             None
-        }   else    {
+        } else {
             Some(self.get_pooled_string(prefix_id)?.to_owned())
         };
 
         let uri = self.get_pooled_string(uri_id)?;
-        Ok(Namespace { prefix, uri: uri.to_string() })
+        Ok(Namespace {
+            prefix,
+            uri: uri.to_string(),
+        })
     }
 
     fn get_pooled_string(&self, id: u32) -> Result<&str> {
         match self.string_pool.get(id as usize) {
             Some(s) => Ok(*&s),
-            None => Err(anyhow!("Invalid string index {id}"))
+            None => Err(anyhow!("Invalid string index {id}")),
         }
     }
 }
@@ -243,7 +259,9 @@ fn load_string_pool(data: &mut (impl Read + Seek)) -> Result<(Vec<String>, bool)
 
     let mut result: Vec<String> = Vec::with_capacity(num_strings as usize);
     for offset in string_offsets.into_iter() {
-        data.seek(SeekFrom::Start(begin_chunk + string_data_offset as u64 + offset as u64))?;
+        data.seek(SeekFrom::Start(
+            begin_chunk + string_data_offset as u64 + offset as u64,
+        ))?;
 
         if utf8 {
             let _ = read_utf8_len(data)?; // TODO: Figure out what this represents
@@ -255,7 +273,7 @@ fn load_string_pool(data: &mut (impl Read + Seek)) -> Result<(Vec<String>, bool)
             data.read_exact(&mut buffer)?;
 
             result.push(std::str::from_utf8(&buffer)?.into());
-        }   else {
+        } else {
             // Length is in UTF-16 codepoints
             let length = read_utf16_len(data)? as usize;
             let mut buffer: Vec<u16> = Vec::with_capacity(length);
@@ -270,11 +288,12 @@ fn load_string_pool(data: &mut (impl Read + Seek)) -> Result<(Vec<String>, bool)
     Ok((result, utf8))
 }
 
-// Reads the length of a UTF-8 string as encoded in AXML. 
+// Reads the length of a UTF-8 string as encoded in AXML.
 // This is a 1-2 byte varint, meaning its maximum value is 32767, as 1 bit is wasted.
 fn read_utf8_len(data: &mut impl Read) -> Result<u16> {
     let mut length = data.read_u8()? as u16;
-    if length & 0x80 != 0 { // Last bit set, so length is 2 bytes
+    if length & 0x80 != 0 {
+        // Last bit set, so length is 2 bytes
         length = (length & 0x7F << 8) | data.read_u8()? as u16;
     }
 

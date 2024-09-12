@@ -1,6 +1,7 @@
 use std::{fs::OpenOptions, path::Path};
 
-const LIBMAIN_URL: &str = "https://github.com/sc2ad/LibMainLoader/releases/download/v0.1.0-alpha/libmain.so";
+const LIBMAIN_URL: &str =
+    "https://github.com/sc2ad/LibMainLoader/releases/download/v0.1.0-alpha/libmain.so";
 const SL2_URL: &str = "https://github.com/sc2ad/Scotland2/releases/latest/download/libsl2.so";
 
 fn download_if_not_exist(url: &str, to: &str) {
@@ -9,7 +10,9 @@ fn download_if_not_exist(url: &str, to: &str) {
     }
 
     println!("Downloading {url} to {to:?}");
-    let mut reader = ureq::get(url).call().expect("Failed to access URL")
+    let mut reader = ureq::get(url)
+        .call()
+        .expect("Failed to access URL")
         .into_reader();
     let mut writer = OpenOptions::new()
         .create_new(true)

@@ -1,7 +1,6 @@
 // Allow dead code since some functions are only used when this crate is imported by the MBF agent.
 #![allow(unused)]
 
-use std::{cell::LazyCell, collections::HashMap, ffi::OsStr, fs::{FileType, OpenOptions}, io::Write, path::{Path, PathBuf}, str::FromStr};
 use adb::uninstall_package;
 use anyhow::{anyhow, Context, Result};
 use clap::{arg, command, Parser, Subcommand};
@@ -14,18 +13,27 @@ use oculus_db::{get_obb_binary, AndroidBinary};
 use release_editor::Repo;
 use res_cache::ResCache;
 use semver::{Op, Version};
+use std::{
+    cell::LazyCell,
+    collections::HashMap,
+    ffi::OsStr,
+    fs::{FileType, OpenOptions},
+    io::Write,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 use version_grabber::SemiSemVer;
 
-mod models;
 mod adb;
+mod default_agent;
 mod diff_builder;
 mod external_res;
-mod release_editor;
-mod oculus_db;
 mod hash_cache;
-mod version_grabber;
+mod models;
+mod oculus_db;
+mod release_editor;
 mod res_cache;
-mod default_agent;
+mod version_grabber;
 
 const APK_ID: &str = "com.beatgames.beatsaber";
 const APK_DATA_DIR: &str = "apk_data";
@@ -40,7 +48,10 @@ const META_TOKEN_PATH: &str = "META_TOKEN.txt";
 
 fn get_res_cache() -> Result<ResCache<'static>> {
     std::fs::create_dir_all(RES_CACHE_PATH)?;
-    Ok(ResCache::new(RES_CACHE_PATH.into(), default_agent::get_agent()))
+    Ok(ResCache::new(
+        RES_CACHE_PATH.into(),
+        default_agent::get_agent(),
+    ))
 }
 
 // Downloads the installed version of Beat Saber to BS_VERSIONS_PATH
@@ -50,7 +61,7 @@ fn download_installed_bs() -> Result<String> {
 
     let bs_version = match adb::get_package_version(APK_ID)? {
         Some(ver) => ver,
-        None => return Err(anyhow!("Package {APK_ID} is not installed"))
+        None => return Err(anyhow!("Package {APK_ID} is not installed")),
     };
 
     let version_path = Path::new(BS_VERSIONS_PATH).join(&bs_version);
@@ -59,8 +70,7 @@ fn download_installed_bs() -> Result<String> {
     info!("Downloading APK");
     let apk_output_path = version_path.join(format!("{APK_ID}.apk"));
 
-    adb::download_apk(APK_ID, &apk_output_path.to_string_lossy())
-        .context("Downloading APK")?;
+    adb::download_apk(APK_ID, &apk_output_path.to_string_lossy()).context("Downloading APK")?;
 
     info!("Downloading OBB file(s)");
 
@@ -72,25 +82,28 @@ fn download_installed_bs() -> Result<String> {
 // Will give an Err if no BS version is saved that begins with bs_version, OR if multiple exist.
 fn find_bs_ver_beginning_with(bs_version: &str) -> Result<PathBuf> {
     let mut matching = Vec::new();
-    for entry_res in std::fs::read_dir(Path::new(BS_VERSIONS_PATH))
-        .context("Reading apk_data folder")? {
-
+    for entry_res in
+        std::fs::read_dir(Path::new(BS_VERSIONS_PATH)).context("Reading apk_data folder")?
+    {
         // Skip entries where reading the metadata failed.
         if let Ok(entry) = entry_res {
             // Find directories that begin with the required BS version
-            if entry.file_type().is_ok_and(|file_type| file_type.is_dir()) 
-                && entry.file_name().to_string_lossy().starts_with(bs_version) {
-                    matching.push(entry.path());
-                }
+            if entry.file_type().is_ok_and(|file_type| file_type.is_dir())
+                && entry.file_name().to_string_lossy().starts_with(bs_version)
+            {
+                matching.push(entry.path());
+            }
         }
     }
 
     // Only succeed if there is exactly one match
     if matching.len() == 0 {
         Err(anyhow!("No BS versions found beginning with {bs_version}"))
-    }   else if matching.len() > 1 {
-        Err(anyhow!("Multiple BS versions exist beginning with {bs_version}"))
-    }   else {
+    } else if matching.len() > 1 {
+        Err(anyhow!(
+            "Multiple BS versions exist beginning with {bs_version}"
+        ))
+    } else {
         Ok(matching.into_iter().next().unwrap())
     }
 }
@@ -102,7 +115,7 @@ fn get_bs_ver_path(bs_version: &str, fuzzy_lookup: bool) -> Result<PathBuf> {
     let version_path = Path::new(BS_VERSIONS_PATH).join(&bs_version);
     if !version_path.exists() && !fuzzy_lookup {
         Err(anyhow!("Beat Saber version {bs_version} not in cache!"))
-    }   else {
+    } else {
         find_bs_ver_beginning_with(bs_version)
     }
 }
@@ -115,33 +128,34 @@ fn install_bs_version(bs_version: &str, fuzzy_lookup: bool) -> Result<()> {
     info!("Installing BS {bs_version}");
     let version_path = get_bs_ver_path(bs_version, fuzzy_lookup)?;
 
-    let (apk_path, maybe_obb_path) = get_obb_and_apk_path(bs_version, fuzzy_lookup)
-        .context("Getting APK and OBB path")?;
+    let (apk_path, maybe_obb_path) =
+        get_obb_and_apk_path(bs_version, fuzzy_lookup).context("Getting APK and OBB path")?;
 
     info!("Installing APK");
     adb::install_apk(&apk_path.to_string_lossy())?;
 
     if let Some(obb_path) = maybe_obb_path {
-        let obb_file_name = obb_path.file_name().ok_or(anyhow!("Obb had no filename"))?
+        let obb_file_name = obb_path
+            .file_name()
+            .ok_or(anyhow!("Obb had no filename"))?
             .to_string_lossy()
             .to_string();
         info!("Copying {obb_file_name}");
 
         let obb_dest = format!("/sdcard/Android/obb/{APK_ID}/{obb_file_name}");
         adb::push_file(&obb_path.to_string_lossy(), &obb_dest)?;
-    }   else {
+    } else {
         info!("No OBB found to copy");
     }
 
     Ok(())
 }
 
-
 // Loads the current diff index from disk.
 fn load_current_diffs() -> Result<DiffIndex> {
     info!("Loading current diff index");
     if !Path::new(DIFF_INDEX_PATH).exists() {
-        return Ok(Vec::new())
+        return Ok(Vec::new());
     }
 
     let mut handle = std::fs::File::open(DIFF_INDEX_PATH)?;
@@ -153,11 +167,13 @@ fn save_diff_index(index: DiffIndex) -> Result<()> {
     info!("Saving diff index");
     std::fs::create_dir_all(DIFFS_PATH)?;
 
-    let mut handle = std::io::BufWriter::new(std::fs::OpenOptions::new()
-        .create(true)
-        .write(true)
-        .truncate(true)
-        .open(DIFF_INDEX_PATH)?);
+    let mut handle = std::io::BufWriter::new(
+        std::fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(DIFF_INDEX_PATH)?,
+    );
 
     serde_json::to_writer_pretty(&mut handle, &index)?;
     Ok(())
@@ -210,43 +226,64 @@ fn remove_if_exists(path: impl AsRef<Path>) -> Result<()> {
 // If a diff exists, and `delete_if_exists` is `true` then the existing diff is
 // removed from the index.
 // If `delete_if_exists` is false, then this function gives an error.
-fn verify_no_existing_diff(index: &mut DiffIndex,
+fn verify_no_existing_diff(
+    index: &mut DiffIndex,
     from_version: &str,
     to_version: &str,
-    delete_if_exists: bool) -> Result<()> {
-    match index.iter()
+    delete_if_exists: bool,
+) -> Result<()> {
+    match index
+        .iter()
         .filter(|diff| diff.from_version == from_version && diff.to_version == to_version)
-        .next() {
-        Some(diff) => if !delete_if_exists {
-            Err(anyhow!("A diff already existed to go from {from_version} to {to_version}"))
-        }   else    {
-            info!("Removing existing diff");
-            // Remove all files for the existing diff
-            remove_if_exists(Path::new(DIFFS_PATH).join(&diff.apk_diff.diff_name))?;
-            for obb_diff in &diff.obb_diffs {
-                remove_if_exists(Path::new(DIFFS_PATH).join(&obb_diff.diff_name))?;
+        .next()
+    {
+        Some(diff) => {
+            if !delete_if_exists {
+                Err(anyhow!(
+                    "A diff already existed to go from {from_version} to {to_version}"
+                ))
+            } else {
+                info!("Removing existing diff");
+                // Remove all files for the existing diff
+                remove_if_exists(Path::new(DIFFS_PATH).join(&diff.apk_diff.diff_name))?;
+                for obb_diff in &diff.obb_diffs {
+                    remove_if_exists(Path::new(DIFFS_PATH).join(&obb_diff.diff_name))?;
+                }
+
+                // Remove the diff from the index.
+                index.retain(|diff| {
+                    diff.from_version != from_version || diff.to_version != to_version
+                });
+                Ok(())
             }
-
-            // Remove the diff from the index.
-            index.retain(|diff| diff.from_version != from_version || diff.to_version != to_version);
-            Ok(())
-
-        },
-        None => Ok(())
+        }
+        None => Ok(()),
     }
 }
 
 // Generates a diff to go between the two provided Beat Saber versions
-fn add_diff_to_index(from_version: String, to_version: String, delete_existing: bool) -> Result<()> {
+fn add_diff_to_index(
+    from_version: String,
+    to_version: String,
+    delete_existing: bool,
+) -> Result<()> {
     info!("Preparing to generate diff from {from_version} to {to_version}");
 
     let mut current_diff_idx = load_current_diffs().context("Loading diff index")?;
 
-    verify_no_existing_diff(&mut current_diff_idx, &from_version, &to_version, delete_existing).context("Verifying removal of existing diff")?;
+    verify_no_existing_diff(
+        &mut current_diff_idx,
+        &from_version,
+        &to_version,
+        delete_existing,
+    )
+    .context("Verifying removal of existing diff")?;
 
-    let (from_apk, from_obb) = get_obb_and_apk_path(&from_version, false).context("Getting APK/OBB path for original version")?;
-    let (to_apk, to_obb) = get_obb_and_apk_path(&to_version, false).context("Getting APK/OBB path for downgraded version")?;
-    
+    let (from_apk, from_obb) = get_obb_and_apk_path(&from_version, false)
+        .context("Getting APK/OBB path for original version")?;
+    let (to_apk, to_obb) = get_obb_and_apk_path(&to_version, false)
+        .context("Getting APK/OBB path for downgraded version")?;
+
     if from_obb == None || to_obb == None {
         return Err(anyhow!("One of the Beat Saber versions had no OBB! Obb-less diffs aren't supported by mbf-res-man"));
     }
@@ -255,12 +292,17 @@ fn add_diff_to_index(from_version: String, to_version: String, delete_existing: 
     let obb_diff_name = format!("bs-obb-{from_version}-to-{to_version}.obb.diff");
 
     info!("Generating diff for APK");
-    let apk_diff = diff_builder::generate_diff(from_apk, to_apk, Path::new(DIFFS_PATH)
-        .join(apk_diff_name)).context("Generating diff for APK")?;
-    
+    let apk_diff =
+        diff_builder::generate_diff(from_apk, to_apk, Path::new(DIFFS_PATH).join(apk_diff_name))
+            .context("Generating diff for APK")?;
+
     info!("Generating diff for OBB");
-    let obb_diff = diff_builder::generate_diff(from_obb.unwrap(), to_obb.unwrap(), Path::new(DIFFS_PATH)
-        .join(obb_diff_name)).context("Generating diff for OBB")?;
+    let obb_diff = diff_builder::generate_diff(
+        from_obb.unwrap(),
+        to_obb.unwrap(),
+        Path::new(DIFFS_PATH).join(obb_diff_name),
+    )
+    .context("Generating diff for OBB")?;
 
     info!("Adding to diff index");
     current_diff_idx.push(VersionDiffs {
@@ -276,7 +318,8 @@ fn add_diff_to_index(from_version: String, to_version: String, delete_existing: 
 
 // Converts a Beat Saber version string to semver.
 fn bs_ver_to_semver(bs_ver: &str) -> semver::Version {
-    let semver_portion = bs_ver.split('_')
+    let semver_portion = bs_ver
+        .split('_')
         .next()
         .expect("Beat Saber version should not be blank");
 
@@ -290,8 +333,9 @@ fn get_latest_moddable_bs() -> Result<String> {
     let core_mods = crate::external_res::fetch_core_mods(&get_res_cache()?, None)
         .context("Downloading (HTTP GET) core mod index")?;
 
-    let latest_ver = core_mods.into_keys().max_by(|version_a, version_b|
-        bs_ver_to_semver(version_a).cmp(&bs_ver_to_semver(version_b)));
+    let latest_ver = core_mods.into_keys().max_by(|version_a, version_b| {
+        bs_ver_to_semver(version_a).cmp(&bs_ver_to_semver(version_b))
+    });
 
     latest_ver.ok_or(anyhow!("No Beat Saber versions were moddable"))
 }
@@ -299,9 +343,10 @@ fn get_latest_moddable_bs() -> Result<String> {
 const GITHUB_TOKEN_PATH: &str = "GITHUB_TOKEN.txt";
 const GITHUB_TOKEN: LazyCell<Option<&'static str>> = LazyCell::new(|| {
     if Path::new(GITHUB_TOKEN_PATH).exists() {
-        Some(Box::leak(Box::new(std::fs::read_to_string(GITHUB_TOKEN_PATH)
-            .expect("Failed to read GH token"))))
-    }   else    {
+        Some(Box::leak(Box::new(
+            std::fs::read_to_string(GITHUB_TOKEN_PATH).expect("Failed to read GH token"),
+        )))
+    } else {
         None
     }
 });
@@ -309,8 +354,9 @@ const GITHUB_TOKEN: LazyCell<Option<&'static str>> = LazyCell::new(|| {
 // Attempts to get or load the github auth token from its containing file if present.
 // Gives an Err if the auth token file does not exist.
 fn get_github_auth_token() -> Result<&'static str> {
-    GITHUB_TOKEN.ok_or(
-        anyhow!("No github token found: {GITHUB_TOKEN_PATH} did not exist"))
+    GITHUB_TOKEN.ok_or(anyhow!(
+        "No github token found: {GITHUB_TOKEN_PATH} did not exist"
+    ))
 }
 
 // Updates the current diff index on github with the diffs in the diffs folder
@@ -320,12 +366,18 @@ fn upload_diff_index() -> Result<()> {
 
     let repo = Repo {
         repo: "mbf-diffs".to_string(),
-        owner: "Lauriethefish".to_string()
+        owner: "Lauriethefish".to_string(),
     };
 
     let auth_token = get_github_auth_token()?;
     let latest_release = release_editor::get_latest_release(repo, auth_token)?;
-    release_editor::update_release_from_directory(DIFFS_PATH, &latest_release, auth_token, false, &mut crc32_cache)?;
+    release_editor::update_release_from_directory(
+        DIFFS_PATH,
+        &latest_release,
+        auth_token,
+        false,
+        &mut crc32_cache,
+    )?;
     crc32_cache.save()?;
 
     Ok(())
@@ -356,7 +408,9 @@ fn update_manifests() -> Result<()> {
         let apk_path = folder.path().join(format!("{APK_ID}.apk"));
         let apk_handle = std::fs::File::open(apk_path).context("No APK found for BS version")?;
         let mut apk_zip = ZipFile::open(apk_handle).context("APK wasn't a valid ZIP file")?;
-        let manifest_contents = apk_zip.read_file("AndroidManifest.xml").context("Reading manifest")?;
+        let manifest_contents = apk_zip
+            .read_file("AndroidManifest.xml")
+            .context("Reading manifest")?;
 
         let mut out_handle = std::fs::OpenOptions::new()
             .create(true)
@@ -373,14 +427,20 @@ fn upload_manifests() -> Result<()> {
     info!("Updating manifests GH release");
     let repo = Repo {
         repo: "mbf-manifests".to_string(),
-        owner: "Lauriethefish".to_string()
+        owner: "Lauriethefish".to_string(),
     };
 
     let mut crc32_cache = HashCache::new_crc32(CRC32_CACHE_PATH.into());
 
     let auth_token = get_github_auth_token()?;
     let latest_release = release_editor::get_latest_release(repo, auth_token)?;
-    release_editor::update_release_from_directory(MANIFESTS_PATH, &latest_release, auth_token, false, &mut crc32_cache)?;
+    release_editor::update_release_from_directory(
+        MANIFESTS_PATH,
+        &latest_release,
+        auth_token,
+        false,
+        &mut crc32_cache,
+    )?;
 
     crc32_cache.save()?;
     Ok(())
@@ -398,7 +458,7 @@ fn update_all_repositories(latest_bs_version: String) -> Result<()> {
     let latest_moddable = get_latest_moddable_bs()?;
     if latest_bs_version == latest_moddable {
         info!("The installed Beat Saber version is already the latest moddable version, no need to generate diff");
-    }   else {
+    } else {
         info!("Ensuring diff exists from latest to latest moddable");
         add_diff_to_index(latest_bs_version, latest_moddable, false)?;
         upload_diff_index()?;
@@ -412,27 +472,26 @@ fn merge_obb(version: String, out_path: impl AsRef<Path>) -> Result<()> {
     let (apk_path, maybe_obb_path) = get_obb_and_apk_path(&version, true)?;
 
     info!("Copying APK to destination");
-    std::fs::copy(&apk_path, out_path.as_ref())
-        .context("Copying APK to destination path")?;
-    
-    let apk_file = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .open(out_path)?;
-    let mut apk_zip = ZipFile::open(apk_file)
-        .context("APK was not valid ZIP archive")?;
+    std::fs::copy(&apk_path, out_path.as_ref()).context("Copying APK to destination path")?;
+
+    let apk_file = OpenOptions::new().read(true).write(true).open(out_path)?;
+    let mut apk_zip = ZipFile::open(apk_file).context("APK was not valid ZIP archive")?;
 
     let obb_path = maybe_obb_path.ok_or(anyhow!("No OBB found for v{version} to merge"))?;
 
-    let mut obb_zip = ZipFile::open(std::fs::File::open(obb_path)?)
-        .context("OBB was not valid ZIP archive")?;
+    let mut obb_zip =
+        ZipFile::open(std::fs::File::open(obb_path)?).context("OBB was not valid ZIP archive")?;
 
     info!("Copying entries from OBB into APK");
-    obb_zip.copy_all_entries_to(&mut apk_zip).context("Copying over over OBB entries")?;
+    obb_zip
+        .copy_all_entries_to(&mut apk_zip)
+        .context("Copying over over OBB entries")?;
 
     const CERT_PEM: &[u8] = include_bytes!("../../mbf-agent/src/debug_cert.pem");
     let (cert, priv_key) = mbf_zip::signing::load_cert_and_priv_key(CERT_PEM);
-    apk_zip.save_and_sign_v2(&priv_key, &cert).context("Signing/saving APK")?;
+    apk_zip
+        .save_and_sign_v2(&priv_key, &cert)
+        .context("Signing/saving APK")?;
     Ok(())
 }
 
@@ -445,7 +504,7 @@ struct Cli {
     command: Commands,
 
     #[clap(short, long)]
-    access_token: Option<String>
+    access_token: Option<String>,
 }
 
 #[derive(Subcommand)]
@@ -459,14 +518,14 @@ enum Commands {
         #[arg(short, long)]
         to_version: String,
         #[arg(short, long)]
-        overwrite: bool
+        overwrite: bool,
     },
     /// Generates a diff file to downgrade from the given game version to the latest moddable version, and adds it to the diff index.
     GenerateDiffToLatest {
         #[arg(short, long)]
         from_version: String,
         #[arg(short, long)]
-        overwrite: bool
+        overwrite: bool,
     },
     /// Downloads the specified Beat Saber version from the Oculus API
     FetchVersion {
@@ -477,9 +536,7 @@ enum Commands {
     /// Lists the currently LIVE Beat Saber versions from the Oculus API.
     ListVersions,
     /// Installs the given Beat Saber version onto the Quest.
-    InstallVersion {
-        version: String
-    },
+    InstallVersion { version: String },
     /// Installs the latest moddable Beat Saber version onto the Quest.
     InstallLatestModdable,
     /// Uploads any changes made to the mbf diffs index.
@@ -502,13 +559,13 @@ enum Commands {
         password: String,
         /// Saves the access token to disk to be used in later commands without entering it each time.
         #[arg(short, long)]
-        save: bool
+        save: bool,
     },
     MergeObb {
         #[arg(short, long)]
         version: String,
         #[arg(short, long)]
-        out_path: String
+        out_path: String,
     },
     /// Fetches Beat Saber versions from the oculus database, then:
     /// - Ensures all manifests are available on the manifests repo.
@@ -516,28 +573,28 @@ enum Commands {
     /// - Uploads the diff to the mbf-diffs repo.
     UpdateReposFromOculusApi {
         #[arg(short, long)]
-        min_version: Option<String>
-    }
+        min_version: Option<String>,
+    },
 }
 
 /// If `argument` is Some, this unwraps `argument` and returns the contained access token.
 /// Otherwise, this function tries to load the meta access token from META_TOKEN_PATH
 /// Gives an error if reading the file fails. (or the file doesn't exist)
-fn get_or_load_access_token(argument: Option<String>) 
-    -> Result<String> {
+fn get_or_load_access_token(argument: Option<String>) -> Result<String> {
     match argument {
         Some(arg_token) => Ok(arg_token),
         None => {
             if Path::new(META_TOKEN_PATH).exists() {
                 Ok(std::fs::read_to_string(META_TOKEN_PATH)?)
-            }   else {
-                Err(anyhow!("No meta access token passed (with argument -a <token>) and
-{META_TOKEN_PATH} did not exist, so could not get access token"))
+            } else {
+                Err(anyhow!(
+                    "No meta access token passed (with argument -a <token>) and
+{META_TOKEN_PATH} did not exist, so could not get access token"
+                ))
             }
         }
     }
 }
-
 
 fn main() -> Result<()> {
     env_logger::builder()
@@ -548,34 +605,52 @@ fn main() -> Result<()> {
 
     let cli = Cli::parse();
     match cli.command {
-        Commands::PullVersion => { download_installed_bs()?; },
-        Commands::FetchVersion { version, older_binaries } => {
+        Commands::PullVersion => {
+            download_installed_bs()?;
+        }
+        Commands::FetchVersion {
+            version,
+            older_binaries,
+        } => {
             let access_token = get_or_load_access_token(cli.access_token)?;
-            let versions = version_grabber::get_live_bs_versions(&access_token, Version::new(0, 0, 0))?;
+            let versions =
+                version_grabber::get_live_bs_versions(&access_token, Version::new(0, 0, 0))?;
 
-            version_grabber::download_version(&access_token,
+            version_grabber::download_version(
+                &access_token,
                 &versions,
                 &version,
                 older_binaries,
                 BS_VERSIONS_PATH,
-                false)?;
-        },
+                false,
+            )?;
+        }
         Commands::ListVersions => {
             let access_token = get_or_load_access_token(cli.access_token)?;
-            let mut versions: Vec<_> = version_grabber::get_live_bs_versions(&access_token, Version::new(0, 0, 0))?
-                .into_keys()
-                .collect();
+            let mut versions: Vec<_> =
+                version_grabber::get_live_bs_versions(&access_token, Version::new(0, 0, 0))?
+                    .into_keys()
+                    .collect();
             versions.sort_by_cached_key(|ver| ver.semver.clone());
 
             for version in versions {
                 info!("{}", version.non_semver);
             }
         }
-        Commands::GenerateDiff { from_version, to_version, overwrite } => add_diff_to_index(from_version, to_version, overwrite)?,
-        Commands::GenerateDiffToLatest { from_version, overwrite } => {
+        Commands::GenerateDiff {
+            from_version,
+            to_version,
+            overwrite,
+        } => add_diff_to_index(from_version, to_version, overwrite)?,
+        Commands::GenerateDiffToLatest {
+            from_version,
+            overwrite,
+        } => {
             let latest_moddable = get_latest_moddable_bs()?;
             if from_version == latest_moddable {
-                return Err(anyhow!("{from_version} is already the latest moddable version"));
+                return Err(anyhow!(
+                    "{from_version} is already the latest moddable version"
+                ));
             }
 
             add_diff_to_index(from_version, latest_moddable, overwrite)?;
@@ -587,13 +662,17 @@ fn main() -> Result<()> {
         Commands::UpdateManifestsRepo => {
             update_manifests()?;
             upload_manifests()?;
-        },
+        }
         Commands::AcceptNewVersion => {
             let installed_bs_version = download_installed_bs()?;
-            
+
             update_all_repositories(installed_bs_version)?;
-        },
-        Commands::GetAccessToken { email, password, save } => {
+        }
+        Commands::GetAccessToken {
+            email,
+            password,
+            save,
+        } => {
             let token = oculus_db::get_quest_access_token(&email, &password)?;
             // Save the access token to a file if specified.
             if save {
@@ -605,24 +684,29 @@ fn main() -> Result<()> {
                     .create(true)
                     .open(META_TOKEN_PATH)?;
                 token_writer.write_all(token_bytes)?;
-            }   else {
+            } else {
                 info!("Access token: {token}");
             }
-        },
+        }
         Commands::UpdateReposFromOculusApi { min_version } => {
             let access_token = get_or_load_access_token(cli.access_token)?;
 
             let min_version_semver = match min_version {
-                Some(version_string) => semver::Version::parse(&version_string).context("Parsing provided version string")?,
-                None => semver::Version::new(0, 0, 0)
+                Some(version_string) => semver::Version::parse(&version_string)
+                    .context("Parsing provided version string")?,
+                None => semver::Version::new(0, 0, 0),
             };
 
-            let latest_bs_version = version_grabber::download_bs_versions(&access_token, BS_VERSIONS_PATH, min_version_semver, false)?;
+            let latest_bs_version = version_grabber::download_bs_versions(
+                &access_token,
+                BS_VERSIONS_PATH,
+                min_version_semver,
+                false,
+            )?;
             info!("Latest Beat Saber version is {latest_bs_version}");
             update_all_repositories(latest_bs_version)?;
-
-        },
-        Commands::MergeObb { version, out_path } => { merge_obb(version, out_path)? }
+        }
+        Commands::MergeObb { version, out_path } => merge_obb(version, out_path)?,
     }
 
     Ok(())

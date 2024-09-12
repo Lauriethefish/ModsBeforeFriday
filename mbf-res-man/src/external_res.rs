@@ -1,39 +1,52 @@
 //! Collection of types used to read the BMBF resources repository to fetch core mod information.
+use crate::{
+    models::{Diff, DiffIndex, ModRepo, VersionedCoreMods},
+    res_cache::{JsonPullError, ResCache},
+};
+use anyhow::{anyhow, Context, Result};
 use log::info;
-use crate::{models::{Diff, DiffIndex, ModRepo, VersionedCoreMods}, res_cache::{JsonPullError, ResCache}};
 use std::collections::HashMap;
-use anyhow::{Context, Result, anyhow};
 
 pub type CoreModIndex = HashMap<String, VersionedCoreMods>;
 
-const CORE_MODS_URL: &str = "https://raw.githubusercontent.com/QuestPackageManager/bs-coremods/main/core_mods.json";
+const CORE_MODS_URL: &str =
+    "https://raw.githubusercontent.com/QuestPackageManager/bs-coremods/main/core_mods.json";
 
-pub fn fetch_core_mods(res_cache: &ResCache, override_core_mod_url: Option<String>) -> Result<CoreModIndex, JsonPullError> {
+pub fn fetch_core_mods(
+    res_cache: &ResCache,
+    override_core_mod_url: Option<String>,
+) -> Result<CoreModIndex, JsonPullError> {
     match override_core_mod_url {
         Some(url) => {
             info!("Using overridden core mod URL");
             // TODO: The override core mod URL should NOT cache
             res_cache.get_json_cached(&url, "core_mods_override.json")
-        },
-        None => res_cache.get_json_cached(CORE_MODS_URL, "core_mods.json")
+        }
+        None => res_cache.get_json_cached(CORE_MODS_URL, "core_mods.json"),
     }
 }
 
-const UNITY_INDEX_URL: &str = "https://raw.githubusercontent.com/Lauriethefish/QuestUnstrippedUnity/main/index.json";
-const UNITY_VER_FORMAT: &str = "https://raw.githubusercontent.com/Lauriethefish/QuestUnstrippedUnity/main/versions/{0}.so";
+const UNITY_INDEX_URL: &str =
+    "https://raw.githubusercontent.com/Lauriethefish/QuestUnstrippedUnity/main/index.json";
+const UNITY_VER_FORMAT: &str =
+    "https://raw.githubusercontent.com/Lauriethefish/QuestUnstrippedUnity/main/versions/{0}.so";
 
-pub fn get_libunity_url(res_cache: &ResCache, apk_id: &str, version: &str) -> Result<Option<String>> {
+pub fn get_libunity_url(
+    res_cache: &ResCache,
+    apk_id: &str,
+    version: &str,
+) -> Result<Option<String>> {
     // Contains an entry for each app supported by the index, which contains an entry for each version of that app.
-    let unity_index: HashMap<String, HashMap<String, String>> = 
+    let unity_index: HashMap<String, HashMap<String, String>> =
         res_cache.get_json_cached(UNITY_INDEX_URL, "libunity_index.json")?;
 
     let app_index = match unity_index.get(apk_id) {
         Some(app_index) => app_index,
-        None => return Ok(None)
+        None => return Ok(None),
     };
     match app_index.get(version) {
         Some(unity_version) => Ok(Some(UNITY_VER_FORMAT.replace("{0}", &unity_version))),
-        None => Ok(None)
+        None => Ok(None),
     }
 }
 
@@ -53,13 +66,15 @@ pub fn get_diff_url(diff: &Diff) -> String {
     format!("{DIFF_INDEX_STEM}/{}", diff.diff_name)
 }
 
-const MANIFEST_FORMAT: &str = "https://github.com/Lauriethefish/mbf-manifests/releases/download/1.0.0/{0}.xml";
+const MANIFEST_FORMAT: &str =
+    "https://github.com/Lauriethefish/mbf-manifests/releases/download/1.0.0/{0}.xml";
 
 // Downloads the AndroidManifest.xml file for the given Beat Saber version (in AXML format) and returns it to the frontend.
 pub fn get_manifest_axml(agent: &ureq::Agent, version: String) -> Result<Vec<u8>> {
     let manifest_url = MANIFEST_FORMAT.replace("{0}", &version);
 
-    let resp = agent.get(&manifest_url)
+    let resp = agent
+        .get(&manifest_url)
         .call()
         .context("Fetching manifest for BS ver")?;
 
@@ -68,7 +83,9 @@ pub fn get_manifest_axml(agent: &ureq::Agent, version: String) -> Result<Vec<u8>
     }
 
     let mut buffer = Vec::new();
-    resp.into_reader().read_to_end(&mut buffer).context("Reading response")?;
+    resp.into_reader()
+        .read_to_end(&mut buffer)
+        .context("Reading response")?;
 
     Ok(buffer)
 }
@@ -79,4 +96,3 @@ const MOD_REPO_URL: &str = "https://mods.bsquest.xyz/mods.json";
 pub fn get_mod_repo(res_cache: &ResCache) -> Result<ModRepo> {
     Ok(res_cache.get_json_cached(MOD_REPO_URL, "mod_repo.json")?)
 }
-

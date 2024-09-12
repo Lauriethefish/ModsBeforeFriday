@@ -3,15 +3,17 @@
 use std::path::Path;
 
 use crate::{data_fix, mod_man::ModManager, patching, paths, requests::Response};
-use anyhow::{Context, Result, anyhow};
+use anyhow::{anyhow, Context, Result};
 use log::{debug, info, warn};
 
-
 /// Handles `QuickFix` [Requests](requests::Request).
-/// 
+///
 /// # Returns
 /// The [Response](requests::Response) to the request (variant `Mods`)
-pub(super) fn handle_quick_fix(override_core_mod_url: Option<String>, wipe_existing_mods: bool) -> Result<Response> {
+pub(super) fn handle_quick_fix(
+    override_core_mod_url: Option<String>,
+    wipe_existing_mods: bool,
+) -> Result<Response> {
     let app_info = super::mod_status::get_app_info()?
         .ok_or(anyhow!("Cannot quick fix when app is not installed"))?;
     let res_cache = crate::load_res_cache()?;
@@ -19,20 +21,27 @@ pub(super) fn handle_quick_fix(override_core_mod_url: Option<String>, wipe_exist
     let mut mod_manager = ModManager::new(app_info.version.clone(), &res_cache);
     if wipe_existing_mods {
         info!("Wiping all existing mods");
-        mod_manager.wipe_all_mods().context("Wiping existing mods")?;
+        mod_manager
+            .wipe_all_mods()
+            .context("Wiping existing mods")?;
     }
     mod_manager.load_mods()?; // Should load no mods.
 
     // Reinstall missing core mods and overwrite the modloader with the one contained within the executable.
-    super::install_core_mods(&res_cache, &mut mod_manager, app_info, override_core_mod_url)?;
+    super::install_core_mods(
+        &res_cache,
+        &mut mod_manager,
+        app_info,
+        override_core_mod_url,
+    )?;
     patching::install_modloader()?;
     Ok(Response::Mods {
-        installed_mods: super::mod_management::get_mod_models(mod_manager)?
+        installed_mods: super::mod_management::get_mod_models(mod_manager)?,
     })
 }
 
 /// Handles `FixPlayerData` [Requests](requests::Request).
-/// 
+///
 /// # Returns
 /// The [Response](requests::Response) to the request (variant `FixedPlayerData`)
 pub(super) fn handle_fix_player_data() -> Result<Response> {
@@ -44,7 +53,7 @@ pub(super) fn handle_fix_player_data() -> Result<Response> {
         data_fix::fix_colour_schemes(paths::DATAKEEPER_PLAYER_DATA)?;
         did_work = true;
     }
-    
+
     if Path::new(paths::PLAYER_DATA).exists() {
         info!("Backing up player data");
         patching::backup_player_data()?;
@@ -56,11 +65,9 @@ pub(super) fn handle_fix_player_data() -> Result<Response> {
             std::fs::remove_file(paths::PLAYER_DATA_BAK)?;
         }
         did_work = true;
-    }   else {
+    } else {
         warn!("No player data found to \"fix\"");
     }
 
-    Ok(Response::FixedPlayerData {
-        existed: did_work
-    })
+    Ok(Response::FixedPlayerData { existed: did_work })
 }

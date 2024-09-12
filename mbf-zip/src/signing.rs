@@ -1,29 +1,44 @@
-//! Basic APK signing implementation, which supports the V2 signature scheme as described here: 
+//! Basic APK signing implementation, which supports the V2 signature scheme as described here:
 //! https://source.android.com/docs/security/features/apksigning/v2
-//! 
+//!
 //! V1 signatures are not supported, so this module cannot be used for APKs that will be installed on any Android version before 7.0.
 
-use std::{io::{Seek, Read, Write, SeekFrom, Cursor}, fs::File};
-use byteorder::{LE, WriteBytesExt, ByteOrder};
+use anyhow::{Context, Result};
+use byteorder::{ByteOrder, WriteBytesExt, LE};
 use rasn_pkix::Certificate;
-use rsa::{sha2::{Sha256, Digest}, RsaPrivateKey, pkcs1::DecodeRsaPrivateKey, Pkcs1v15Sign};
-use anyhow::{Result, Context};
+use rsa::{
+    pkcs1::DecodeRsaPrivateKey,
+    sha2::{Digest, Sha256},
+    Pkcs1v15Sign, RsaPrivateKey,
+};
+use std::{
+    fs::File,
+    io::{Cursor, Read, Seek, SeekFrom, Write},
+};
 
 use super::data::EndOfCentDir;
 
 /// Writes the v2 signature block to the APK.
 /// The `apk` stream should be seeked to the first byte after the contents of the last ZIP entry.
-pub(super) fn write_v2_signature(apk: &mut File, priv_key: &RsaPrivateKey, cert: &Certificate, central_dir_bytes: &[u8], mut eocd: EndOfCentDir) -> Result<()> {
+pub(super) fn write_v2_signature(
+    apk: &mut File,
+    priv_key: &RsaPrivateKey,
+    cert: &Certificate,
+    central_dir_bytes: &[u8],
+    mut eocd: EndOfCentDir,
+) -> Result<()> {
     let after_entries_offset = apk.stream_position()?;
 
     // For the purpose of signing, the EOCD must set the central directory offset to point to the position of the signature.
     eocd.cent_dir_offset = after_entries_offset
-        .try_into().context("ZIP file too large (to sign)")?;
+        .try_into()
+        .context("ZIP file too large (to sign)")?;
 
     let mut eocd_bytes = Vec::new();
     eocd.write(&mut Cursor::new(&mut eocd_bytes))?;
 
-    let apk_digest = calculate_apk_digest(apk, after_entries_offset, central_dir_bytes, &eocd_bytes)?;
+    let apk_digest =
+        calculate_apk_digest(apk, after_entries_offset, central_dir_bytes, &eocd_bytes)?;
     write_signature_block(apk, &apk_digest, cert, priv_key)?;
     Ok(())
 }
@@ -39,17 +54,22 @@ pub fn load_cert_and_priv_key(pem_data: &[u8]) -> (Certificate, RsaPrivateKey) {
 
     for pem_sect in pem.iter() {
         if pem_sect.tag() == "RSA PRIVATE KEY" {
-            priv_key = Some(RsaPrivateKey::from_pkcs1_der(pem_sect.contents())
-                .expect("Invalid private key"));
+            priv_key = Some(
+                RsaPrivateKey::from_pkcs1_der(pem_sect.contents()).expect("Invalid private key"),
+            );
         }
 
         if pem_sect.tag() == "CERTIFICATE" {
-            cert = Some(rasn::der::decode::<Certificate>(pem_sect.contents())
-                .expect("Invalid certificate"));
+            cert = Some(
+                rasn::der::decode::<Certificate>(pem_sect.contents()).expect("Invalid certificate"),
+            );
         }
     }
 
-    return (cert.expect("No certificate"), priv_key.expect("No private key"))
+    return (
+        cert.expect("No certificate"),
+        priv_key.expect("No private key"),
+    );
 }
 
 const CHUNK_SIZE: u64 = 0x100000;
@@ -59,12 +79,13 @@ const V2_SIGNATURE_ID: u32 = 0x7109871a;
 
 // Calculates the digest of contiguous data in a stream, using the chunked method described in the V2 signing documentation.
 // `chunk_buffer.len()` should match `CHUNK_SIZE`
-fn calculate_chunked_digest(offset: u64,
+fn calculate_chunked_digest(
+    offset: u64,
     length: u64,
     source: &mut (impl Read + Seek),
     output: &mut impl Write,
-    chunk_buffer: &mut [u8]) -> Result<u32> {
-
+    chunk_buffer: &mut [u8],
+) -> Result<u32> {
     let section_end = offset + length;
 
     source.seek(SeekFrom::Start(offset))?;
@@ -82,7 +103,7 @@ fn calculate_chunked_digest(offset: u64,
         sha.update(&buf);
 
         let this_chunk_buf = &mut chunk_buffer[0..(bytes_in_chunk as usize)];
-        source.read_exact(this_chunk_buf)?;       
+        source.read_exact(this_chunk_buf)?;
         sha.update(this_chunk_buf);
         let hash = sha.finalize();
 
@@ -95,7 +116,12 @@ fn calculate_chunked_digest(offset: u64,
 }
 
 // Calculates the digest of an APK, based on the chunked contents of the CD, EOCD and file headers/entries.
-fn calculate_apk_digest(apk: &mut File, entries_data_length: u64, central_dir: &[u8], eocd: &[u8]) -> Result<Vec<u8>> {
+fn calculate_apk_digest(
+    apk: &mut File,
+    entries_data_length: u64,
+    central_dir: &[u8],
+    eocd: &[u8],
+) -> Result<Vec<u8>> {
     let mut digests: Vec<u8> = Vec::new();
     let mut digests_stream = Cursor::new(&mut digests);
     digests_stream.write_u8(0x5a)?; // Magic value for the APK digest
@@ -109,9 +135,27 @@ fn calculate_apk_digest(apk: &mut File, entries_data_length: u64, central_dir: &
     let mut eocd_stream = Cursor::new(eocd);
 
     // Add the digests of each chunk, keeping track of the overall chunk count
-    chunk_count += calculate_chunked_digest(0, entries_data_length, apk, &mut digests_stream, &mut chunk_buffer)?;
-    chunk_count += calculate_chunked_digest(0, central_dir.len() as u64, &mut cd_stream, &mut digests_stream, &mut chunk_buffer)?;
-    chunk_count += calculate_chunked_digest(0, eocd.len() as u64, &mut eocd_stream, &mut digests_stream, &mut chunk_buffer)?;
+    chunk_count += calculate_chunked_digest(
+        0,
+        entries_data_length,
+        apk,
+        &mut digests_stream,
+        &mut chunk_buffer,
+    )?;
+    chunk_count += calculate_chunked_digest(
+        0,
+        central_dir.len() as u64,
+        &mut cd_stream,
+        &mut digests_stream,
+        &mut chunk_buffer,
+    )?;
+    chunk_count += calculate_chunked_digest(
+        0,
+        eocd.len() as u64,
+        &mut eocd_stream,
+        &mut digests_stream,
+        &mut chunk_buffer,
+    )?;
 
     // Overwrite the chunk count now that we know the correct value
     digests_stream.seek(SeekFrom::Start(1))?;
@@ -123,21 +167,31 @@ fn calculate_apk_digest(apk: &mut File, entries_data_length: u64, central_dir: &
     Ok(top_level_sha.finalize().to_vec())
 }
 
-fn write_signature_block(apk: &mut File, apk_digest: &[u8], cert: &Certificate, priv_key: &RsaPrivateKey) -> Result<()> {
+fn write_signature_block(
+    apk: &mut File,
+    apk_digest: &[u8],
+    cert: &Certificate,
+    priv_key: &RsaPrivateKey,
+) -> Result<()> {
     // Generate the block of data that we will be signing, which includes the APK digest and certificate
     let signed_data = generate_signed_data(apk_digest, cert)?;
 
     let mut signed_data_digest = Sha256::new();
     signed_data_digest.update(&signed_data);
 
-    let signature = priv_key.sign(Pkcs1v15Sign::new::<Sha256>(), &signed_data_digest.finalize())
+    let signature = priv_key
+        .sign(
+            Pkcs1v15Sign::new::<Sha256>(),
+            &signed_data_digest.finalize(),
+        )
         .context("Signing data")?;
 
     let public_key_info = rasn::der::encode(&cert.tbs_certificate.subject_public_key_info)
         .expect("Failed to encode public key");
 
     // Calculate the total length of the signer section
-    let signer_len = 4 + signed_data.len() + 4 + 4 + 4 + 4 + signature.len() + 4 + public_key_info.len();
+    let signer_len =
+        4 + signed_data.len() + 4 + 4 + 4 + 4 + signature.len() + 4 + public_key_info.len();
 
     // Calculate the total length of the signing block
     let v2_signature_value_len = signer_len + 4 + 4;
@@ -183,14 +237,13 @@ fn generate_signed_data(apk_digest: &[u8], cert: &Certificate) -> Result<Vec<u8>
     signed_data_stream.write_u32::<LE>(apk_digest.len() as u32)?;
     signed_data_stream.write_all(apk_digest)?;
 
-    let cert_data = rasn::der::encode(cert)
-        .expect("Failed to encode certificate");
+    let cert_data = rasn::der::encode(cert).expect("Failed to encode certificate");
 
     signed_data_stream.write_u32::<LE>((cert_data.len() + 4) as u32)?; // Length of certificates array
     signed_data_stream.write_u32::<LE>(cert_data.len() as u32)?; // Length of our one certificate
     signed_data_stream.write_all(&cert_data)?;
 
     signed_data_stream.write_u32::<LE>(0)?; // No additional attributes
-   
+
     Ok(signed_data)
 }
