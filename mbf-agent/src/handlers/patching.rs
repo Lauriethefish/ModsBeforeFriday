@@ -4,7 +4,7 @@ use std::path::Path;
 
 use log::{info, warn};
 
-use crate::{mod_man::ModManager, patching, paths, requests::Response};
+use crate::{mod_man::ModManager, models::response::Response, patching, paths};
 use anyhow::{anyhow, Context, Result};
 
 /// Handles `GetDowngradedManifest` [Requests](requests::Request).

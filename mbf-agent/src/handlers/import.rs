@@ -3,8 +3,8 @@ use std::path::{Path, PathBuf};
 use crate::{
     downloads,
     mod_man::ModManager,
+    models::response::{self, ImportResultType, Response},
     paths,
-    requests::{self, ImportResultType, Response},
 };
 use anyhow::{anyhow, Context, Result};
 use log::{debug, info, warn};
@@ -67,7 +67,7 @@ pub(super) fn handle_import(
     } else if file_ext == "dll" {
         // This is a PC mod file, so delete it and return this fact to the importer.
         std::fs::remove_file(path.clone()).context("Removing temporary upload file")?;
-        Ok(requests::ImportResultType::NonQuestModDetected)
+        Ok(response::ImportResultType::NonQuestModDetected)
     } else {
         attempt_file_copy(path.clone(), file_ext, mod_manager)
     };

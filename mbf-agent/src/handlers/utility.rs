@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use crate::{data_fix, mod_man::ModManager, patching, paths, requests::Response};
+use crate::{data_fix, mod_man::ModManager, models::response::Response, patching, paths};
 use anyhow::{anyhow, Context, Result};
 use log::{debug, info, warn};
 

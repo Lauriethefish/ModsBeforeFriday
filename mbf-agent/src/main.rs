@@ -4,16 +4,15 @@ mod downloads;
 mod handlers;
 mod manifest;
 mod mod_man;
+mod models;
 mod patching;
 mod paths;
-mod requests;
 
-use crate::requests::Request;
 use anyhow::{Context, Result};
 use downloads::DownloadConfig;
 use log::{debug, error, warn, Level};
 use mbf_res_man::res_cache::ResCache;
-use requests::Response;
+use models::{request, response};
 use serde::{Deserialize, Serialize};
 use std::{
     io::{BufRead, BufReader, Write},
@@ -116,14 +115,14 @@ impl log::Log for ResponseLogger {
         }
 
         // Ignore errors, logging should be infallible and we don't want to panic
-        let _result = write_response(Response::LogMsg {
+        let _result = write_response(response::Response::LogMsg {
             message: format!("{}", record.args()),
             level: match record.level() {
-                Level::Debug => requests::LogLevel::Debug,
-                Level::Info => requests::LogLevel::Info,
-                Level::Warn => requests::LogLevel::Warn,
-                Level::Error => requests::LogLevel::Error,
-                Level::Trace => requests::LogLevel::Trace,
+                Level::Debug => response::LogLevel::Debug,
+                Level::Info => response::LogLevel::Info,
+                Level::Warn => response::LogLevel::Warn,
+                Level::Error => response::LogLevel::Error,
+                Level::Trace => response::LogLevel::Trace,
             },
         });
     }
@@ -133,7 +132,7 @@ impl log::Log for ResponseLogger {
     }
 }
 
-fn write_response(response: Response) -> Result<()> {
+fn write_response(response: response::Response) -> Result<()> {
     let mut lock = std::io::stdout().lock();
     serde_json::to_writer(&mut lock, &response).context("Serializing JSON response")?;
     writeln!(lock)?;
@@ -152,7 +151,7 @@ fn main() -> Result<()> {
     let mut reader = BufReader::new(std::io::stdin());
     let mut line = String::new();
     reader.read_line(&mut line)?;
-    let req: Request = serde_json::from_str(&line)?;
+    let req: request::Request = serde_json::from_str(&line)?;
 
     // Set a panic hook that writes the panic as a JSON Log
     // (we don't do this in catch_unwind as we get an `Any` there, which doesn't implement Display)

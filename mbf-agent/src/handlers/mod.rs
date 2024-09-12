@@ -5,7 +5,10 @@ use std::{io::Cursor, process::Command};
 use crate::{
     downloads,
     mod_man::ModManager,
-    requests::{self, Request, Response},
+    models::{
+        request::Request,
+        response::{self, Response},
+    },
 };
 use anyhow::{anyhow, Context, Result};
 use log::info;
@@ -102,7 +105,7 @@ fn get_app_version_only() -> Result<String> {
 fn install_core_mods(
     res_cache: &ResCache,
     mod_manager: &mut ModManager,
-    app_info: requests::AppInfo,
+    app_info: response::AppInfo,
     override_core_mod_url: Option<String>,
 ) -> Result<()> {
     info!("Preparing core mods");

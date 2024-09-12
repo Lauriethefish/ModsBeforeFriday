@@ -8,9 +8,9 @@ use std::{
 use crate::{
     axml::{self, AxmlWriter},
     data_fix::fix_colour_schemes,
-    downloads, paths,
-    requests::{AppInfo, InstallStatus, ModLoader},
-    ModTag, APK_ID,
+    downloads,
+    models::response::{AppInfo, InstallStatus, ModLoader},
+    paths, ModTag, APK_ID,
 };
 use anyhow::{anyhow, Context, Result};
 use log::{info, warn};

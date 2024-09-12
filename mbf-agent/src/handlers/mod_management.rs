@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 use crate::{
     mod_man::ModManager,
-    requests::{ModModel, Response},
+    models::response::{ModModel, Response},
 };
 use anyhow::{Context, Result};
 use log::info;

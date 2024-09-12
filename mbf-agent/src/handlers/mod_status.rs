@@ -13,15 +13,15 @@ use crate::{
     axml::{self, AxmlReader},
     manifest::ManifestInfo,
     mod_man::ModManager,
+    models::response::{self, CoreModsInfo, Response},
     patching,
-    requests::{self, CoreModsInfo, Response},
 };
 use anyhow::{Context, Result};
 
-/// Handles `GetModStatus` [Requests](requests::Request).
+/// Handles `GetModStatus` [Requests](response::Request).
 ///
 /// # Returns
-/// The [Response](requests::Response) to the request (variant `ModStatus`)
+/// The [Response](response::Response) to the request (variant `ModStatus`)
 pub(super) fn handle_get_mod_status(override_core_mod_url: Option<String>) -> Result<Response> {
     crate::try_delete_legacy_dirs();
 
@@ -60,7 +60,7 @@ pub(super) fn handle_get_mod_status(override_core_mod_url: Option<String>) -> Re
     })
 }
 
-pub(super) fn get_app_info() -> Result<Option<requests::AppInfo>> {
+pub(super) fn get_app_info() -> Result<Option<response::AppInfo>> {
     let apk_path = match crate::get_apk_path().context("Finding APK path")? {
         Some(path) => path,
         None => return Ok(None),
@@ -73,7 +73,7 @@ pub(super) fn get_app_info() -> Result<Option<requests::AppInfo>> {
     let obb_present = patching::check_obb_present()?;
 
     let (manifest_info, manifest_xml) = get_manifest_info_and_xml(&mut apk)?;
-    Ok(Some(requests::AppInfo {
+    Ok(Some(response::AppInfo {
         loader_installed: modloader,
         version: manifest_info.package_version,
         obb_present,
@@ -139,7 +139,7 @@ fn get_core_mods_info(
     // Check that all core mods are installed with an appropriate version
     let all_core_mods_installed = match core_mods.get(apk_version) {
         Some(core_mods) => get_core_mods_install_status(&core_mods.mods, mod_manager),
-        None => requests::InstallStatus::Missing,
+        None => response::InstallStatus::Missing,
     };
 
     let supported_versions: Vec<String> = core_mods
@@ -232,7 +232,7 @@ fn try_parse_bs_ver_as_semver(version: &str) -> Option<semver::Version> {
 fn get_core_mods_install_status(
     core_mods: &[CoreMod],
     mod_man: &ModManager,
-) -> requests::InstallStatus {
+) -> response::InstallStatus {
     info!("Checking if core mods installed and up to date");
     mark_all_core_mods(mod_man, core_mods);
 
@@ -263,11 +263,11 @@ fn get_core_mods_install_status(
     }
 
     if missing_core_mods {
-        requests::InstallStatus::Missing
+        response::InstallStatus::Missing
     } else if outdated_core_mods {
-        requests::InstallStatus::NeedUpdate
+        response::InstallStatus::NeedUpdate
     } else {
-        requests::InstallStatus::Ready
+        response::InstallStatus::Ready
     }
 }
 
