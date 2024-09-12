@@ -53,8 +53,8 @@ pub enum Request {
     Import {
         from_path: String
     },
-    /// Downloads the file from the given URL and then attempts to import it as a mod (only).
-    /// Returns an ImportedMod message.
+    /// Downloads the file from the given URL and then attempts to import it.
+    /// Returns an ImportResult message.
     ImportUrl {
         from_url: String,
     },
