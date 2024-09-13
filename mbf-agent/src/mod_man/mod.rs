@@ -1,8 +1,12 @@
+//! Module for mod management within MBF.
+
 mod manifest;
+mod util;
 
 use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},
+    ffi::{OsStr, OsString},
     fs::OpenOptions,
     io::{Cursor, Read, Seek},
     path::{Path, PathBuf},
@@ -28,12 +32,13 @@ use crate::{downloads, paths};
 /// This is the same schema used by QuestPatcher.
 const QMOD_SCHEMA: &str = include_str!("qmod_schema.json");
 /// The maximum `_QPVersion` that MBF will accept in `mod.json`.
-/// 
+///
 /// NB: The schema also checks that this property is an allowed value, however it is good
 /// if we can detect a version that's too new/old manually to give a more helpful error message
 /// than "schema validation failed."
 const MAX_SCHEMA_VERSION: Version = Version::new(1, 2, 0);
 
+/// Represents a mod that is loaded by MBF.
 pub struct Mod {
     /// The `mod.json` manifest of the mod.
     manifest: ModInfo,
@@ -91,11 +96,11 @@ pub struct ModManager<'cache> {
 
 impl<'cache> ModManager<'cache> {
     /// Creates a new [ModManager].
-    /// 
+    ///
     /// # Arguments
     /// * `game_version` - The full `versionName` of the installed Beat Saber app.
     /// * `res_cache` - MBF resource cache.
-    /// 
+    ///
     /// # Returns
     /// A new [ModManager] with specified parameters. The instance returned *will not* have mods loaded
     /// yet, and this must be done by invoking [ModManager::load_mods].
@@ -126,7 +131,7 @@ impl<'cache> ModManager<'cache> {
             paths::LATE_MODS,
             paths::EARLY_MODS,
             paths::LIBS,
-            &self.qmods_dir
+            &self.qmods_dir,
         ];
         for path in to_remove {
             let path = Path::new(path);
@@ -157,7 +162,7 @@ impl<'cache> ModManager<'cache> {
     }
 
     /// Loads the installed mods from the [paths::QMODS] directory in ModData.
-    /// 
+    ///
     /// Also loads any legacy (non-extracted) mods found in the [paths::OLD_QMODS] directory,
     /// if the directory exists, and extracts them to the new path. [paths::OLD_QMODS] is then deleted.
     pub fn load_mods(&mut self) -> Result<()> {
@@ -252,7 +257,7 @@ impl<'cache> ModManager<'cache> {
     /// - A dependency conflict (a dependency needs to be upgraded to install the mod but another mod will not allow
     /// the newer version to be installed.)
     /// - `id` is not the ID of an installed mod.
-    /// 
+    ///
     /// This function will NOT fail if the mod is missing one of its stated mod/lib/late_mod files, but will instead
     /// log a warning.
     pub fn install_mod(&mut self, id: &str) -> Result<()> {
@@ -309,7 +314,7 @@ impl<'cache> ModManager<'cache> {
 
     /// Uninstalls the mod with the given ID.
     /// This process will uninstall any mods that depend on the mod with a required dependency,.
-    /// 
+    ///
     /// This does nothing if the mod is not already installed (see [Mod::installed])
     /// # Arguments
     /// * `id` - the ID of the mod to uninstall.
@@ -361,12 +366,12 @@ impl<'cache> ModManager<'cache> {
 
     /// Attempts to load a new QMOD from a stream.
     /// This will load the mod as a ZIP and validate its manifest.
-    /// 
+    ///
     /// If a mod with this mod's ID already exists in the [ModManager], this function checks, for all mods that are dependant
     /// on the ID, that the new mod version matches their dependency constraints.
     /// If this is not the case, the operation fails.
     /// If this is the case, the existing mod will be overwritten with the new mod.
-    /// 
+    ///
     /// The mod will not be automatically installed, [ModManager::install_mod] must be called separately.
     /// # Arguments
     /// * `mod_stream` - A readable and seekable stream to load the mod from.
@@ -437,7 +442,7 @@ impl<'cache> ModManager<'cache> {
 
     /// Uninstalls (if installed) and deletes the mod with the specified ID.
     /// If no mod exists with this ID, then the operation does nothing.
-    /// 
+    ///
     /// This will uninstall any mods with a required dependency on this mod and any of their dependencies transitively.
     /// # Arguments
     /// * `id` - the ID of the mod to delete.
@@ -489,9 +494,9 @@ impl<'cache> ModManager<'cache> {
     /// .. and updates this in the Mod structure.
     fn check_if_mod_files_exist(manifest: &ModInfo) -> Result<bool> {
         Ok(
-            files_exist_in_dir(paths::EARLY_MODS, manifest.mod_files.iter())?
-                && files_exist_in_dir(paths::LATE_MODS, manifest.late_mod_files.iter())?
-                && files_exist_in_dir(paths::LIBS, manifest.library_files.iter())?
+            util::files_exist_in_dir(paths::EARLY_MODS, manifest.mod_files.iter())?
+                && util::files_exist_in_dir(paths::LATE_MODS, manifest.late_mod_files.iter())?
+                && util::files_exist_in_dir(paths::LIBS, manifest.library_files.iter())?
                 && manifest
                     .file_copies
                     .iter()
@@ -599,17 +604,17 @@ impl<'cache> ModManager<'cache> {
     /// Installs a mod without handling dependencies
     /// i.e. just copies the necessary files.
     fn install_unchecked(&self, to_install: &mut Mod) -> Result<()> {
-        copy_stated_files(
+        util::copy_files_from_mod_folder(
             &to_install.loaded_from,
             &to_install.manifest.mod_files,
             paths::EARLY_MODS,
         )?;
-        copy_stated_files(
+        util::copy_files_from_mod_folder(
             &to_install.loaded_from,
             &to_install.manifest.library_files,
             paths::LIBS,
         )?;
-        copy_stated_files(
+        util::copy_files_from_mod_folder(
             &to_install.loaded_from,
             &to_install.manifest.late_mod_files,
             paths::LATE_MODS,
@@ -654,7 +659,7 @@ impl<'cache> ModManager<'cache> {
     /// i.e. just deletes the necessary files.
     fn uninstall_unchecked(&self, id: &str) -> Result<()> {
         // Gather a set of all library SOs being used by other mods.
-        let mut retained_libs = HashSet::new();
+        let mut retained_libs: HashSet<OsString> = HashSet::new();
         for (other_id, other_mod) in &self.mods {
             if other_id == id {
                 continue;
@@ -667,25 +672,28 @@ impl<'cache> ModManager<'cache> {
             }
 
             for lib_path in other_mod_ref.manifest.library_files.iter() {
-                retained_libs.insert(get_so_name(&lib_path).to_string());
+                if let Some(file_name) = Path::new(lib_path).file_name() {
+                    retained_libs.insert(file_name.to_owned());
+                }
             }
         }
 
         let mut to_remove = (**self.mods.get(id).unwrap()).borrow_mut();
-        delete_file_names(
-            &to_remove.manifest.mod_files,
-            HashSet::new(),
+        util::remove_file_names_from_folder(
+            to_remove.manifest.mod_files.iter(),
             paths::EARLY_MODS,
         )?;
-        delete_file_names(
-            &to_remove.manifest.late_mod_files,
-            HashSet::new(),
+        util::remove_file_names_from_folder(
+            to_remove.manifest.late_mod_files.iter(),
             paths::LATE_MODS,
         )?;
-        // Only delete libraries not in use (!)
-        delete_file_names(
-            &to_remove.manifest.library_files,
-            retained_libs,
+        util::remove_file_names_from_folder(
+            // Only delete libraries not in use (!)
+            to_remove
+                .manifest
+                .library_files
+                .iter()
+                .filter(|lib_file| !retained_libs.contains(OsStr::new(lib_file))),
             paths::LIBS,
         )?;
 
@@ -954,82 +962,4 @@ impl<'cache> ModManager<'cache> {
 
         Ok(self.mod_repo.as_ref().expect("Just loaded mod repo"))
     }
-}
-
-fn get_so_name(path: &str) -> &str {
-    path.split('/').last().unwrap()
-}
-
-// Deletes the files corresponding to the given SO files in a QMOD from the given folder
-// (i.e. will only consider the SO file name, not the full path in the ZIP)
-// `exclude` is a set of all of the SO file names that must not be deleted, (as they are being used by another mod).
-fn delete_file_names(
-    file_paths: &[String],
-    exclude: HashSet<String>,
-    within: impl AsRef<Path>,
-) -> Result<()> {
-    for path in file_paths {
-        let file_name = get_so_name(path);
-        if exclude.contains(file_name) {
-            debug!("Keeping lib {file_name} as it's used by another mod");
-            continue;
-        }
-
-        let stored_path = within.as_ref().join(file_name);
-        if stored_path.exists() {
-            debug!("Removing {file_name}");
-            std::fs::remove_file(stored_path)?;
-        }
-    }
-
-    Ok(())
-}
-
-// Copies all of the files with names in `files` to the path `to/{file name not including directory in ZIP}`
-fn copy_stated_files(
-    mod_folder: impl AsRef<Path>,
-    files: &[String],
-    to: impl AsRef<Path>,
-) -> Result<()> {
-    for file in files {
-        let file_location = mod_folder.as_ref().join(file);
-
-        if !file_location.exists() {
-            warn!("Could not install file {file} as it wasn't found in the QMOD");
-            continue;
-        }
-
-        let file_name = file.split('/').last().unwrap();
-        let copy_to = to.as_ref().join(file_name);
-
-        debug!("Copying {file_name} to {copy_to:?}");
-
-        if copy_to.exists() {
-            std::fs::remove_file(&copy_to).context("Removing existing mod file")?;
-        }
-        std::fs::copy(file_location, copy_to).context("Copying SO for mod")?;
-    }
-
-    Ok(())
-}
-
-// For each file path in `file_names`:
-// - Gets only the file name of this path if it has a stem.
-// - Appends this file_name to `dir_path`.
-// - Checks if the file exists
-// Returns true iff all of the files in `file_names` exist within `dir_path` as above.
-fn files_exist_in_dir(
-    dir_path: impl AsRef<Path>,
-    mut file_names: impl Iterator<Item = impl AsRef<Path>>,
-) -> Result<bool> {
-    let dir_path = dir_path.as_ref();
-    Ok(file_names.all(|name| {
-        dir_path
-            .join(
-                name.as_ref()
-                    .file_name()
-                    .expect("Mod file names should not be blank"),
-            )
-            .exists()
-    }))
 }

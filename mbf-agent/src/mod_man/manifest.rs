@@ -1,3 +1,5 @@
+//! Structures for the deserialization for the QMOD `mod.json` file.
+//!
 //! Taken from the QPM.qmod library at the following URL
 //! https://github.com/QuestPackageManager/QPM.qmod/blob/main/src/models/mod_json.rs
 //! This code is under the GNU General Public License version 3, found here:
@@ -6,12 +8,12 @@
 use semver::{Version, VersionReq};
 use serde::{Deserialize, Serialize};
 
+/// Model for the `mod.json` manifest within a QMOD.
 #[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
-#[serde(default)] // skip missing fields
+#[serde(default)] // Skip missing fields
 pub struct ModInfo {
     /// The Questpatcher version this mod.json was made for
-    /// 1.1.0
     #[serde(rename(serialize = "_QPVersion", deserialize = "_QPVersion"))]
     pub schema_version: Version,
     /// Name of the mod
@@ -84,23 +86,23 @@ impl Default for ModInfo {
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ModDependency {
-    /// the version requirement for this dependency
+    /// The version requirement for this dependency
     #[serde(rename = "version")]
     pub version_range: VersionReq,
-    /// the id of this dependency
+    /// The id of this dependency
     pub id: String,
-    /// the download link for this dependency, must satisfy id and version range!
+    /// The download link for this dependency, must satisfy id and version range!
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "downloadIfMissing")]
     pub mod_link: Option<String>,
+    /// Whether this dependency must be installed for the dependant mod to be installed.
+    /// If this is `false`, then the dependency must satisfy `version_range` *if* it is installed.
     #[serde(default = "true_default")]
     pub required: bool,
 }
 
-fn true_default() -> bool {
-    true
-}
-
+/// A QMOD file copy.
+/// These can be used to copy arbitrary files to arbitrary locations on the Quest.
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct FileCopy {
@@ -110,6 +112,8 @@ pub struct FileCopy {
     pub destination: String,
 }
 
+/// A QMOD copy extension
+/// Copy extensions allow mods to specify where files with particular file extensions should be copied to.
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct CopyExtension {
@@ -117,4 +121,8 @@ pub struct CopyExtension {
     pub extension: String,
     /// the destination folder these files should be going to
     pub destination: String,
+}
+
+fn true_default() -> bool {
+    true
 }
