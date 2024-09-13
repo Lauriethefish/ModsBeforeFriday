@@ -2,11 +2,12 @@
 
 mod manifest;
 mod util;
+mod loaded_mod;
 
 use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},
-    ffi::{OsStr, OsString},
+    ffi::OsString,
     fs::OpenOptions,
     io::{Cursor, Read, Seek},
     path::{Path, PathBuf},
@@ -16,6 +17,7 @@ use std::{
 use jsonschema::JSONSchema;
 use log::{debug, error, info, warn};
 pub use manifest::*;
+pub use loaded_mod::Mod;
 
 use anyhow::{anyhow, Context, Result};
 use mbf_res_man::{
@@ -37,46 +39,6 @@ const QMOD_SCHEMA: &str = include_str!("qmod_schema.json");
 /// if we can detect a version that's too new/old manually to give a more helpful error message
 /// than "schema validation failed."
 const MAX_SCHEMA_VERSION: Version = Version::new(1, 2, 0);
-
-/// Represents a mod that is loaded by MBF.
-pub struct Mod {
-    /// The `mod.json` manifest of the mod.
-    manifest: ModInfo,
-    /// Whether all mod files exist in their expected destinations
-    /// Set immediately after loading a mod, no need to wait for other mods to be loaded.
-    files_exist: bool,
-    /// Whether or not the mod is installed, which is only considered `true` if all of its dependencies are also installed.
-    /// This is optional as this can only be determined once all mods are loaded. It is None up until this point.
-    installed: Option<bool>,
-    /// The folder that this mod was loaded from,.
-    loaded_from: PathBuf,
-    /// Whether the mod is core or any (transitive) required dependency of a core mod.
-    is_core: bool,
-}
-
-impl Mod {
-    /// Gets whether or not the mod is currently considered to be installed.
-    /// This is true if all of the mod's late mod files, library files, early mod files and file copies are all present
-    /// AND the same is true for all dependencies of this mod, transitively.
-    pub fn installed(&self) -> bool {
-        self.installed.expect(
-            "Mod install status should have been checked
-            before mod was made available through public API",
-        )
-    }
-
-    /// Gets a reference to the manifest of the mod.
-    pub fn manifest(&self) -> &ModInfo {
-        &self.manifest
-    }
-
-    /// Gets a boolean indicating whether the mod is a core mod.
-    /// NB: This value will be false until [ModManager::set_mod_core] is called with the ID of the mod OR the ID
-    /// of any mod that depends on this mod with a required dependency (transitively).
-    pub fn is_core(&self) -> bool {
-        self.is_core
-    }
-}
 
 /// A structure to manage QMODs installed on Beat Saber.
 pub struct ModManager<'cache> {
@@ -182,15 +144,15 @@ impl<'cache> ModManager<'cache> {
 
             match self.load_mod_from_directory(mod_path.clone()) {
                 Ok(loaded_mod) => {
-                    if !self.mods.contains_key(&loaded_mod.manifest.id) {
+                    if !self.mods.contains_key(&loaded_mod.manifest().id) {
                         self.mods.insert(
-                            loaded_mod.manifest.id.clone(),
+                            loaded_mod.manifest().id.clone(),
                             Rc::new(RefCell::new(loaded_mod)),
                         );
                     } else {
                         warn!(
                             "Mod at {mod_path:?} had ID {}, but a mod with this ID already existed",
-                            loaded_mod.manifest.id
+                            loaded_mod.manifest().id
                         );
                     }
                 }
@@ -277,17 +239,17 @@ impl<'cache> ModManager<'cache> {
 
         info!(
             "Installing {} v{}",
-            to_install.manifest.id, to_install.manifest.version
+            to_install.manifest().id, to_install.manifest().version
         );
 
-        for dep in &to_install.manifest.dependencies {
+        for dep in &to_install.manifest().dependencies {
             match self.mods.get(&dep.id) {
                 Some(existing_dep) => {
                     let dep_ref = (**existing_dep).borrow();
-                    if !dep.version_range.matches(&dep_ref.manifest.version) {
+                    if !dep.version_range.matches(&dep_ref.manifest().version) {
                         info!(
                             "Dependency {} is out of date, got version {} but need {}",
-                            dep.id, dep_ref.manifest.version, dep.version_range
+                            dep.id, dep_ref.manifest().version, dep.version_range
                         );
                         drop(dep_ref);
                         self.install_dependency(&dep)?;
@@ -308,7 +270,7 @@ impl<'cache> ModManager<'cache> {
         }
         drop(to_install);
 
-        self.install_unchecked(&mut (*mod_rc).borrow_mut())?;
+        mod_rc.borrow_mut().install_unchecked()?;
         Ok(())
     }
 
@@ -336,7 +298,7 @@ impl<'cache> ModManager<'cache> {
 
         info!(
             "Uninstalling {} v{}",
-            to_remove.manifest.id, to_remove.manifest.version
+            to_remove.manifest().id, to_remove.manifest().version
         );
         drop(to_remove); // Avoid other code that needs the mod from panicking
 
@@ -349,7 +311,7 @@ impl<'cache> ModManager<'cache> {
             let m_ref = (**m).borrow();
             if m_ref.installed()
                 && m_ref
-                    .manifest
+                    .manifest()
                     .dependencies
                     .iter()
                     .any(|dep| &dep.id == id && dep.required)
@@ -360,7 +322,8 @@ impl<'cache> ModManager<'cache> {
             }
         }
 
-        self.uninstall_unchecked(id)?;
+        mod_rc.borrow_mut().uninstall_unchecked(self.get_retained_lib_files(id))
+            .context("Uninstalling unchecked")?;
         Ok(())
     }
 
@@ -406,9 +369,10 @@ impl<'cache> ModManager<'cache> {
         // Remove the existing version of the mod,
         // unchecked as we don't want to nuke any dependant mods or any of its dependencies; we have established that the upgrade is safe.
         // by allowing remove_mod to run a regular uninstall
-        if self.mods.contains_key(&id) {
+        if let Some(existing_mod) = self.mods.get(&id) {
             info!("Removing existing version of mod");
-            self.uninstall_unchecked(&id)?;
+            existing_mod.borrow_mut().uninstall_unchecked(self.get_retained_lib_files(&id))
+                .context("Uninstalling existing mod")?;
         }
         self.remove_mod(&id)?;
 
@@ -424,13 +388,7 @@ impl<'cache> ModManager<'cache> {
             .context("Extracting QMOD file")?;
 
         // Insert the mod into the HashMap of loaded mods, and now it is ready to be manipulated by the mod manager!
-        let loaded_mod = Mod {
-            installed: None,
-            files_exist: Self::check_if_mod_files_exist(&loaded_mod_manifest)?,
-            manifest: loaded_mod_manifest,
-            loaded_from: extract_path,
-            is_core: false,
-        };
+        let loaded_mod = Mod::new(loaded_mod_manifest, extract_path).context("Creating Mod")?;
         self.mods
             .insert(id.clone(), Rc::new(RefCell::new(loaded_mod)));
 
@@ -447,20 +405,17 @@ impl<'cache> ModManager<'cache> {
     /// # Arguments
     /// * `id` - the ID of the mod to delete.
     pub fn remove_mod(&mut self, id: &str) -> Result<()> {
-        match self.mods.get(id) {
-            Some(to_remove) => {
-                let to_remove_ref: std::cell::Ref<Mod> = (**to_remove).borrow();
-                let path_to_delete = to_remove_ref.loaded_from.clone();
+        if self.mods.contains_key(id) {
+            self.uninstall_mod(id)?;
+            let to_remove = self.mods.remove(id).unwrap();
+            let owned_mod = Rc::try_unwrap(to_remove)
+                .expect("Should be only one reference")
+                .into_inner();
 
-                drop(to_remove_ref);
-                self.uninstall_mod(id)?;
-                self.mods.remove(id);
-
-                std::fs::remove_dir_all(path_to_delete)?;
-                Ok(())
-            }
-            None => Ok(()),
+            owned_mod.delete_unchecked().context("Deleting mod files")?;
         }
+
+        Ok(())
     }
 
     /// Sets a particular mod ID as being a core mod.
@@ -481,28 +436,12 @@ impl<'cache> ModManager<'cache> {
             mod_ref.is_core = true;
 
             // Recursively mark all dependencies as core.
-            for dependency in &mod_ref.manifest.dependencies {
+            for dependency in &mod_ref.manifest().dependencies {
                 if dependency.required {
                     self.set_mod_core(&dependency.id);
                 }
             }
         }
-    }
-
-    /// Checks whether the mod with the provided mod manifest has all of its
-    /// file copies, mod, late_mod and lib files in their expected destinations,
-    /// .. and updates this in the Mod structure.
-    fn check_if_mod_files_exist(manifest: &ModInfo) -> Result<bool> {
-        Ok(
-            util::files_exist_in_dir(paths::EARLY_MODS, manifest.mod_files.iter())?
-                && util::files_exist_in_dir(paths::LATE_MODS, manifest.late_mod_files.iter())?
-                && util::files_exist_in_dir(paths::LIBS, manifest.library_files.iter())?
-                && manifest
-                    .file_copies
-                    .iter()
-                    .map(|copy| &copy.destination)
-                    .all(|dest| Path::new(dest).exists()),
-        )
     }
 
     /// Attempts to load QMODs found in the legacy ModsBeforeFriday directory.
@@ -555,14 +494,7 @@ impl<'cache> ModManager<'cache> {
         let manifest = self
             .load_manifest_from_slice(&json_data)
             .context("Parsing manifest as JSON")?;
-        Ok(Mod {
-            files_exist: Self::check_if_mod_files_exist(&manifest)
-                .context("Checking if mod files exist when loading mod")?,
-            manifest,
-            installed: None, // Must call update_mods_status
-            loaded_from: from,
-            is_core: false, // Only set when the user of the ModManager calls set_core_mod
-        })
+        Ok(Mod::new(manifest, from).context("Creating Mod")?)
     }
 
     fn load_manifest_from_slice(&self, manifest_slice: &[u8]) -> Result<ModInfo> {
@@ -601,67 +533,17 @@ impl<'cache> ModManager<'cache> {
             .expect("Failed to parse as QMOD manifest, despite being valid according to schema. This is a bug"))
     }
 
-    /// Installs a mod without handling dependencies
-    /// i.e. just copies the necessary files.
-    fn install_unchecked(&self, to_install: &mut Mod) -> Result<()> {
-        util::copy_files_from_mod_folder(
-            &to_install.loaded_from,
-            &to_install.manifest.mod_files,
-            paths::EARLY_MODS,
-        )?;
-        util::copy_files_from_mod_folder(
-            &to_install.loaded_from,
-            &to_install.manifest.library_files,
-            paths::LIBS,
-        )?;
-        util::copy_files_from_mod_folder(
-            &to_install.loaded_from,
-            &to_install.manifest.late_mod_files,
-            paths::LATE_MODS,
-        )?;
-
-        for file_copy in &to_install.manifest.file_copies {
-            let file_path_in_mod = to_install.loaded_from.join(&file_copy.name);
-            if !file_path_in_mod.exists() {
-                warn!(
-                    "Could not install file copy {} as it did not exist in the QMOD",
-                    file_copy.name
-                );
-                continue;
-            }
-
-            let dest_path = Path::new(&file_copy.destination);
-            match dest_path.parent() {
-                Some(parent) => std::fs::create_dir_all(parent)
-                    .context("Creating destination directory for file copy")?,
-                None => {}
-            }
-
-            if Path::new(&file_copy.destination).exists() {
-                std::fs::remove_file(&file_copy.destination)
-                    .context("Removing existing copied file")?;
-            }
-
-            debug!(
-                "Installing file copy {file_path_in_mod:?} to {}",
-                file_copy.destination
-            );
-            std::fs::copy(file_path_in_mod, &file_copy.destination)
-                .context("Copying stated file copy to destination")?;
-        }
-        to_install.installed = Some(true);
-        to_install.files_exist = true;
-
-        Ok(())
-    }
-
-    /// Uninstalls a mod without handling dependencies
-    /// i.e. just deletes the necessary files.
-    fn uninstall_unchecked(&self, id: &str) -> Result<()> {
-        // Gather a set of all library SOs being used by other mods.
+    /// Used to avoid removing library files that are still in use by another mod when uninstalling a mod.
+    /// # Arguments
+    /// * `uninstalling_id` - The ID of the mod that is being uninstalled.
+    /// Library files belonging to this mod ID will NOT be included.
+    /// # Returns
+    /// A HashSet of the file name (with extension) of all library files in use by an installed mod that DOES NOT
+    /// have ID `uninstalling_id`.
+    fn get_retained_lib_files(&self, uninstalling_id: &str) -> HashSet<OsString> {
         let mut retained_libs: HashSet<OsString> = HashSet::new();
-        for (other_id, other_mod) in &self.mods {
-            if other_id == id {
+        for (id, other_mod) in &self.mods {
+            if id == uninstalling_id {
                 continue;
             }
 
@@ -671,43 +553,14 @@ impl<'cache> ModManager<'cache> {
                 continue;
             }
 
-            for lib_path in other_mod_ref.manifest.library_files.iter() {
+            for lib_path in other_mod_ref.manifest().library_files.iter() {
                 if let Some(file_name) = Path::new(lib_path).file_name() {
                     retained_libs.insert(file_name.to_owned());
                 }
             }
         }
 
-        let mut to_remove = (**self.mods.get(id).unwrap()).borrow_mut();
-        util::remove_file_names_from_folder(
-            to_remove.manifest.mod_files.iter(),
-            paths::EARLY_MODS,
-        )?;
-        util::remove_file_names_from_folder(
-            to_remove.manifest.late_mod_files.iter(),
-            paths::LATE_MODS,
-        )?;
-        util::remove_file_names_from_folder(
-            // Only delete libraries not in use (!)
-            to_remove
-                .manifest
-                .library_files
-                .iter()
-                .filter(|lib_file| !retained_libs.contains(OsStr::new(lib_file))),
-            paths::LIBS,
-        )?;
-
-        for copy in &to_remove.manifest.file_copies {
-            let dest_path = Path::new(&copy.destination);
-            if dest_path.exists() {
-                debug!("Removing file copy at destination {dest_path:?}");
-                std::fs::remove_file(dest_path).context("Deleting copied file")?;
-            }
-        }
-        to_remove.installed = Some(false);
-        to_remove.files_exist = false;
-
-        Ok(())
+        retained_libs
     }
 
     fn install_dependency(&mut self, dep: &ModDependency) -> Result<()> {
@@ -827,17 +680,17 @@ impl<'cache> ModManager<'cache> {
         checked_in_path: &mut HashSet<String>,
     ) -> Result<bool> {
         // If the mod does not have its files in the necessary destinations, then this mod definitely is not installed, so no need to check dependencies.
-        if !mod_ref.files_exist {
+        if !mod_ref.files_exist() {
             return Ok(false);
         }
 
-        for dependency in &mod_ref.manifest.dependencies {
+        for dependency in &mod_ref.manifest().dependencies {
             match self.get_mod(&dependency.id) {
                 Some(dep_rc) => {
                     let dep_ref = dep_rc.borrow();
 
                     // Check if the dependency is within the required version range, if not then the mod definitely isn't installed.
-                    if !dependency.version_range.matches(&dep_ref.manifest.version) {
+                    if !dependency.version_range.matches(&dep_ref.manifest().version) {
                         return Ok(false);
                     }
 
@@ -919,7 +772,7 @@ impl<'cache> ModManager<'cache> {
             }
 
             match mod_ref
-                .manifest
+                .manifest()
                 .dependencies
                 .iter()
                 .filter(|existing_dep| existing_dep.id == dep_id)
@@ -930,7 +783,7 @@ impl<'cache> ModManager<'cache> {
                         all_compatible = false;
                         let incompat_msg = format!(
                             "Mod {} depends on range {}",
-                            mod_ref.manifest.id, existing_dep.version_range
+                            mod_ref.manifest().id, existing_dep.version_range
                         );
 
                         error!("Cannot upgrade {dep_id} to {new_version}: {incompat_msg}");
