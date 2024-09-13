@@ -24,10 +24,18 @@ use semver::Version;
 
 use crate::{downloads, paths};
 
+/// The JSON schema for the `mod.json` file within a qmod.
+/// This is the same schema used by QuestPatcher.
 const QMOD_SCHEMA: &str = include_str!("qmod_schema.json");
+/// The maximum `_QPVersion` that MBF will accept in `mod.json`.
+/// 
+/// NB: The schema also checks that this property is an allowed value, however it is good
+/// if we can detect a version that's too new/old manually to give a more helpful error message
+/// than "schema validation failed."
 const MAX_SCHEMA_VERSION: Version = Version::new(1, 2, 0);
 
 pub struct Mod {
+    /// The `mod.json` manifest of the mod.
     manifest: ModInfo,
     /// Whether all mod files exist in their expected destinations
     /// Set immediately after loading a mod, no need to wait for other mods to be loaded.
@@ -132,15 +140,26 @@ impl<'cache> ModManager<'cache> {
         Ok(())
     }
 
+    /// Gets all loaded mods.
+    /// # Returns
+    /// An iterator over all currently loaded mods.
     pub fn get_mods(&self) -> impl Iterator<Item = &Rc<RefCell<Mod>>> {
         self.mods.values()
     }
 
+    /// Gets a mod by its ID.
+    /// # Arguments
+    /// * `id` - The ID of the mod to fetch.
+    /// # Returns
+    /// The mod with ID `id`, or [Option::None] if no such mod existed.
     pub fn get_mod(&self, id: &str) -> Option<&Rc<RefCell<Mod>>> {
         self.mods.get(id)
     }
 
-    /// Loads any mods from the QMODs directory that have not yet been loaded.
+    /// Loads the installed mods from the [paths::QMODS] directory in ModData.
+    /// 
+    /// Also loads any legacy (non-extracted) mods found in the [paths::OLD_QMODS] directory,
+    /// if the directory exists, and extracts them to the new path. [paths::OLD_QMODS] is then deleted.
     pub fn load_mods(&mut self) -> Result<()> {
         self.create_mods_dir()?;
         self.mods.clear();
@@ -205,7 +224,6 @@ impl<'cache> ModManager<'cache> {
     /// A mod is considered installed if:
     /// 1 - All mod files, late mod files, lib files and file copies exist in their expected destinations.
     /// 2 - All of its dependencies are installed and are within the expected version range
-    /// This method uses the existing state of `Mod#files_exist` for each mod, i.e. it will not re-check whether the mod files exist for each mod.
     pub fn check_mods_installed(&mut self) -> Result<()> {
         debug!("Checking if mods are installed");
         // Set all mods to having no known install status
@@ -223,72 +241,20 @@ impl<'cache> ModManager<'cache> {
         Ok(())
     }
 
-    // Updates whether the mod with the given ID is currently installed.
-    // This will recursively check whether any dependent mods are installed.
-    // `checked_in_path` is used to detect recursive dependencies - which are not allowed and will trigger an error.
-    // Returns the new state of Mod#installed for the mod.
-    fn check_mod_installed(&self, id: &str, checked_in_pass: &mut HashSet<String>) -> Result<bool> {
-        if !checked_in_pass.insert(id.to_string()) {
-            return Err(anyhow!("Recursive dependency detected. Mod with ID {id} depends on itself, directly or indirectly. This is not permitted"));
-        }
-
-        let mod_rc = self
-            .mods
-            .get(id)
-            .ok_or(anyhow!("No mod with ID {id} found"))?;
-
-        let mod_ref = mod_rc.borrow();
-        let installed = self.check_mod_installed_internal(&*mod_ref, checked_in_pass)?;
-
-        drop(mod_ref);
-        mod_rc.borrow_mut().installed = Some(installed);
-
-        Ok(installed)
-    }
-
-    // Does the actual checking of whether a mod is installed.
-    // Returns whether the mod should be set as installed or not.
-    fn check_mod_installed_internal(
-        &self,
-        mod_ref: &Mod,
-        checked_in_path: &mut HashSet<String>,
-    ) -> Result<bool> {
-        // If the mod does not have its files in the necessary destinations, then this mod definitely is not installed, so no need to check dependencies.
-        if !mod_ref.files_exist {
-            return Ok(false);
-        }
-
-        for dependency in &mod_ref.manifest.dependencies {
-            match self.get_mod(&dependency.id) {
-                Some(dep_rc) => {
-                    let dep_ref = dep_rc.borrow();
-
-                    // Check if the dependency is within the required version range, if not then the mod definitely isn't installed.
-                    if !dependency.version_range.matches(&dep_ref.manifest.version) {
-                        return Ok(false);
-                    }
-
-                    // If the dependency exists and is within the required range, we need to verify that it is installed also
-                    if !match dep_ref.installed {
-                        None => {
-                            drop(dep_ref);
-                            self.check_mod_installed(&dependency.id, checked_in_path)
-                                .context("Checking if dependency was installed")?
-                        }
-                        Some(installed) => installed,
-                    } {
-                        return Ok(false);
-                    }
-                }
-                None => return Ok(false),
-            }
-        }
-
-        Ok(true)
-    }
-
     /// Installs the mod with the given ID.
-    /// This will install dependencies if necessary.
+    /// This will install/upgrade dependencies if necessary.
+    /// If the mod is already installed (see [Mod::installed]), this does nothing.
+    /// # Arguments
+    /// * `id` the ID of the mod to install.
+    /// # Returns
+    /// `Ok` if all mod files were copied successfully and all dependencies were installed correctly.
+    /// Reasons for failure could include:
+    /// - A dependency conflict (a dependency needs to be upgraded to install the mod but another mod will not allow
+    /// the newer version to be installed.)
+    /// - `id` is not the ID of an installed mod.
+    /// 
+    /// This function will NOT fail if the mod is missing one of its stated mod/lib/late_mod files, but will instead
+    /// log a warning.
     pub fn install_mod(&mut self, id: &str) -> Result<()> {
         // Install the mod's dependencies if applicable
         let mod_rc = self
@@ -342,7 +308,14 @@ impl<'cache> ModManager<'cache> {
     }
 
     /// Uninstalls the mod with the given ID.
-    /// This will uninstall dependant mods if necessary
+    /// This process will uninstall any mods that depend on the mod with a required dependency,.
+    /// 
+    /// This does nothing if the mod is not already installed (see [Mod::installed])
+    /// # Arguments
+    /// * `id` - the ID of the mod to uninstall.
+    /// # Returns
+    /// `Ok` if the operation succeeded. Failure should only happen in case of an IO error,
+    /// which should not happen as the MBF process should have enough permissions to access the mod directories.
     pub fn uninstall_mod(&self, id: &str) -> Result<()> {
         let mod_rc = self
             .mods
@@ -386,8 +359,19 @@ impl<'cache> ModManager<'cache> {
         Ok(())
     }
 
-    /// Loads a new mod from a QMOD file.
-    /// Returns the mod ID
+    /// Attempts to load a new QMOD from a stream.
+    /// This will load the mod as a ZIP and validate its manifest.
+    /// 
+    /// If a mod with this mod's ID already exists in the [ModManager], this function checks, for all mods that are dependant
+    /// on the ID, that the new mod version matches their dependency constraints.
+    /// If this is not the case, the operation fails.
+    /// If this is the case, the existing mod will be overwritten with the new mod.
+    /// 
+    /// The mod will not be automatically installed, [ModManager::install_mod] must be called separately.
+    /// # Arguments
+    /// * `mod_stream` - A readable and seekable stream to load the mod from.
+    /// # Returns
+    /// If successful, the ID of the loaded mod.
     pub fn try_load_new_mod(&mut self, mod_stream: impl Read + Seek) -> Result<String> {
         let mut zip = ZipFile::open(mod_stream).context("Mod was invalid ZIP archive")?;
 
@@ -451,6 +435,12 @@ impl<'cache> ModManager<'cache> {
         Ok(id)
     }
 
+    /// Uninstalls (if installed) and deletes the mod with the specified ID.
+    /// If no mod exists with this ID, then the operation does nothing.
+    /// 
+    /// This will uninstall any mods with a required dependency on this mod and any of their dependencies transitively.
+    /// # Arguments
+    /// * `id` - the ID of the mod to delete.
     pub fn remove_mod(&mut self, id: &str) -> Result<()> {
         match self.mods.get(id) {
             Some(to_remove) => {
@@ -469,8 +459,10 @@ impl<'cache> ModManager<'cache> {
     }
 
     /// Sets a particular mod ID as being a core mod.
-    /// This will also make all dependencies of the mod core.
+    /// This will also make all required dependencies of the mod core, transitively.
     /// Does nothing if the mod with the given ID doesn't exist or is already marked as core.
+    /// # Arguments
+    /// * `id` - The ID of the mod to set as core.
     pub fn set_mod_core(&self, id: &str) {
         if let Some(mod_rc) = self.mods.get(id) {
             let mut mod_ref = match mod_rc.try_borrow_mut() {
@@ -794,6 +786,70 @@ impl<'cache> ModManager<'cache> {
                 None
             }
         }
+    }
+
+    /// Updates whether the mod with the given ID is currently installed.
+    /// This will recursively check whether any dependent mods are installed.
+    // `checked_in_path` is used to detect recursive dependencies - which are not allowed and will trigger an error.
+    // Returns the new state of Mod#installed for the mod.
+    fn check_mod_installed(&self, id: &str, checked_in_pass: &mut HashSet<String>) -> Result<bool> {
+        if !checked_in_pass.insert(id.to_string()) {
+            return Err(anyhow!("Recursive dependency detected. Mod with ID {id} depends on itself, directly or indirectly. This is not permitted"));
+        }
+
+        let mod_rc = self
+            .mods
+            .get(id)
+            .ok_or(anyhow!("No mod with ID {id} found"))?;
+
+        let mod_ref = mod_rc.borrow();
+        let installed = self.check_mod_installed_internal(&*mod_ref, checked_in_pass)?;
+
+        drop(mod_ref);
+        mod_rc.borrow_mut().installed = Some(installed);
+
+        Ok(installed)
+    }
+
+    // Does the actual checking of whether a mod is installed.
+    // Returns whether the mod should be set as installed or not.
+    fn check_mod_installed_internal(
+        &self,
+        mod_ref: &Mod,
+        checked_in_path: &mut HashSet<String>,
+    ) -> Result<bool> {
+        // If the mod does not have its files in the necessary destinations, then this mod definitely is not installed, so no need to check dependencies.
+        if !mod_ref.files_exist {
+            return Ok(false);
+        }
+
+        for dependency in &mod_ref.manifest.dependencies {
+            match self.get_mod(&dependency.id) {
+                Some(dep_rc) => {
+                    let dep_ref = dep_rc.borrow();
+
+                    // Check if the dependency is within the required version range, if not then the mod definitely isn't installed.
+                    if !dependency.version_range.matches(&dep_ref.manifest.version) {
+                        return Ok(false);
+                    }
+
+                    // If the dependency exists and is within the required range, we need to verify that it is installed also
+                    if !match dep_ref.installed {
+                        None => {
+                            drop(dep_ref);
+                            self.check_mod_installed(&dependency.id, checked_in_path)
+                                .context("Checking if dependency was installed")?
+                        }
+                        Some(installed) => installed,
+                    } {
+                        return Ok(false);
+                    }
+                }
+                None => return Ok(false),
+            }
+        }
+
+        Ok(true)
     }
 
     // Finds a path to extract the mod with the given manifest.
