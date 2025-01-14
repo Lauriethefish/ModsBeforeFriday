@@ -44,7 +44,7 @@ pub fn mod_current_apk(
     app_info: &AppInfo,
     manifest_mod: String,
     manifest_only: bool,
-    replace_ovr: bool,
+    device_pre_v51: bool,
     vr_splash_path: Option<&str>,
     res_cache: &ResCache,
 ) -> Result<()> {
@@ -73,7 +73,7 @@ pub fn mod_current_apk(
         obb_backups,
         manifest_mod,
         manifest_only,
-        replace_ovr,
+        device_pre_v51,
         vr_splash_path,
     )
     .context("Patching and reinstalling APK")?;
@@ -87,7 +87,7 @@ pub fn downgrade_and_mod_apk(
     app_info: &AppInfo,
     diffs: VersionDiffs,
     manifest_mod: String,
-    replace_ovr: bool,
+    device_pre_v51: bool,
     vr_splash_path: Option<&str>,
     res_cache: &ResCache,
 ) -> Result<bool> {
@@ -146,7 +146,7 @@ pub fn downgrade_and_mod_apk(
         obb_backup_paths,
         manifest_mod,
         false,
-        replace_ovr,
+        device_pre_v51,
         vr_splash_path,
     )
     .context("Patching and reinstall APK")?;
@@ -180,7 +180,7 @@ fn patch_and_reinstall(
     obb_paths: Vec<PathBuf>,
     manifest_mod: String,
     manifest_only: bool,
-    replace_ovr: bool,
+    device_pre_v51: bool,
     vr_splash_path: Option<&str>,
 ) -> Result<()> {
     info!("Patching APK");
@@ -189,7 +189,7 @@ fn patch_and_reinstall(
         libunity_path,
         manifest_mod,
         manifest_only,
-        replace_ovr,
+        device_pre_v51,
         vr_splash_path,
     )
     .context("Patching APK")?;
@@ -432,7 +432,7 @@ fn patch_apk_in_place(
     libunity_path: Option<PathBuf>,
     manifest_mod: String,
     manifest_only: bool,
-    replace_ovr: bool,
+    device_pre_v51: bool,
     vr_splash_path: Option<&str>,
 ) -> Result<()> {
     let file = OpenOptions::new()
@@ -477,7 +477,7 @@ fn patch_apk_in_place(
             None => warn!("No unstripped unity added to the APK! This might cause issues later"),
         }
 
-        if replace_ovr {
+        if device_pre_v51 {
             info!("Replacing ovrplatformloader");
             zip.write_file(
                 LIB_OVR_PATH, 
