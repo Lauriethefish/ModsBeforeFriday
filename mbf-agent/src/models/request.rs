@@ -69,6 +69,8 @@ pub enum Request {
         remodding: bool,
         // If this is true, patching will not be failed if core mods cannot be found for the version.
         allow_no_core_mods: bool,
+        // If this is true, libovrplatformloader.so will be replaced with the old version to make the game work on quest 1
+        replace_ovr: bool,
         // If not null, this specifies a core mod JSON to use instead of the default core mods source.
         // This is useful for developers testing a core mod update.
         override_core_mod_url: Option<String>,
