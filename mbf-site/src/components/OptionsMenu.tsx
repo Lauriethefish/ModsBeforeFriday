@@ -110,7 +110,7 @@ function RepatchMenu({ device, modStatus, quit }: {
                 // TODO: Right now we do not set the mod status back to the DeviceModder state for it.
                 // This is fine at the moment since repatching does not update this state in any important way,
                 // but would be a problem if repatching did update it!
-                await patchApp(device, modStatus, null, manifest.current.toString(), true, false, splashScreen);
+                await patchApp(device, modStatus, null, manifest.current.toString(), true, false, false, splashScreen);
                 toast.success("Successfully repatched");
             })
         }}>Repatch game</button>

@@ -116,6 +116,8 @@ export class AndroidManifest {
         application.setAttributeNS(ANDROID_NS_URI, `${this.androidNsPrefix}:debuggable`, "true");
         application.setAttributeNS(ANDROID_NS_URI, `${this.androidNsPrefix}:hardwareAccelerated`, "true");
 
+        this.setMetadata("com.oculus.supportedDevices", "quest|quest2");
+
         this.addPermission("android.permission.MANAGE_EXTERNAL_STORAGE");
     }
 

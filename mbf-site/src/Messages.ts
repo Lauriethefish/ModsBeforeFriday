@@ -11,6 +11,7 @@ export interface Patch {
     downgrade_to: string | null,
     allow_no_core_mods: boolean,
     override_core_mod_url: string | null,
+    replace_ovr: boolean,
     // Path to a file containing the splash image, as a PNG
     vr_splash_path: string | null,
     remodding: boolean
