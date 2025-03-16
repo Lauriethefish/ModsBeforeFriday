@@ -27,7 +27,7 @@ export async function prepareAgent(adb: Adb) {
     .trim()
     .toUpperCase();
   Log.debug("Existing agent SHA1: " + existingSha1);
-  const existingUpToDate = AGENT_SHA1 == existingSha1.trim().toUpperCase();
+  const existingUpToDate = AGENT_SHA1 && AGENT_SHA1 == existingSha1.trim().toUpperCase();
   if(existingUpToDate) {
     Log.info("Agent is up to date");
   } else  {
