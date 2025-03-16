@@ -12,6 +12,7 @@ export function CreditsModal({ isVisible, onClose }: { isVisible: boolean, onClo
 
         <h3>MBF contributors</h3>
         <ul>
+            <li><a href="https://github.com/DanTheMan827">DanTheMan827</a> implemented native adb connection through a WebSocket proxy server.</li>
             <li><a href="https://github.com/FrozenAlex">FrozenAlex</a> created the drag 'n' drop system for MBF, and has provided me with much insight on UI design. Without him, the UI would be (even more of) a cluttered mess!</li>
             <li><a href="https://github.com/XoToM">XoToM</a>, a good friend of mine, created the animated background that you know and love. (although your CPU might hate it!)</li>
             <li><a href="https://github.com/AltyFox">Alteran</a>, a member of the BSMG support team, has provided invaluable feedback regarding usability, and has helped me to pinpoint and fix bugs.</li>
