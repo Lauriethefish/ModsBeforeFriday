@@ -136,7 +136,7 @@ function ChooseDevice() {
 
   // Update the available devices on an interval
   useEffect(() => {
-    if (bridgeClient) {
+    if (bridgeClient && !chosenDevice) {
       const deviceUpdate = async () => {
         try {
           const client = new AdbServerClient(new AdbServerWebSocketConnector())
