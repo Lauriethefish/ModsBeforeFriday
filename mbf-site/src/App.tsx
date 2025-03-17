@@ -188,7 +188,7 @@ function ChooseDevice() {
       </div>
     } else  {
       return <>
-        <DeviceModder device={chosenDevice} quit={(err) => {
+        <DeviceModder device={chosenDevice} usingBridge={bridgeClient != null} quit={(err) => {
           if(err != null) {
             setConnectError(String(err));
           }
@@ -289,10 +289,10 @@ function ChooseDevice() {
 function DeviceInUse() {
  return <>
   <p>Some other app is trying to access your Quest, e.g. SideQuest.</p>
-  {isViewingOnWindows() ? 
+  {isViewingOnWindows() ?
     <>
       <p>To fix this, close SideQuest if you have it open, press <span className="codeBox">Win + R</span> and type the following text, and finally press enter.</p>
-      <span className="codeBox">taskkill /IM adb.exe /F</span>  
+      <span className="codeBox">taskkill /IM adb.exe /F</span>
       <p>Alternatively, restart your computer.</p>
     </>
     : <p>To fix this, restart your {isViewingOnMobile() ? "phone" : "computer"}.</p>}
@@ -343,8 +343,15 @@ function ChooseCoreModUrl({ setSpecifiedCoreMods } : { setSpecifiedCoreMods: () 
 
 function AppContents() {
   const [ hasSetCoreUrl, setSetCoreUrl ] = useState(false);
-
+  const [ hasBridge, setHasBridge ] = useState(false);
   const overrideQueryParam: string | null = new URLSearchParams(window.location.search).get("setcores");
+  useEffect(() => {
+    checkForBridge().then((hasBridge) => {
+      setHasBridge(hasBridge);
+      console.log("Bridge running: " + hasBridge);
+    });
+  });
+
   let mustEnterUrl = false;
   if(overrideQueryParam !== "prompt" && overrideQueryParam !== null) {
     if(!hasSetCoreUrl) {
@@ -359,7 +366,7 @@ function AppContents() {
 
   if (usingOculusBrowser()) {
     return <OculusBrowserMessage />
-  } else  if (navigator.usb === undefined) {
+  } else  if (navigator.usb === undefined && !hasBridge) {
     return <UnsupportedMessage />
   } else if (hasSetCoreUrl || !mustEnterUrl) {
     return <ChooseDevice />
