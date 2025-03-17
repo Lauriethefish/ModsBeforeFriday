@@ -3,8 +3,9 @@ import { MaybeConsumable, ReadableStream, ReadableWritablePair } from "@yume-cha
 import { PromiseResolver } from "@yume-chan/async";
 
 /** WebSocket bridge endpoints. */
-export const bridgeWebsocketAddress = "ws://127.0.0.1:25037/bridge";
-export const bridgePingAddress = "http://127.0.0.1:25037/bridge/ping";
+const bridge = new URLSearchParams(window.location.search).get("bridge") || "127.0.0.1:25037";
+export const bridgeWebsocketAddress = `ws://${bridge}/bridge`;
+export const bridgePingAddress = `http://${bridge}/bridge/ping`;
 
 /**
  * Checks if the bridge is running by sending a GET request to the ping endpoint.

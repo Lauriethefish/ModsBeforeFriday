@@ -14,11 +14,13 @@ import { Log } from './Logging';
 import { wrapOperation } from './SyncStore';
 import { OpenLogsButton } from './components/OpenLogsButton';
 import { lte as semverLte } from 'semver';
+import { checkForBridge } from './AdbServerWebSocketConnector';
 
 interface DeviceModderProps {
     device: Adb,
     // Quits back to the main menu, optionally giving an error that caused the quit.
     quit: (err: unknown | null) => void
+    usingBridge: boolean
 }
 
 export async function uninstallBeatSaber(device: Adb) {
@@ -66,13 +68,23 @@ export function CompareBeatSaberVersions(a: string, b: string): number {
 
 export function DeviceModder(props: DeviceModderProps) {
     const [modStatus, setModStatus] = useState(null as ModStatus | null);
-    const { device, quit } = props;
+    const { device, quit, usingBridge } = props;
 
     useEffect(() => {
         loadModStatus(device)
             .then(loadedModStatus => setModStatus(loadedModStatus))
             .catch(err => quit(err));
     }, [device, quit]);
+
+    useEffect(() => {
+        if (usingBridge) {
+            const timer = setInterval(async () => {
+                await checkForBridge();
+            }, 5000);
+
+            return () => clearInterval(timer);
+        }
+    })
 
     // Fun "ocean" of IF statements, hopefully covering every possible state of an installation!
     if (modStatus === null) {
