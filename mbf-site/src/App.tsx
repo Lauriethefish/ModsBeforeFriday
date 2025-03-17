@@ -179,15 +179,31 @@ function ChooseDevice() {
   }
 
   if(chosenDevice !== null) {
-    return <>
-      <DeviceModder device={chosenDevice} devicePreV51={devicePreV51} quit={(err) => {
-        if(err != null) {
-          setConnectError(String(err));
-        }
-        chosenDevice.close().catch(err => Log.warn("Failed to close device " + err));
-        setChosenDevice(null);
-      }} />
-    </>
+    Log.debug("Device model: " + chosenDevice.banner.model);
+    if(chosenDevice.banner.model === "Quest") { // "Quest" not "Quest 2/3"
+      return <div className='container mainContainer'>
+        <h1>Quest 1 Not Supported</h1>
+        <p>ModsBeforeFriday has detected that you're using a Quest 1, which is not supported by MBF. (and never will be)</p>
+        <p>This is because Quest 1 uses different builds of the Beat Saber game and so mods are stuck forever on version 1.28.0 of the game.</p>
+        <p>Follow <a href="https://bsmg.wiki/quest/modding-quest1.html">this link</a> for instructions on how to set up mods on Quest 1.</p>
+      </div>
+    } else if(devicePreV51 && chosenDevice.banner.model?.includes("Quest")) {
+      return <div className="container mainContainer">
+        <h1>Pre-v51 OS Detected</h1>
+        <p>ModsBeforeFriday has detected that you have an outdated version of the Quest operating system installed which is no longer supported by mods.</p>
+        <p>Please ensure your operating system is up to date and then refresh the page.</p>
+      </div>
+    } else  {
+      return <>
+        <DeviceModder device={chosenDevice} devicePreV51={devicePreV51} usingBridge={bridgeClient != null} quit={(err) => {
+          if(err != null) {
+            setConnectError(String(err));
+          }
+          chosenDevice.close().catch(err => Log.warn("Failed to close device " + err));
+          setChosenDevice(null);
+        }} />
+      </>
+    }
   } else if(authing) {
     return <div className='container mainContainer fadeIn'>
       <h2>Allow connection in headset</h2>
@@ -305,10 +321,10 @@ function AskLaurie() {
 function DeviceInUse() {
  return <>
   <p>Some other app is trying to access your Quest, e.g. SideQuest.</p>
-  {isViewingOnWindows() ? 
+  {isViewingOnWindows() ?
     <>
       <p>To fix this, close SideQuest if you have it open, press <span className="codeBox">Win + R</span> and type the following text, and finally press enter.</p>
-      <span className="codeBox">taskkill /IM adb.exe /F</span>  
+      <span className="codeBox">taskkill /IM adb.exe /F</span>
       <p>Alternatively, restart your computer.</p>
 
       <AskLaurie />
@@ -361,8 +377,15 @@ function ChooseCoreModUrl({ setSpecifiedCoreMods } : { setSpecifiedCoreMods: () 
 
 function AppContents() {
   const [ hasSetCoreUrl, setSetCoreUrl ] = useState(false);
-
+  const [ hasBridge, setHasBridge ] = useState(false);
   const overrideQueryParam: string | null = new URLSearchParams(window.location.search).get("setcores");
+  useEffect(() => {
+    checkForBridge().then((hasBridge) => {
+      setHasBridge(hasBridge);
+      console.log("Bridge running: " + hasBridge);
+    });
+  });
+
   let mustEnterUrl = false;
   if(overrideQueryParam !== "prompt" && overrideQueryParam !== null) {
     if(!hasSetCoreUrl) {
@@ -377,7 +400,7 @@ function AppContents() {
 
   if (usingOculusBrowser()) {
     return <OculusBrowserMessage />
-  } else  if (navigator.usb === undefined) {
+  } else  if (navigator.usb === undefined && !hasBridge) {
     return <UnsupportedMessage />
   } else if (hasSetCoreUrl || !mustEnterUrl) {
     return <ChooseDevice />
