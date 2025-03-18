@@ -286,6 +286,7 @@ function ChooseDevice() {
                     </li>
                   </>)}
               </ul>
+              <span><OpenLogsButton /></span>
             </div>
           </>}
           {!bridgeClient && navigator.usb && <>
