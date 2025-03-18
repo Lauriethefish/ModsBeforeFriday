@@ -171,6 +171,30 @@ function ChooseDevice() {
     setChosenDevice(null);
   }
 
+  async function connectWebUsb() {
+    let device: Adb | null;
+
+    try {
+      const result = await connect(() => setAuthing(true));
+      if(result === "NoDeviceSelected") {
+        device = null;
+      } else if(result === "DeviceInUse") {
+        setDeviceInUse(true);
+        return;
+      } else  {
+        device = result;
+
+        setChosenDevice(device);
+      }
+
+    } catch(error) {
+      Log.error("Failed to connect: " + error);
+      setConnectError(String(error));
+      setChosenDevice(null);
+      return;
+    }
+  }
+
   if(chosenDevice !== null) {
     Log.debug("Device model: " + chosenDevice.banner.model);
     if(chosenDevice.banner.model === "Quest") { // "Quest" not "Quest 2/3"
@@ -219,14 +243,13 @@ function ChooseDevice() {
 
           <NoCompatibleDevices />
 
-          {(() => {
-            console.log(bridgeClient, adbDevices);
-            if(bridgeClient && adbDevices.length > 0) {
-              return <div className="connectedDevicesContainer">
-                <h2>Connected devices</h2>
-                <ul>
-                  {adbDevices.map(device => {
-                    return <li key={device.serial}>
+          {bridgeClient && <>
+            <div className="connectedDevicesContainer">
+              <h2>Detected devices</h2>
+              <ul>
+                {adbDevices.map(device =>
+                  <>
+                    <li key={device.serial}>
                       <button onClick={async () => {
                         try {
                           const adbDevice = await connectAdbDevice(bridgeClient, device);
@@ -238,38 +261,16 @@ function ChooseDevice() {
                         }
                       }}>Connect to {device.serial}</button>
                     </li>
-                  })}
-                </ul>
-              </div>
-            }
-
-            return <div className="chooseDeviceContainer">
-              <span><OpenLogsButton /></span>
-              <button onClick={async () => {
-                  let device: Adb | null;
-
-                  try {
-                    const result = await connect(() => setAuthing(true));
-                    if(result === "NoDeviceSelected") {
-                      device = null;
-                    } else if(result === "DeviceInUse") {
-                      setDeviceInUse(true);
-                      return;
-                    } else  {
-                      device = result;
-
-                      setChosenDevice(device);
-                    }
-
-                  } catch(error) {
-                    Log.error("Failed to connect: " + error);
-                    setConnectError(String(error));
-                    setChosenDevice(null);
-                    return;
-                  }
-                }}>Connect to Quest</button>
+                  </>)}
+              </ul>
             </div>
-          })()}
+          </>}
+          {!bridgeClient && navigator.usb && <>
+            <div className="chooseDeviceContainer">
+              <span><OpenLogsButton /></span>
+              <button onClick={connectWebUsb}>Connect to Quest</button>
+            </div>
+          </>}
 
           <ErrorModal isVisible={connectError != null}
             title="Failed to connect to device"

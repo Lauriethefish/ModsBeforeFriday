@@ -63,6 +63,16 @@ body {
     right: 0;
 }
 
+.connectedDevicesContainer li {
+    padding: 5px 0;
+    &:first-child {
+        padding-top: 0;
+    }
+    &:last-child {
+        padding-bottom: 0;
+    }
+}
+
 .fireFox {
     color: red;
 }
