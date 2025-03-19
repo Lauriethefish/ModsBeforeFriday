@@ -366,7 +366,7 @@ function AppContents() {
     mustEnterUrl = true;
   }
 
-  if (usingOculusBrowser()) {
+  if (usingOculusBrowser() && !hasBridge) {
     return <OculusBrowserMessage />
   } else  if (navigator.usb === undefined && !hasBridge) {
     return <UnsupportedMessage />
