@@ -317,7 +317,7 @@ function PatchingMenu(props: PatchingMenuProps) {
                 .catch(error => {
                     // TODO: Perhaps revert to "not downgrading" if this error comes up (but only if the latest version is moddable)
                     // This is low priority as this error message should only show up very rarely - there is already a previous check for internet access.
-                    Log.error("Failed to fetch older manifest: " + error);
+                    Log.error("Failed to fetch older manifest: " + error, error);
                     props.quit("Failed to fetch AndroidManifest.xml for the selected downgrade version. Did your quest lose its internet connection suddenly?");
                 });
         }

@@ -67,7 +67,7 @@ export function useSetError(errorTitle: string): (error: unknown | null) => void
         if(error === null) {
             setError(null);
         }   else    {
-            Log.error(errorTitle + ": " + String(error));
+            Log.error(`${errorTitle}: ${String(error)}`, error);
             setError({
                 title: errorTitle,
                 error: String(error)
@@ -87,7 +87,7 @@ export async function wrapOperation(operationName: string,
     try {
         await operation();
     }   catch(error) {
-        Log.error(errorModalTitle + ": " + error);
+        Log.error(errorModalTitle + ": " + error, error);
         setError(error);
     }   finally {
         setWorking(false);

@@ -149,8 +149,7 @@ function ChooseDevice() {
           setBridgeClient(null);
           setAdbDevices([]);
           setCheckedForBridge(false);
-          Log.error("Failed to get devices: " + err);
-          console.error("Failed to get devices: ", err);
+          Log.error("Failed to get devices: " + err, err);
         }
       }
       const timer = setInterval(deviceUpdate, 1000);
@@ -216,7 +215,7 @@ function ChooseDevice() {
           if(err != null) {
             setConnectError(String(err));
           }
-          chosenDevice.close().catch(err => Log.warn("Failed to close device " + err));
+          chosenDevice.close().catch(err => Log.error("Failed to close device " + err, err));
           setChosenDevice(null);
         }} />
       </>
@@ -255,7 +254,7 @@ function ChooseDevice() {
                           const adbDevice = await connectAdbDevice(bridgeClient, device);
                           await connectDevice(adbDevice)
                         } catch(error) {
-                          Log.error("Failed to connect: " + error);
+                          Log.error("Failed to connect: " + error, error);
                           setConnectError(String(error));
                           setChosenDevice(null);
                         }

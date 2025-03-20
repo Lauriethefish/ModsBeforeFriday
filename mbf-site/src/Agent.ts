@@ -125,7 +125,7 @@ async function downloadAgent(): Promise<Uint8Array> {
 
       return new Uint8Array(xhr.response);
     } catch(e) {
-      Log.info("Failed to fetch agent, status " + e);
+      Log.error("Failed to fetch agent, status " + e, e);
     }
 
     attempt++;
