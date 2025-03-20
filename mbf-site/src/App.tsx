@@ -16,7 +16,7 @@ import { OperationModals } from './components/OperationModals';
 import { OpenLogsButton } from './components/OpenLogsButton';
 import { isViewingOnIos, isViewingOnMobile, isViewingOnWindows, usingOculusBrowser } from './platformDetection';
 import { SourceUrl } from '.';
-import { AdbServerWebSocketConnector, checkForBridge } from './AdbServerWebSocketConnector';
+import { AdbServerWebSocketConnector, bridgeData, checkForBridge } from './AdbServerWebSocketConnector';
 
 type NoDeviceCause = "NoDeviceSelected" | "DeviceInUse";
 

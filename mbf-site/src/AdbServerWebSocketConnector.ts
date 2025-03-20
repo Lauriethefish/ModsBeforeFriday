@@ -3,22 +3,56 @@ import { MaybeConsumable, ReadableStream, ReadableWritablePair } from "@yume-cha
 import { PromiseResolver } from "@yume-chan/async";
 
 /** WebSocket bridge endpoints. */
-const bridge = new URLSearchParams(window.location.search).get("bridge") || "127.0.0.1:25037";
-export const bridgeWebsocketAddress = `ws://${bridge}/bridge`;
-export const bridgePingAddress = `http://${bridge}/bridge/ping`;
+class BridgeData {
+  readonly bridge: string;
+  readonly websocketAddress: string;
+  readonly pingAddress: string;
+  readonly isLocal: boolean;
+
+  constructor(bridge: string) {
+    // Tsc doesn't know about URL.parse, so we need to cast it to any.
+    const parseUrl = (URL as any).parse as (url: string | URL, base?: string | URL) => URL | null;
+
+    const parsed = (/^https?:\/\//i).exec(bridge) ? parseUrl(bridge)! : parseUrl(`http://${bridge}`)!;
+    this.bridge = parsed ? parsed.host : "127.0.0.1:25037";
+    this.websocketAddress = `ws${parsed.protocol.toLowerCase() == "https:" ? "s" : ""}://${this.bridge}/bridge`;
+    this.pingAddress = `${parsed.protocol}//${this.bridge}/bridge/ping`;
+    this.isLocal = parsed != null && ["127.0.0.1", "localhost"].includes(parsed.hostname.toLowerCase());
+  }
+}
+
+export const bridgeData = (() => {
+  const params = new URLSearchParams(location.search);
+
+  if (params.has("bridge") && params.get("bridge") === "") {
+    return new BridgeData(location.href);
+  }
+
+  if (params.has("bridge")) {
+    return new BridgeData(params.get("bridge")!);
+  }
+
+  return new BridgeData("127.0.0.1:25037");
+})();
 
 /**
  * Checks if the bridge is running by sending a GET request to the ping endpoint.
  *
  * @returns A promise that resolves to true if the bridge is running, false otherwise.
  */
-export async function checkForBridge(): Promise<boolean> {
+export async function checkForBridge(address?: string): Promise<boolean> {
   try {
-    const response = await fetch(bridgePingAddress);
-    return response.ok;
+    const response = await fetch(address || bridgeData.pingAddress);
+    if (response.ok) {
+      // Read the response body
+      var text = await response.text();
+      return text === "OK";
+    }
   } catch {
     return false;
   }
+
+  return false;
 }
 
 /**
@@ -130,7 +164,7 @@ export class AdbServerWebSocketConnector implements AdbServerClient.ServerConnec
    * @returns A promise that resolves to the ADB server connection.
    */
   async connect(): Promise<AdbServerClient.ServerConnection> {
-    const connection = new WebSocketConnection(bridgeWebsocketAddress);
+    const connection = new WebSocketConnection(bridgeData.websocketAddress);
     let timer: ReturnType<typeof setTimeout> | undefined = undefined;
 
     // Create a timeout promise that rejects after 5000ms.
