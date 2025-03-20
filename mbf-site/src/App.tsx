@@ -166,7 +166,24 @@ function ChooseDevice() {
     setAuthing(false);
     setChosenDevice(device);
 
+    // Track if the transport disconnects early
+    let disconnectedEarly = true;
+    setTimeout(() => disconnectedEarly = false, 1000);
+
+    // Wait for the transport to determine disconnect
     await device.transport.disconnected;
+
+    // Old adb server versions don't support the wait-for-any-disconnect feautre
+    // so if the transport disconnects within 1 second, we spawn a process that
+    // never exits and await it instead.
+    if (disconnectedEarly) {
+      try {
+        await device.subprocess.spawnAndWait("read");
+      } catch (error) {
+        Log.error("ADB server process exited: " + error, error);
+      }
+    }
+
     setChosenDevice(null);
   }
 
