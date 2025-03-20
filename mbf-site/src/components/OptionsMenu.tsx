@@ -175,7 +175,7 @@ function AdbLogger({ device }: { device: Adb }) {
                 setLogFile(log);
                 setWaitingForLog(false);
             })
-            .catch(e => Log.error("Failed to get ADB log " + e));
+            .catch(e => Log.error("Failed to get ADB log " + e, e));
         
         // When the value of `logging` changes to false, use the cleanup function to tell the `log` function to stop getting logs as soon as it can.
         return () => {
