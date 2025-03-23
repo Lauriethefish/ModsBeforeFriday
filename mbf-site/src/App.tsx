@@ -144,6 +144,9 @@ function ChooseDevice() {
 
           if (!areDevicesEqual(devices, adbDevices)) {
             setAdbDevices(devices);
+            if (devices.length == 1) {
+              setChosenDevice(await connectAdbDevice(bridgeClient, devices[0]));
+            }
           }
         } catch (err) {
           setBridgeClient(null);
