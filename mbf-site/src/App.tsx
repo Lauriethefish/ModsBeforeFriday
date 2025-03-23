@@ -144,6 +144,9 @@ function ChooseDevice() {
 
           if (!areDevicesEqual(devices, adbDevices)) {
             setAdbDevices(devices);
+            if (devices.length == 1) {
+              setChosenDevice(await connectAdbDevice(bridgeClient, devices[0]));
+            }
           }
         } catch (err) {
           setBridgeClient(null);
@@ -278,7 +281,7 @@ function ChooseDevice() {
                       }}>Connect to {device.serial}</button>
                     </li>
                   </>)}
-                {navigator.usb && <>
+                {!usingOculusBrowser() && navigator.usb && <>
                   <li>
                     <button onClick={async () => {
                       if (!bridgeData.isLocal || confirm("Connecting with WebUSB will terminate the ADB server.  Are you sure you want to proceed?")) {
