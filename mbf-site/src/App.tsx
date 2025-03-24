@@ -281,19 +281,6 @@ function ChooseDevice() {
                       }}>Connect to {device.serial}</button>
                     </li>
                   </>)}
-                {!usingOculusBrowser() && navigator.usb && <>
-                  <li>
-                    <button onClick={async () => {
-                      if (!bridgeData.isLocal || confirm("Connecting with WebUSB will terminate the ADB server.  Are you sure you want to proceed?")) {
-                        if (bridgeData.isLocal) {
-                          await bridgeClient.killServer();
-                        }
-
-                        await connectWebUsb();
-                      }
-                    }}>Connect with WebUSB</button>
-                  </li>
-                </>}
               </ul>
               <span><OpenLogsButton /></span>
             </div>
