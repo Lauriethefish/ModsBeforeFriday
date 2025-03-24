@@ -28,7 +28,7 @@ jobs:
       - name: Agent Hash
         id: agent_hash
         run: |
-          echo "hash=$(find mbf-agent* mbf-res-man mbf-zip  -type f -exec md5sum {} \; | md5sum - | cut -d ' ' -f1)" >> $GITHUB_OUTPUT
+          echo "hash=$(find Cargo.* mbf-agent* mbf-res-man mbf-zip  -type f -exec md5sum {} \; | md5sum - | cut -d ' ' -f1)" >> $GITHUB_OUTPUT
 
       - name: Agent Cache
         id: agent_cache
