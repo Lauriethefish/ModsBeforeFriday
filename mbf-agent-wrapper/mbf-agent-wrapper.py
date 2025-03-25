@@ -175,6 +175,10 @@ class Wrapper():
         if not hasattr(self, 'mod_status'):
             self.get_mod_status(args)
 
+        if not self.mod_status['core_mods']:
+            self.log('    \033[33m Core Mod data not found! Is your headset connected to the internet?', level=WARN)
+            return
+
         if args.game_version == 'auto':
             supported_versions = self.mod_status['core_mods']['supported_versions']
 
@@ -183,6 +187,10 @@ class Wrapper():
             args.game_version = supported_versions[-1]
 
     def patch(self, args):
+        if not self.mod_status['core_mods']:
+            self.log('    \033[33m Core Mod data not found! Is your headset connected to the internet?', level=WARN)
+            return
+            
         self.auto_game_version(args)
 
         args.manifest_mod = None
@@ -291,7 +299,7 @@ class Wrapper():
                 self.log_mod(mod)
 
             # Core Mods
-            if 'core_mods' in response:
+            if 'core_mods' in response and response['core_mods']:
                 self.log('  \033[1;92mCore Mods\033[0m', level=DEBUG)
 
                 core_status = response['core_mods']['core_mod_install_status']
@@ -306,7 +314,9 @@ class Wrapper():
                 for downgrade_version in response['core_mods']['downgrade_versions']:
                     self.log(f'      {downgrade_version}', level=DEBUG)
 
-            self.log(f'    Is Awaiting Diff? {self.color_bool(response["core_mods"]["is_awaiting_diff"], flipped=True)}', level=DEBUG)
+                self.log(f'    Is Awaiting Diff? {self.color_bool(response["core_mods"]["is_awaiting_diff"], flipped=True)}', level=DEBUG)
+            else:
+                self.log('    \033[33m Core Mod data not found! Is your headset connected to the internet?', level=WARN)
 
             # OBB File Warning
             if not response['app_info']['obb_present']:
