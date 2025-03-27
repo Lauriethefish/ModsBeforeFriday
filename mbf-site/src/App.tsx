@@ -17,6 +17,7 @@ import { OpenLogsButton } from './components/OpenLogsButton';
 import { isViewingOnIos, isViewingOnMobile, isViewingOnWindows, usingOculusBrowser } from './platformDetection';
 import { SourceUrl } from '.';
 import { AdbServerWebSocketConnector, bridgeData, checkForBridge } from './AdbServerWebSocketConnector';
+import { waitForDisconnect } from "./waitForDisconnect";
 
 type NoDeviceCause = "NoDeviceSelected" | "DeviceInUse";
 
@@ -145,7 +146,7 @@ function ChooseDevice() {
           if (!areDevicesEqual(devices, adbDevices)) {
             setAdbDevices(devices);
             if (devices.length == 1) {
-              setChosenDevice(await connectAdbDevice(bridgeClient, devices[0]));
+              await connectDevice(await connectAdbDevice(bridgeClient, devices[0]));
             }
           }
         } catch (err) {
@@ -169,23 +170,7 @@ function ChooseDevice() {
     setAuthing(false);
     setChosenDevice(device);
 
-    // Track if the transport disconnects early
-    let disconnectedEarly = true;
-    setTimeout(() => disconnectedEarly = false, 1000);
-
-    // Wait for the transport to determine disconnect
-    await device.transport.disconnected;
-
-    // Old adb server versions don't support the wait-for-any-disconnect feautre
-    // so if the transport disconnects within 1 second, we spawn a process that
-    // never exits and await it instead.
-    if (disconnectedEarly) {
-      try {
-        await device.subprocess.spawnAndWait("read");
-      } catch (error) {
-        Log.error("ADB server process exited: " + error, error);
-      }
-    }
+    await waitForDisconnect(device);
 
     setChosenDevice(null);
   }

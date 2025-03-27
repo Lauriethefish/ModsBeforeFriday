@@ -15,6 +15,7 @@ import useFileDropper from "../hooks/useFileDropper";
 import { Log } from "../Logging";
 import { useSetWorking, useSyncStore, wrapOperation } from "../SyncStore";
 import { ModRepoMod } from "../ModsRepo";
+import { waitForDisconnect } from "../waitForDisconnect";
 
 interface ModManagerProps {
     gameVersion: string,
@@ -279,7 +280,7 @@ function AddModsMenu(props: ModMenuProps) {
         isProcessingQueue = true;
 
         let disconnected = false;
-        device.disconnected.then(() => disconnected = true);
+        waitForDisconnect(device).then(() => disconnected = true);
         const setWorking = useSetWorking("Importing");
         const { setStatusText } = useSyncStore.getState(); 
 
