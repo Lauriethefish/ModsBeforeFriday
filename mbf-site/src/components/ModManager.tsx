@@ -17,7 +17,7 @@ import { useSetWorking, useSyncStore, wrapOperation } from "../SyncStore";
 import { ModRepoMod } from "../ModsRepo";
 import { useDeviceStore } from "../DeviceStore";
 import SyncIcon from "../icons/sync.svg"
-
+import { waitForDisconnect } from "../waitForDisconnect";
 
 interface ModManagerProps {
     gameVersion: string,
@@ -304,7 +304,7 @@ function AddModsMenu(props: ModMenuProps) {
         isProcessingQueue = true;
 
         let disconnected = false;
-        device.disconnected.then(() => disconnected = true);
+        waitForDisconnect(device).then(() => disconnected = true);
         const setWorking = useSetWorking("Importing");
         const { setStatusText } = useSyncStore.getState(); 
 
