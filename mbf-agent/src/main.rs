@@ -9,6 +9,7 @@ mod patching;
 mod paths;
 
 use anyhow::{Context, Result};
+use clap::{arg, command, Parser};
 use downloads::DownloadConfig;
 use log::{debug, error, warn, Level};
 use mbf_res_man::res_cache::ResCache;
@@ -19,11 +20,14 @@ use std::{
     panic,
     path::Path,
     process::Command,
-    sync,
+    sync::{self, OnceLock},
 };
 
 /// The ID of the APK file that MBF manages.
-pub const APK_ID: &str = "com.beatgames.beatsaber";
+pub static APK_ID: OnceLock<&str> = OnceLock::new();
+
+/// Don't check the package ID of the qmod during install.
+pub const IGNORE_QMOD_PACKAGE_ID: OnceLock<bool> = OnceLock::new();
 
 #[cfg(feature = "request_timing")]
 use log::info;
@@ -62,16 +66,16 @@ pub fn get_dl_cfg() -> &'static DownloadConfig<'static> {
 /// Creates a ResCache for downloading files using mbf_res_man
 /// This should be reused where possible.
 pub fn load_res_cache() -> Result<ResCache<'static>> {
-    std::fs::create_dir_all(paths::RES_CACHE).expect("Failed to create resource cache folder");
+    std::fs::create_dir_all(*(paths::RES_CACHE.get().unwrap())).expect("Failed to create resource cache folder");
     Ok(ResCache::new(
-        paths::RES_CACHE.into(),
+        (*(paths::RES_CACHE.get().unwrap())).into(),
         mbf_res_man::default_agent::get_agent(),
     ))
 }
 
 pub fn get_apk_path() -> Result<Option<String>> {
     let pm_output = Command::new("pm")
-        .args(["path", APK_ID])
+        .args(["path", *(APK_ID.get().unwrap())])
         .output()
         .context("Working out APK path")?;
     if 8 > pm_output.stdout.len() {
@@ -141,7 +145,26 @@ fn write_response(response: response::Response) -> Result<()> {
 
 static LOGGER: ResponseLogger = ResponseLogger {};
 
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// The package ID of the game to manage mods for.
+    #[arg(long, default_value = "com.beatgames.beatsaber")]
+    game_id: String,
+
+    /// Whether to ignore the package ID of the qmod during install.
+    #[arg[long, default_value = "false"]]
+    ignore_package_id: bool,
+}
+
 fn main() -> Result<()> {
+    {
+        let args = Args::parse();
+        paths::init_paths(args.game_id.as_str());
+        let _ = IGNORE_QMOD_PACKAGE_ID.set(args.ignore_package_id);
+    }
+
+
     #[cfg(feature = "request_timing")]
     let start_time = Instant::now();
 

@@ -12,6 +12,7 @@ import { useSetError, wrapOperation } from '../SyncStore';
 import { Log } from '../Logging';
 import { Modal } from './Modal';
 import { SplashScreenSelector } from './SplashScreenSelector';
+import { gameId } from '../game_info';
 
 export function OptionsMenu({ device, quit, modStatus, setModStatus }: {
     device: Adb,
@@ -41,7 +42,7 @@ function ModTools({ device, quit, modStatus, setModStatus }: {
         <button onClick={async () => {
             const setError = useSetError("Failed to kill Beat Saber process");
             try {
-                await device.subprocess.spawnAndWait("am force-stop com.beatgames.beatsaber");
+                await device.subprocess.spawnAndWait(`am force-stop ${gameId}`);
                 toast.success("Successfully killed Beat Saber");
             }   catch(e) {
                 setError(e);
@@ -84,7 +85,7 @@ function ModTools({ device, quit, modStatus, setModStatus }: {
             }
         }}>Fix Player Data</button>
         Fixes an issue with player data permissions.
-        
+
         <br/>
     </div>
 }
@@ -101,7 +102,7 @@ function RepatchMenu({ device, modStatus, quit }: {
     const [splashScreen, setSplashScreen] = useState(null as File | null);
 
     return <>
-        <p>Certain mods require particular Android permissions to be enabled in order to work. 
+        <p>Certain mods require particular Android permissions to be enabled in order to work.
             To change the permisions, you will need to re-patch your game, which can be done automatically with the button below.</p>
         <PermissionsMenu manifest={manifest.current} />
         <br/>
@@ -127,7 +128,7 @@ async function logcatToBlob(device: Adb, getCancelled: () => boolean): Promise<B
 
     // First clear the logcat buffer - we only want logs from events happening after the "start logcat" button is pressed.
     await device.subprocess.spawnAndWait("logcat -c");
-    
+
     const process = await device.subprocess.spawn("logcat");
     let killed = false;
 
@@ -175,8 +176,8 @@ function AdbLogger({ device }: { device: Adb }) {
                 setLogFile(log);
                 setWaitingForLog(false);
             })
-            .catch(e => Log.error("Failed to get ADB log " + e));
-        
+            .catch(e => Log.error("Failed to get ADB log " + e, e));
+
         // When the value of `logging` changes to false, use the cleanup function to tell the `log` function to stop getting logs as soon as it can.
         return () => {
             cancelled = true;
@@ -189,8 +190,8 @@ function AdbLogger({ device }: { device: Adb }) {
         <p>Click the button below, <span className="warning">and keep your headset plugged in.</span> Open the game and do whatever it is that was causing you issues, then click the button again.</p>
 
         <p className="warning"></p>
-        {!logging ? 
-            <button onClick={async () => setLogging(true)}>Start Logging</button> : 
+        {!logging ?
+            <button onClick={async () => setLogging(true)}>Start Logging</button> :
             <button onClick={() => setLogging(false)}>Stop Logging</button>}
             <br/>
 

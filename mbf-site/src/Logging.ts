@@ -16,28 +16,40 @@ export const useLogStore = create<LogEventStore>(set => ({
     setEnableDebugLogs: (enabled: boolean) => set(_ => ({ enableDebugLogs: enabled }))
 }))
 
+interface MbfLogMsg<T> extends LogMsg {
+    rawData?: T
+}
+
 // Logging class which provides convenience functions to manipulate the global logging state.
 export class Log {
-    static emitEvent(event: LogMsg) {
-        useLogStore.getState().addLogEvent(event);
+    static emitEvent<T>(event: MbfLogMsg<T>) {
+        // Log the event to the console, more convenient during MBF development.
+        let consoleData: any[] = [event.message];
 
-        // Also log the event to the console, more convenient during MBF development.
+        if (event.rawData !== undefined) {
+            consoleData.push(event.rawData);
+        }
+
         switch(event.level) {
             case 'Error':
-                console.error(event.message);
+                console.error(...consoleData);
                 break;
             case 'Warn':
-                console.warn(event.message);
+                console.warn(...consoleData);
                 break;
             case 'Debug':
-                console.debug(event.message);
+                console.debug(...consoleData);
                 break;
             case 'Info':
-                console.info(event.message);
+                console.info(...consoleData);
                 break;
             case 'Trace':
-                console.trace(event.message);
+                console.trace(...consoleData);
         }
+
+        // Log the event to the global log store.
+        delete event.rawData;
+        useLogStore.getState().addLogEvent(event);
     }
 
     // Gets a large string containing all messages logged to MBF.
@@ -50,43 +62,24 @@ export class Log {
         return logs;
     }
 
-    static trace(msg: any) {
+    static emitMessage<T>(level: 'Trace' | 'Debug' | 'Info' | 'Warn' | 'Error', msg: any, raw?: T) {
+        let rawData: any;
+
+        if (raw !== undefined) {
+            rawData = raw;
+        }
+
         this.emitEvent({
             'type': 'LogMsg',
-            'level': 'Trace',
-            message: String(msg)
-        })
+            'level': level,
+            message: String(msg),
+            rawData: rawData
+        });
     }
 
-    static debug(msg: any) {
-        this.emitEvent({
-            'type': 'LogMsg',
-            'level': 'Debug',
-            message: String(msg)
-        })
-    }
-
-    static info(msg: any) {
-        this.emitEvent({
-            'type': 'LogMsg',
-            'level': 'Info',
-            message: String(msg)
-        })
-    }
-
-    static warn(msg: any) {
-        this.emitEvent({
-            'type': 'LogMsg',
-            'level': 'Warn',
-            message: String(msg)
-        })
-    }
-
-    static error(msg: any) {
-        this.emitEvent({
-            'type': 'LogMsg',
-            'level': 'Error',
-            message: String(msg)
-        })
-    }
+    static trace: (<T>(msg: any, raw?: T) => void) = (msg, raw) => this.emitMessage('Trace', msg, raw);
+    static debug: (<T>(msg: any, raw?: T) => void) = (msg, raw) => this.emitMessage('Debug', msg, raw);
+    static info: (<T>(msg: any, raw?: T) => void) = (msg, raw) => this.emitMessage('Info', msg, raw);
+    static warn: (<T>(msg: any, raw?: T) => void) = (msg, raw) => this.emitMessage('Warn', msg, raw);
+    static error: (<T>(msg: any, raw?: T) => void) = (msg, raw) => this.emitMessage('Error', msg, raw);
 }

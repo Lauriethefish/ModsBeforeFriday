@@ -70,7 +70,7 @@ pub fn handle_request(request: Request) -> Result<Response> {
 /// An `Err` variant is returned on failure, for example if Beat Saber isn't installed or the result from `dumpsys` couldn't be parsed.
 fn get_app_version_only() -> Result<String> {
     let dumpsys_output = Command::new("dumpsys")
-        .args(["package", crate::APK_ID])
+        .args(["package", *(crate::APK_ID.get().unwrap())])
         .output()
         .context("Invoking dumpsys")?;
     let dumpsys_stdout =

@@ -20,6 +20,7 @@ log = "0.4.22"
 const_format = "0.2.32"
 jsonschema = { version = "0.18.0", default-features = false }
 xml = "0.8.20"
+clap = { version = "4", features = ["derive"] }
 
 [build-dependencies]
 ureq = "2.9.6"

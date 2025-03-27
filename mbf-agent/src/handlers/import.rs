@@ -15,8 +15,8 @@ use mbf_zip::ZipFile;
 /// # Returns
 /// The [Response](requests::Response) to the request (variant `ImportResult`)
 pub(super) fn handle_import_mod_url(from_url: String) -> Result<Response> {
-    std::fs::create_dir_all(paths::MBF_DOWNLOADS)?;
-    let download_path = Path::new(paths::MBF_DOWNLOADS).join("import_from_url");
+    std::fs::create_dir_all(*(paths::MBF_DOWNLOADS.get().unwrap()))?;
+    let download_path = Path::new(*(paths::MBF_DOWNLOADS.get().unwrap())).join("import_from_url");
 
     info!("Downloading {}", from_url);
     let filename: Option<String> =
@@ -183,7 +183,7 @@ fn attempt_song_import(from_path: PathBuf) -> Result<ImportResultType> {
     let mut zip = ZipFile::open(song_handle).context("Song was invalid ZIP file")?;
 
     if zip.contains_file("info.dat") || zip.contains_file("Info.dat") {
-        let extract_path = Path::new(paths::CUSTOM_LEVELS)
+        let extract_path = Path::new(*(paths::CUSTOM_LEVELS.get().unwrap()))
             .join(from_path.file_stem().expect("Must have file stem"));
 
         if extract_path.exists() {

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import './css/App.css';
 import { AdbDaemonWebUsbConnection, AdbDaemonWebUsbDeviceManager } from '@yume-chan/adb-daemon-webusb';
-import { AdbDaemonTransport, Adb } from '@yume-chan/adb';
+import { AdbDaemonTransport, Adb, AdbServerClient, AdbServerTransport, } from '@yume-chan/adb';
 
 import AdbWebCredentialStore from "@yume-chan/adb-credential-web";
 import { DeviceModder } from './DeviceModder';
@@ -16,10 +16,17 @@ import { OperationModals } from './components/OperationModals';
 import { OpenLogsButton } from './components/OpenLogsButton';
 import { isViewingOnIos, isViewingOnMobile, isViewingOnWindows, usingOculusBrowser } from './platformDetection';
 import { SourceUrl } from '.';
+import { AdbServerWebSocketConnector, bridgeData, checkForBridge } from './AdbServerWebSocketConnector';
+import { waitForDisconnect } from "./waitForDisconnect";
 
 type NoDeviceCause = "NoDeviceSelected" | "DeviceInUse";
 
 const MIN_SUPPORTED_ANDROID_VERSION: number = 11;
+
+async function connectAdbDevice(client: AdbServerClient, device: AdbServerClient.Device): Promise<Adb> {
+  const transport = await client.createTransport(device);
+  return new Adb(transport);
+}
 
 async function connect(
   setAuthing: () => void): Promise<Adb | NoDeviceCause> {
@@ -71,12 +78,126 @@ export async function getAndroidVersion(device: Adb) {
   return Number(result.stdout.trim());
 }
 
+function areDevicesEqual(devices1: Record<string, any>[], devices2: Record<string, any>[]): boolean {
+  if (devices1.length !== devices2.length) {
+    return false;
+  }
+
+  for (let i = 0; i < devices1.length; i++) {
+    const device1 = devices1[i];
+    const device2 = devices2[i];
+
+    if (!areObjectsEqual(device1, device2)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function areObjectsEqual(obj1: Record<string, any>, obj2: Record<string, any>): boolean {
+  const keys1 = Object.keys(obj1);
+  const keys2 = Object.keys(obj2);
+
+  if (keys1.length !== keys2.length) {
+    return false;
+  }
+
+  for (const key of keys1) {
+    if (obj1[key] !== obj2[key]) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 function ChooseDevice() {
   const [authing, setAuthing] = useState(false);
   const [chosenDevice, setChosenDevice] = useState(null as Adb | null);
   const [connectError, setConnectError] = useState(null as string | null);
   const [devicePreV51, setdevicePreV51] = useState(false);
   const [deviceInUse, setDeviceInUse] = useState(false);
+  const [checkedForBridge, setCheckedForBridge] = useState(false);
+  const [bridgeClient, setBridgeClient] = useState<AdbServerClient | null>(null);
+  const [adbDevices, setAdbDevices] = useState<AdbServerClient.Device[]>([]);
+
+  // Check if the bridge is running
+  useEffect(() => {
+    if (!checkedForBridge) {
+      checkForBridge().then(haveBridge => {
+        if (haveBridge) {
+          setBridgeClient(new AdbServerClient(new AdbServerWebSocketConnector()));
+        }
+
+        setCheckedForBridge(true);
+      });
+    }
+  });
+
+  // Update the available devices on an interval
+  useEffect(() => {
+    if (bridgeClient && !chosenDevice) {
+      const deviceUpdate = async () => {
+        try {
+          const client = new AdbServerClient(new AdbServerWebSocketConnector())
+          const devices = (await client.getDevices()).filter(device => device.authenticating === false);
+
+          if (!areDevicesEqual(devices, adbDevices)) {
+            setAdbDevices(devices);
+            if (devices.length == 1) {
+              await connectDevice(await connectAdbDevice(bridgeClient, devices[0]));
+            }
+          }
+        } catch (err) {
+          setBridgeClient(null);
+          setAdbDevices([]);
+          setCheckedForBridge(false);
+          Log.error("Failed to get devices: " + err, err);
+        }
+      }
+      const timer = setInterval(deviceUpdate, 1000);
+      deviceUpdate();
+
+      return () => clearInterval(timer);
+    }
+  })
+
+  async function connectDevice(device: Adb) {
+    const androidVersion = await getAndroidVersion(device);
+    Log.debug("Device android version: " + androidVersion);
+    setdevicePreV51(androidVersion < MIN_SUPPORTED_ANDROID_VERSION);
+    setAuthing(false);
+    setChosenDevice(device);
+
+    await waitForDisconnect(device);
+
+    setChosenDevice(null);
+  }
+
+  async function connectWebUsb() {
+    let device: Adb | null;
+
+    try {
+      const result = await connect(() => setAuthing(true));
+      if(result === "NoDeviceSelected") {
+        device = null;
+      } else if(result === "DeviceInUse") {
+        setDeviceInUse(true);
+        return;
+      } else  {
+        device = result;
+
+        setChosenDevice(device);
+      }
+
+    } catch(error) {
+      Log.error("Failed to connect: " + error);
+      setConnectError(String(error));
+      setChosenDevice(null);
+      return;
+    }
+  }
 
   if(chosenDevice !== null) {
     Log.debug("Device model: " + chosenDevice.banner.model);
@@ -95,11 +216,11 @@ function ChooseDevice() {
       </div>
     } else  {
       return <>
-        <DeviceModder device={chosenDevice} quit={(err) => {
+        <DeviceModder device={chosenDevice} usingBridge={bridgeClient != null} quit={(err) => {
           if(err != null) {
             setConnectError(String(err));
           }
-          chosenDevice.close().catch(err => Log.warn("Failed to close device " + err));
+          chosenDevice.close().catch(err => Log.error("Failed to close device " + err, err));
           setChosenDevice(null);
         }} />
       </>
@@ -126,39 +247,35 @@ function ChooseDevice() {
 
           <NoCompatibleDevices />
 
-          <div className="chooseDeviceContainer">
-            <span><OpenLogsButton /></span>
-            <button onClick={async () => {
-              let device: Adb | null;
-
-              try {
-                const result = await connect(() => setAuthing(true));
-                if(result === "NoDeviceSelected") {
-                  device = null;
-                } else if(result === "DeviceInUse") {
-                  setDeviceInUse(true);
-                  return;
-                } else  {
-                  device = result;
-
-                  const androidVersion = await getAndroidVersion(device);
-                  Log.debug("Device android version: " + androidVersion);
-                  setdevicePreV51(androidVersion < MIN_SUPPORTED_ANDROID_VERSION);
-                  setAuthing(false);
-                  setChosenDevice(device);
-
-                  await device.transport.disconnected;
-                  setChosenDevice(null);
-                }
-
-              } catch(error) {
-                Log.error("Failed to connect: " + error);
-                setConnectError(String(error));
-                setChosenDevice(null);
-                return;
-              }
-            }}>Connect to Quest</button>
-          </div>
+          {bridgeClient && <>
+            <div className="connectedDevicesContainer">
+              <h2>Detected devices</h2>
+              <ul>
+                {adbDevices.map(device =>
+                  <>
+                    <li key={device.serial}>
+                      <button onClick={async () => {
+                        try {
+                          const adbDevice = await connectAdbDevice(bridgeClient, device);
+                          await connectDevice(adbDevice)
+                        } catch(error) {
+                          Log.error("Failed to connect: " + error, error);
+                          setConnectError(String(error));
+                          setChosenDevice(null);
+                        }
+                      }}>Connect to {device.serial}</button>
+                    </li>
+                  </>)}
+              </ul>
+              <span><OpenLogsButton /></span>
+            </div>
+          </>}
+          {!bridgeClient && navigator.usb && <>
+            <div className="chooseDeviceContainer">
+              <span><OpenLogsButton /></span>
+              <button onClick={connectWebUsb}>Connect to Quest</button>
+            </div>
+          </>}
 
           <ErrorModal isVisible={connectError != null}
             title="Failed to connect to device"
@@ -178,10 +295,10 @@ function ChooseDevice() {
 function DeviceInUse() {
  return <>
   <p>Some other app is trying to access your Quest, e.g. SideQuest.</p>
-  {isViewingOnWindows() ? 
+  {isViewingOnWindows() ?
     <>
       <p>To fix this, close SideQuest if you have it open, press <span className="codeBox">Win + R</span> and type the following text, and finally press enter.</p>
-      <span className="codeBox">taskkill /IM adb.exe /F</span>  
+      <span className="codeBox">taskkill /IM adb.exe /F</span>
       <p>Alternatively, restart your computer.</p>
     </>
     : <p>To fix this, restart your {isViewingOnMobile() ? "phone" : "computer"}.</p>}
@@ -232,8 +349,15 @@ function ChooseCoreModUrl({ setSpecifiedCoreMods } : { setSpecifiedCoreMods: () 
 
 function AppContents() {
   const [ hasSetCoreUrl, setSetCoreUrl ] = useState(false);
-
+  const [ hasBridge, setHasBridge ] = useState(false);
   const overrideQueryParam: string | null = new URLSearchParams(window.location.search).get("setcores");
+  useEffect(() => {
+    checkForBridge().then((hasBridge) => {
+      setHasBridge(hasBridge);
+      console.log("Bridge running: " + hasBridge);
+    });
+  });
+
   let mustEnterUrl = false;
   if(overrideQueryParam !== "prompt" && overrideQueryParam !== null) {
     if(!hasSetCoreUrl) {
@@ -246,9 +370,9 @@ function AppContents() {
     mustEnterUrl = true;
   }
 
-  if (usingOculusBrowser()) {
+  if (usingOculusBrowser() && !hasBridge) {
     return <OculusBrowserMessage />
-  } else  if (navigator.usb === undefined) {
+  } else  if (navigator.usb === undefined && !hasBridge) {
     return <UnsupportedMessage />
   } else if (hasSetCoreUrl || !mustEnterUrl) {
     return <ChooseDevice />

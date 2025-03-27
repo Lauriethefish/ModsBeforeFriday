@@ -77,24 +77,24 @@ impl Mod {
 
     /// Installs this mod by copying all of the necessary mod files/lib files/file copies to
     /// the modloader folders and marking it as installed.
-    /// 
+    ///
     /// Does not install dependencies, hence the "unchecked".
     pub(super) fn install_unchecked(&mut self) -> Result<()> {
         // Copy early mods, late mods and library binaries.
         util::copy_files_from_mod_folder(
             &self.loaded_from,
             &self.manifest().mod_files,
-            paths::EARLY_MODS,
+            *(paths::EARLY_MODS.get().unwrap()),
         )?;
         util::copy_files_from_mod_folder(
             &self.loaded_from,
             &self.manifest().library_files,
-            paths::LIBS,
+            *(paths::LIBS.get().unwrap()),
         )?;
         util::copy_files_from_mod_folder(
             &self.loaded_from,
             &self.manifest().late_mod_files,
-            paths::LATE_MODS,
+            *(paths::LATE_MODS.get().unwrap()),
         )?;
 
         self.copy_file_copies().context("Copying auxillary files")?;
@@ -108,17 +108,17 @@ impl Mod {
 
     /// Uninstalls this mod by deleting all copied binary files and file copies and marking it
     /// as uninstalled.
-    /// 
+    ///
     /// Does not uninstall dependant mods, hence the "unchecked"
     pub(super) fn uninstall_unchecked(&mut self, retained_libs: HashSet<OsString>) -> Result<()> {
         // Delete all mod binary files.
         util::remove_file_names_from_folder(
             self.manifest().mod_files.iter(),
-            paths::EARLY_MODS,
+            *(paths::EARLY_MODS.get().unwrap()),
         )?;
         util::remove_file_names_from_folder(
             self.manifest().late_mod_files.iter(),
-            paths::LATE_MODS,
+            *(paths::LATE_MODS.get().unwrap()),
         )?;
         util::remove_file_names_from_folder(
             // Only delete libraries not in use (!)
@@ -127,7 +127,7 @@ impl Mod {
                 .library_files
                 .iter()
                 .filter(|lib_file| !retained_libs.contains(OsStr::new(lib_file))),
-            paths::LIBS,
+            *(paths::LIBS.get().unwrap()),
         )?;
 
         // Delete all file copies.
@@ -150,7 +150,7 @@ impl Mod {
     pub(super) fn delete_unchecked(self) -> Result<()> {
         std::fs::remove_dir_all(self.loaded_from).context("Deleting mod extract directory")?;
         Ok(())
-    } 
+    }
 
     /// Copies all auxillary file copies in the manifest from the extracted mod to the required destination.
     fn copy_file_copies(&self) -> Result<()> {
@@ -198,9 +198,9 @@ impl Mod {
     /// destinations.
     fn check_if_files_copied(manifest: &ModInfo) -> Result<bool> {
         Ok(
-            util::files_exist_in_dir(paths::EARLY_MODS, manifest.mod_files.iter())?
-                && util::files_exist_in_dir(paths::LATE_MODS, manifest.late_mod_files.iter())?
-                && util::files_exist_in_dir(paths::LIBS, manifest.library_files.iter())?
+            util::files_exist_in_dir(*(paths::EARLY_MODS.get().unwrap()), manifest.mod_files.iter())?
+                && util::files_exist_in_dir(*(paths::LATE_MODS.get().unwrap()), manifest.late_mod_files.iter())?
+                && util::files_exist_in_dir(*(paths::LIBS.get().unwrap()), manifest.library_files.iter())?
                 && manifest
                     .file_copies
                     .iter()
