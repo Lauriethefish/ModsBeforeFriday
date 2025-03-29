@@ -16,8 +16,8 @@ jobs:
     name: Build and deploy site
     runs-on: ubuntu-latest
     env:
-      CC_aarch64-linux-android: /home/runner/android-ndk-r26c/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android31-clang
-      AR_aarch64-linux-android: /home/runner/android-ndk-r26c/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
+      CC_aarch64-linux-android: /home/runner/android-ndk-r27c/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android31-clang
+      AR_aarch64-linux-android: /home/runner/android-ndk-r27c/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
       BASE_URL: './'
     environment:
       name: github-pages
@@ -58,13 +58,13 @@ jobs:
         id: ndk_cache
         uses: actions/cache@v4
         with:
-          path: ~/android-ndk-r26c
-          key: linux-android-ndk-r26c
+          path: ~/android-ndk-r27c
+          key: linux-android-ndk-r27c
 
       - name: Install NDK
         if: steps.agent_cache.outputs.cache-hit != 'true' && steps.ndk_cache.outputs.cache-hit != 'true'
         run: |
-          curl -L "https://dl.google.com/android/repository/android-ndk-r26c-linux.zip" -o ndk.zip
+          curl -L "https://dl.google.com/android/repository/android-ndk-r27c-linux.zip" -o ndk.zip
           unzip ndk.zip -d /home/runner/
           rm ndk.zip
 
