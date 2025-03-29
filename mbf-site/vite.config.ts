@@ -4,9 +4,9 @@ import viteTsconfigPaths from 'vite-tsconfig-paths'
 import mkcert from 'vite-plugin-mkcert'
 
 export default defineConfig({
-    base: process.env.BASE_URL ?? '/',
+    base: process.env.BASE_URL ?? './',
     plugins: [react(), viteTsconfigPaths(), mkcert()],
-    server: {    
+    server: {
         open: true,
         port: 3000,
         https: true
