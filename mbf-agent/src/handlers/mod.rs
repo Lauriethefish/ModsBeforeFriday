@@ -7,8 +7,9 @@ use crate::{
     mod_man::ModManager,
     models::{
         request::Request,
+        request::RequestEnum,
         response::{self, Response},
-    },
+    }, parameters::PARAMETERS,
 };
 use anyhow::{anyhow, Context, Result};
 use log::info;
@@ -28,11 +29,11 @@ mod utility;
 /// # Returns
 /// If successful, a [Response] to be sent back to the frontend.
 pub fn handle_request(request: Request) -> Result<Response> {
-    match request {
-        Request::GetModStatus {
+    match request.request {
+        RequestEnum::GetModStatus {
             override_core_mod_url,
         } => mod_status::handle_get_mod_status(override_core_mod_url),
-        Request::Patch {
+        RequestEnum::Patch {
             downgrade_to,
             remodding,
             manifest_mod,
@@ -49,15 +50,15 @@ pub fn handle_request(request: Request) -> Result<Response> {
             override_core_mod_url,
             vr_splash_path,
         ),
-        Request::GetDowngradedManifest { version } => {
+        RequestEnum::GetDowngradedManifest { version } => {
             patching::handle_get_downgraded_manifest(version)
         }
-        Request::RemoveMod { id } => mod_management::handle_remove_mod(id),
-        Request::SetModsEnabled { statuses } => mod_management::handle_set_mods_enabled(statuses),
-        Request::Import { from_path } => import::handle_import(from_path, None),
-        Request::ImportUrl { from_url } => import::handle_import_mod_url(from_url),
-        Request::FixPlayerData => utility::handle_fix_player_data(),
-        Request::QuickFix {
+        RequestEnum::RemoveMod { id } => mod_management::handle_remove_mod(id),
+        RequestEnum::SetModsEnabled { statuses } => mod_management::handle_set_mods_enabled(statuses),
+        RequestEnum::Import { from_path } => import::handle_import(from_path, None),
+        RequestEnum::ImportUrl { from_url } => import::handle_import_mod_url(from_url),
+        RequestEnum::FixPlayerData => utility::handle_fix_player_data(),
+        RequestEnum::QuickFix {
             override_core_mod_url,
             wipe_existing_mods,
         } => utility::handle_quick_fix(override_core_mod_url, wipe_existing_mods),
@@ -72,7 +73,7 @@ pub fn handle_request(request: Request) -> Result<Response> {
 /// An `Err` variant is returned on failure, for example if Beat Saber isn't installed or the result from `dumpsys` couldn't be parsed.
 fn get_app_version_only() -> Result<String> {
     let dumpsys_output = Command::new("dumpsys")
-        .args(["package", crate::APK_ID])
+        .args(["package", &PARAMETERS.apk_id])
         .output()
         .context("Invoking dumpsys")?;
     let dumpsys_stdout =

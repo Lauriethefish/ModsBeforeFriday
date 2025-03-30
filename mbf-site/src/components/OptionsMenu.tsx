@@ -13,6 +13,7 @@ import { Log } from '../Logging';
 import { Modal } from './Modal';
 import { SplashScreenSelector } from './SplashScreenSelector';
 import { useDeviceStore } from '../DeviceStore';
+import { gameId } from '../game_info';
 
 interface OptionsMenuProps {
     setModStatus: (status: ModStatus) => void,
@@ -61,10 +62,10 @@ function ModTools({ quit, modStatus, setModStatus }: {
 
             const setError = useSetError("Failed to kill Beat Saber process");
             try {
-              await device.subprocess.spawnAndWait("am force-stop com.beatgames.beatsaber");
-              toast.success("Successfully killed Beat Saber");
-            } catch (e) {
-              setError(e);
+                await device.subprocess.spawnAndWait(`am force-stop ${gameId}`);
+                toast.success("Successfully killed Beat Saber");
+            }   catch(e) {
+                setError(e);
             }
           }}
         />

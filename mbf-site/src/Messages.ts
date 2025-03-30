@@ -52,6 +52,13 @@ export interface GetDowngradedManifest {
     version: string
 }
 
+export interface AgentParameters {
+    agent_parameters: {
+        game_id: String,
+        ignore_package_id: boolean
+    }
+}
+
 export type Request = GetModStatus | 
     Patch | 
     SetModsEnabled | 
