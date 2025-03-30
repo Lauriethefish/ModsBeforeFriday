@@ -12,6 +12,7 @@ import { useSetError, wrapOperation } from '../SyncStore';
 import { Log } from '../Logging';
 import { Modal } from './Modal';
 import { SplashScreenSelector } from './SplashScreenSelector';
+import { gameId } from '../game_info';
 
 export function OptionsMenu({ device, quit, modStatus, setModStatus }: {
     device: Adb,
@@ -41,7 +42,7 @@ function ModTools({ device, quit, modStatus, setModStatus }: {
         <button onClick={async () => {
             const setError = useSetError("Failed to kill Beat Saber process");
             try {
-                await device.subprocess.spawnAndWait("am force-stop com.beatgames.beatsaber");
+                await device.subprocess.spawnAndWait(`am force-stop ${gameId}`);
                 toast.success("Successfully killed Beat Saber");
             }   catch(e) {
                 setError(e);
