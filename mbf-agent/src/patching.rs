@@ -10,7 +10,7 @@ use crate::{
     data_fix::fix_colour_schemes,
     downloads,
     models::response::{AppInfo, InstallStatus, ModLoader},
-    paths, ModTag, APK_ID,
+    ModTag, parameters::PARAMETERS,
 };
 use anyhow::{anyhow, Context, Result};
 use log::{info, warn};
@@ -73,7 +73,7 @@ pub fn mod_current_apk(
     let obb_backup = temp_path.join("obbs");
     std::fs::create_dir_all(&obb_backup)?;
     let obb_backups =
-        save_obbs(Path::new(paths::OBB_DIR), &obb_backup).context("Saving OBB files")?;
+        save_obbs(Path::new(&PARAMETERS.obb_dir), &obb_backup).context("Saving OBB files")?;
 
     patch_and_reinstall(
         libunity_path,
@@ -128,7 +128,7 @@ pub fn downgrade_and_mod_apk(
     std::fs::create_dir_all(&obb_backup_dir).context("Creating OBB backup directory")?;
     let mut obb_backup_paths = Vec::new();
     for obb_diff in &diffs.obb_diffs {
-        let obb_path = Path::new(paths::OBB_DIR).join(&obb_diff.file_name);
+        let obb_path = Path::new(&PARAMETERS.obb_dir).join(&obb_diff.file_name);
         if !obb_path.exists() {
             return Err(anyhow!(
                 "Obb file {} did not exist, is the Beat Saber installation corrupt",
@@ -146,7 +146,7 @@ pub fn downgrade_and_mod_apk(
 
     // Beat Saber DLC asset files do not have the .obb suffix.
     // If there are any DLC, then these have been deleted by the patching process so we return true so that the user can later be informed of this.
-    let contains_dlc = has_file_with_no_extension(paths::OBB_DIR).context("Checking for DLC")?;
+    let contains_dlc = has_file_with_no_extension(&PARAMETERS.obb_dir).context("Checking for DLC")?;
 
     patch_and_reinstall(
         libunity_path,
@@ -178,7 +178,7 @@ fn has_file_with_no_extension(obb_dir: impl AsRef<Path>) -> Result<bool> {
 
 pub fn kill_app() -> Result<()> {
     info!("Killing Beat Saber");
-    Command::new("am").args(&["force-stop", APK_ID]).output()?;
+    Command::new("am").args(&["force-stop", &PARAMETERS.apk_id]).output()?;
     Ok(())
 }
 
@@ -202,16 +202,16 @@ fn patch_and_reinstall(
     )
     .context("Patching APK")?;
 
-    if Path::new(paths::PLAYER_DATA).exists() {
+    if Path::new(&PARAMETERS.player_data).exists() {
         info!("Backing up player data");
         backup_player_data().context("Backing up player data")?;
     } else {
         info!("No player data to backup");
     }
 
-    if Path::new(paths::DATAKEEPER_PLAYER_DATA).exists() {
+    if Path::new(&PARAMETERS.datakeeper_player_data).exists() {
         info!("Fixing colour schemes in backed up PlayerData.dat");
-        match fix_colour_schemes(paths::DATAKEEPER_PLAYER_DATA) {
+        match fix_colour_schemes(&PARAMETERS.datakeeper_player_data) {
             Ok(_) => {}
             Err(err) => warn!("Failed to fix colour schemes: {err}"),
         }
@@ -221,7 +221,7 @@ fn patch_and_reinstall(
     std::fs::remove_file(temp_apk_path)?;
 
     info!("Restoring OBB files");
-    restore_obb_files(Path::new(paths::OBB_DIR), obb_paths).context("Restoring OBB files")?;
+    restore_obb_files(Path::new(&PARAMETERS.obb_dir), obb_paths).context("Restoring OBB files")?;
 
     // Player data is not restored back to the `files` directory as we cannot correctly set its permissions so that BS can access it.
     // (which causes a black screen that can only be fixed by manually deleting the file)
@@ -230,18 +230,18 @@ fn patch_and_reinstall(
 }
 
 pub fn backup_player_data() -> Result<()> {
-    info!("Copying to {}", paths::AUX_DATA_BACKUP);
+    info!("Copying to {}", &PARAMETERS.aux_data_backup);
 
-    std::fs::create_dir_all(Path::new(paths::AUX_DATA_BACKUP).parent().unwrap())?;
-    std::fs::copy(paths::PLAYER_DATA, paths::AUX_DATA_BACKUP)?;
+    std::fs::create_dir_all(Path::new(&PARAMETERS.aux_data_backup).parent().unwrap())?;
+    std::fs::copy(&PARAMETERS.player_data, &PARAMETERS.aux_data_backup)?;
 
-    if Path::new(paths::DATAKEEPER_PLAYER_DATA).exists() {
-        warn!("Did not backup PlayerData.dat to datakeeper folder as there was already a PlayerData.dat there. 
-            The player data is still safe in {}", paths::AUX_DATA_BACKUP);
+    if Path::new(&PARAMETERS.datakeeper_player_data).exists() {
+        warn!("Did not backup PlayerData.dat to datakeeper folder as there was already a PlayerData.dat there.
+            The player data is still safe in {}", &PARAMETERS.aux_data_backup);
     } else {
-        info!("Copying to {}", paths::DATAKEEPER_PLAYER_DATA);
-        std::fs::create_dir_all(Path::new(paths::DATAKEEPER_PLAYER_DATA).parent().unwrap())?;
-        std::fs::copy(paths::PLAYER_DATA, paths::DATAKEEPER_PLAYER_DATA)?;
+        info!("Copying to {}", &PARAMETERS.datakeeper_player_data);
+        std::fs::create_dir_all(Path::new(&PARAMETERS.datakeeper_player_data).parent().unwrap())?;
+        std::fs::copy(&PARAMETERS.player_data, &PARAMETERS.datakeeper_player_data)?;
     }
 
     Ok(())
@@ -253,7 +253,7 @@ fn reinstall_modded_app(
 ) -> Result<()> {
     info!("Reinstalling modded app");
     Command::new("pm")
-        .args(["uninstall", APK_ID])
+        .args(["uninstall", &PARAMETERS.apk_id])
         .output()
         .context("Uninstalling vanilla APK")?;
 
@@ -264,17 +264,17 @@ fn reinstall_modded_app(
 
     info!("Granting external storage permission");
     Command::new("appops")
-        .args(["set", "--uid", APK_ID, "MANAGE_EXTERNAL_STORAGE", "allow"])
+        .args(["set", "--uid", &PARAMETERS.apk_id, "MANAGE_EXTERNAL_STORAGE", "allow"])
         .output()?;
 
     // Quest 1 specific permissions
     if device_pre_v51 {
         info!("Granting WRITE_EXTERNAL_STORAGE and READ_EXTERNAL_STORAGE (Quest 1)");
         Command::new("pm")
-            .args(["grant", APK_ID, "android.permission.WRITE_EXTERNAL_STORAGE"])
+            .args(["grant", &PARAMETERS.apk_id, "android.permission.WRITE_EXTERNAL_STORAGE"])
             .output()?;
         Command::new("pm")
-            .args(["grant", APK_ID, "android.permission.READ_EXTERNAL_STORAGE"])
+            .args(["grant", &PARAMETERS.apk_id, "android.permission.READ_EXTERNAL_STORAGE"])
             .output()?;    
     }
 
@@ -357,7 +357,7 @@ fn save_libunity(
     temp_path: impl AsRef<Path>,
     version: &str,
 ) -> Result<Option<PathBuf>> {
-    let url = match external_res::get_libunity_url(res_cache, APK_ID, version)? {
+    let url = match external_res::get_libunity_url(res_cache, &PARAMETERS.apk_id, version)? {
         Some(url) => url,
         None => return Ok(None), // No libunity for this version
     };
@@ -404,7 +404,7 @@ fn restore_obb_files(restore_dir: &Path, obb_backups: Vec<PathBuf>) -> Result<()
 }
 
 pub fn get_modloader_path() -> Result<PathBuf> {
-    let modloaders_path = format!("/sdcard/ModData/{APK_ID}/Modloader/");
+    let modloaders_path = format!("{}/", &PARAMETERS.modloader_dir);
 
     std::fs::create_dir_all(&modloaders_path)?;
     Ok(PathBuf::from(modloaders_path).join(MODLOADER_NAME))
@@ -572,12 +572,12 @@ pub fn get_modloader_installed(apk: &mut ZipFile<File>) -> Result<Option<ModLoad
 /// MBF only supports BS versions >1.35.0, which all use OBBs so if the obb is not present
 /// the installation is invalid and we need to prompt the user to uninstall it.
 pub fn check_obb_present() -> Result<bool> {
-    if !Path::new(paths::OBB_DIR).exists() {
+    if !Path::new(&PARAMETERS.obb_dir).exists() {
         return Ok(false);
     }
 
     // Check if any of the files in the OBB directory have extension OBB
-    Ok(std::fs::read_dir(paths::OBB_DIR)?.any(|stat_res| {
+    Ok(std::fs::read_dir(&PARAMETERS.obb_dir)?.any(|stat_res| {
         stat_res.is_ok_and(|path| {
             path.path()
                 .extension()

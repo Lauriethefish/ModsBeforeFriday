@@ -28,7 +28,7 @@ use mbf_res_man::{
 use mbf_zip::ZipFile;
 use semver::Version;
 
-use crate::{downloads, paths};
+use crate::{downloads, parameters::PARAMETERS};
 
 /// The JSON schema for the `mod.json` file within a qmod.
 /// This is the same schema used by QuestPatcher.
@@ -76,7 +76,7 @@ impl<'cache> ModManager<'cache> {
                 )
                 .expect("QMOD schema should be a valid JSON schema"),
             // Each game version stores its QMODs in a different directory.
-            qmods_dir: paths::QMODS.replace('$', &game_version),
+            qmods_dir: (&PARAMETERS.qmods).replace('$', &game_version),
             game_version,
             res_cache,
             mod_repo: None,
@@ -89,10 +89,10 @@ impl<'cache> ModManager<'cache> {
 
         // Wipe all mod directories, if they exist.
         let to_remove = [
-            paths::OLD_QMODS,
-            paths::LATE_MODS,
-            paths::EARLY_MODS,
-            paths::LIBS,
+            &PARAMETERS.old_qmods,
+            &PARAMETERS.late_mods,
+            &PARAMETERS.early_mods,
+            &PARAMETERS.libs,
             &self.qmods_dir,
         ];
         for path in to_remove {
@@ -450,14 +450,14 @@ impl<'cache> ModManager<'cache> {
     /// Will do nothing if the old mods directory does not exist.
     /// Returns true if any old QMODs were found
     fn load_old_qmods(&mut self) -> Result<bool> {
-        if !Path::new(paths::OLD_QMODS).exists() {
+        if !Path::new(&PARAMETERS.old_qmods).exists() {
             return Ok(false);
         }
 
         warn!("Migrating mods from legacy folder");
         let mut found_qmod = false;
         for stat_result in
-            std::fs::read_dir(paths::OLD_QMODS).context("Reading old QMODs directory")?
+            std::fs::read_dir(&PARAMETERS.old_qmods).context("Reading old QMODs directory")?
         {
             let stat = stat_result?;
 
@@ -474,7 +474,7 @@ impl<'cache> ModManager<'cache> {
             found_qmod = true;
             std::fs::remove_file(stat.path()).context("Deleting legacy mod")?;
         }
-        std::fs::remove_dir(paths::OLD_QMODS)?;
+        std::fs::remove_dir(&PARAMETERS.old_qmods)?;
 
         Ok(found_qmod)
     }
@@ -741,13 +741,13 @@ impl<'cache> ModManager<'cache> {
     /// and the Packages directory that stores the extracted QMODs for the current game version.
     fn create_mods_dir(&self) -> Result<()> {
         std::fs::create_dir_all(&self.qmods_dir)?;
-        std::fs::create_dir_all(paths::LATE_MODS)?;
-        std::fs::create_dir_all(paths::EARLY_MODS)?;
-        std::fs::create_dir_all(paths::LIBS)?;
+        std::fs::create_dir_all(&PARAMETERS.late_mods)?;
+        std::fs::create_dir_all(&PARAMETERS.early_mods)?;
+        std::fs::create_dir_all(&PARAMETERS.libs)?;
         OpenOptions::new()
             .create(true)
             .write(true)
-            .open(paths::MODDATA_NOMEDIA)
+            .open(&PARAMETERS.moddata_nomedia)
             .context("Creating nomedia file")?;
 
         Ok(())
