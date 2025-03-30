@@ -1,10 +1,11 @@
 import { AdbSync, AdbSyncWriteOptions, Adb, encodeUtf8 } from '@yume-chan/adb';
 import { PromiseResolver } from '@yume-chan/async';
 import { Consumable, TextDecoderStream, MaybeConsumable, ReadableStream, WritableStream } from '@yume-chan/stream-extra';
-import { Request, Response, LogMsg, ModStatus, Mods, FixedPlayerData, ImportResult, DowngradedManifest, Patched, ModSyncResult } from "./Messages";
+import { Request, Response, LogMsg, ModStatus, Mods, FixedPlayerData, ImportResult, DowngradedManifest, Patched, ModSyncResult, AgentParameters } from "./Messages";
 import { AGENT_SHA1 } from './agent_manifest';
 import { toast } from 'react-toastify';
 import { Log } from './Logging';
+import { gameId, ignorePackageId } from './game_info';
 
 const AgentPath: string = "/data/local/tmp/mbf-agent";
 const UploadsPath: string = "/data/local/tmp/mbf/uploads/";
@@ -179,7 +180,14 @@ function createLoggingWritableStream<ChunkType>(chunkCallback?: (chunks: ChunkTy
 }
 
 async function sendRequest(adb: Adb, request: Request): Promise<Response> {
-  let command_buffer = encodeUtf8(JSON.stringify(request) + "\n");
+  let wrappedRequest: AgentParameters & Request = {
+    agent_parameters: {
+      game_id: gameId,
+      ignore_package_id: ignorePackageId
+    },
+    ...request
+  }
+  let command_buffer = encodeUtf8(JSON.stringify(wrappedRequest) + "\n");
   let agentProcess = await adb.subprocess.spawn(AgentPath);
   let response = null as (Response | null); // Typescript is weird...
   const stdin = agentProcess.stdin.getWriter();
@@ -191,7 +199,7 @@ async function sendRequest(adb: Adb, request: Request): Promise<Response> {
   }
 
   console.group("Agent Request");
-  console.log(request);
+  console.log(wrappedRequest);
 
   console.group("Messages");
 
