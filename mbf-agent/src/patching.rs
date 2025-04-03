@@ -58,6 +58,14 @@ pub fn mod_current_apk(
     let temp_apk_path = temp_path.join("mbf-tmp.apk");
     std::fs::copy(&app_info.path, &temp_apk_path).context("Copying APK to temp")?;
 
+    // Make sure the APK is writable.  Sometimes Android will mark it as read-only and
+    // the resulting copy will inherit those permissions.
+    {
+        let mut permissions = std::fs::metadata(&temp_apk_path).context("Reading temp APK permissions")?.permissions();
+        permissions.set_readonly(false);
+        std::fs::set_permissions(&temp_apk_path, permissions).context("Making temp APK writable")?;
+    }
+
     info!("Saving OBB files");
     let obb_backup = temp_path.join("obbs");
     std::fs::create_dir_all(&obb_backup)?;
