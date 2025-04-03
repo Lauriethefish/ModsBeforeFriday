@@ -22,7 +22,7 @@ export interface FixPlayerData {
 
 export interface SetModsEnabled {
     type: 'SetModsEnabled',
-    statuses: { [id: string]: boolean } 
+    statuses: { [id: string]: boolean }
 }
 
 export interface QuickFix {
@@ -51,13 +51,20 @@ export interface GetDowngradedManifest {
     version: string
 }
 
-export type Request = GetModStatus | 
-    Patch | 
-    SetModsEnabled | 
-    QuickFix | 
-    RemoveMod | 
-    Import | 
-    ImportUrl | 
+export interface AgentParameters {
+    agent_parameters: {
+        game_id: String,
+        ignore_package_id: boolean
+    }
+}
+
+export type Request = GetModStatus |
+    Patch |
+    SetModsEnabled |
+    QuickFix |
+    RemoveMod |
+    Import |
+    ImportUrl |
     FixPlayerData |
     GetDowngradedManifest;
 

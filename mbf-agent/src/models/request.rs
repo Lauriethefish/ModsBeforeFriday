@@ -1,12 +1,53 @@
 //! Models used for communication *from the frontend to the backend*.
 
 use std::collections::HashMap;
-
 use serde::Deserialize;
 
+/// The default value for the game_id parameter.
+fn default_game_id() -> String {
+    "com.beatgames.beatsaber".to_string()
+}
+
+/// The default value for the ignore_package_id parameter.
+fn default_ignore_package_id() -> bool {
+    false
+}
+
+/// The default value for the agent_parameters parameter.
+fn default_agent_parameters() -> AgentRequestParameters {
+    AgentRequestParameters {
+        game_id: default_game_id(),
+        ignore_package_id: default_ignore_package_id(),
+    }
+}
+
+/// A struct that contains the game ID to be used for the agent and a flag indicating whether to skip the game ID check.
+#[derive(Deserialize)]
+pub struct AgentRequestParameters {
+    /// The ID of the Beat Saber APK on the device.
+    #[serde(default = "default_game_id")]
+    pub game_id: String,
+
+    /// If true, the game ID check is skipped during qmod install.
+    #[serde(default = "default_ignore_package_id")]
+    pub ignore_package_id: bool,
+}
+
+/// A struct that represents a request from the frontend to the agent.
+#[derive(Deserialize)]
+pub struct Request {
+    /// The parameters for the agent, including the game ID and whether to skip the game ID check.
+    #[serde(default = "default_agent_parameters")]
+    pub agent_parameters: AgentRequestParameters,
+
+    #[serde(flatten)]
+    pub request: RequestEnum,
+}
+
+/// An enum that represents the different types of requests that can be made to the agent.
 #[derive(Deserialize)]
 #[serde(tag = "type")]
-pub enum Request {
+pub enum RequestEnum {
     /// Gathers several pieces of data to check that the installation is modded appropriately, including:
     /// - Whether the APK is patched
     /// - The APK version
