@@ -346,10 +346,9 @@ fn save_obbs(obb_dir: &Path, obb_backups_path: &Path) -> Result<Vec<PathBuf>> {
         if let Ok(stat) = err_or_stat {
             let path = stat.path();
 
-            // Rename doesn't work due to different mount points
+            // Make a backup copy of the obb to restore later after patching.
             let obb_backup_path = obb_backups_path.join(path.file_name().unwrap());
             std::fs::copy(&path, &obb_backup_path)?;
-            std::fs::remove_file(&path)?;
 
             paths.push(obb_backup_path);
         }
