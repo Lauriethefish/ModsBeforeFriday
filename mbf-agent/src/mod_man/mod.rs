@@ -98,7 +98,7 @@ impl<'cache> ModManager<'cache> {
         for path in to_remove {
             let path = Path::new(path);
             if path.exists() {
-                std::fs::remove_dir(path).context("Failed to delete mod folder")?;
+                std::fs::remove_dir_all(path).context("Failed to delete mod folder")?;
             }
         }
 
