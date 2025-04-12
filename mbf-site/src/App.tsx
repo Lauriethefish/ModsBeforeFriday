@@ -127,8 +127,15 @@ function ChooseDevice() {
                   device = result;
 
                   const androidVersion = await getAndroidVersion(device);
+
                   Log.debug("Device android version: " + androidVersion);
-                  setdevicePreV51(androidVersion < MIN_SUPPORTED_ANDROID_VERSION);
+
+                  const deviceName = device.banner.model;
+                  if (deviceName === "Quest") {
+                    Log.debug("Device is a Quest 1, switching to pre-v51 mode");
+                    setdevicePreV51(androidVersion < MIN_SUPPORTED_ANDROID_VERSION);                  
+                  }
+
                   setAuthing(false);
                   setChosenDevice(device);
 
