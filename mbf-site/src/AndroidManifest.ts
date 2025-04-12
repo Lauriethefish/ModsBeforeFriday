@@ -124,6 +124,7 @@ export class AndroidManifest {
         // Quest 1 specific
         this.addPermission("android.permission.WRITE_EXTERNAL_STORAGE");
         this.addPermission("android.permission.READ_EXTERNAL_STORAGE");
+        this.setMetadata(`com.oculus.supportedDevices`, "quest|quest2");
     }
 
     // Adds a <uses-permission> element for the specified permission underneath the manifest tag.
