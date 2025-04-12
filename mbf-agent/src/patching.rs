@@ -261,11 +261,12 @@ fn reinstall_modded_app(
 
     // Quest 1 specific permissions
     if device_pre_v51 {
-        Command::new("appops")
-            .args(["set", "--uid", APK_ID, "WRITE_EXTERNAL_STORAGE", "allow"])
+        info!("Granting WRITE_EXTERNAL_STORAGE and READ_EXTERNAL_STORAGE (Quest 1)");
+        Command::new("pm")
+            .args(["grant", APK_ID, "android.permission.WRITE_EXTERNAL_STORAGE"])
             .output()?;
-        Command::new("appops")
-            .args(["set", "--uid", APK_ID, "READ_EXTERNAL_STORAGE", "allow"])
+        Command::new("pm")
+            .args(["grant", APK_ID, "android.permission.READ_EXTERNAL_STORAGE"])
             .output()?;    
     }
 
