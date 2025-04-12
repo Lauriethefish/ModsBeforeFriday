@@ -209,7 +209,7 @@ fn patch_and_reinstall(
         }
     }
 
-    reinstall_modded_app(&temp_apk_path).context("Reinstalling modded APK")?;
+    reinstall_modded_app(&temp_apk_path, device_pre_v51).context("Reinstalling modded APK")?;
     std::fs::remove_file(temp_apk_path)?;
 
     info!("Restoring OBB files");
@@ -239,7 +239,10 @@ pub fn backup_player_data() -> Result<()> {
     Ok(())
 }
 
-fn reinstall_modded_app(temp_apk_path: &Path) -> Result<()> {
+fn reinstall_modded_app(
+    temp_apk_path: &Path,
+    device_pre_v51: bool,
+) -> Result<()> {
     info!("Reinstalling modded app");
     Command::new("pm")
         .args(["uninstall", APK_ID])
@@ -255,6 +258,16 @@ fn reinstall_modded_app(temp_apk_path: &Path) -> Result<()> {
     Command::new("appops")
         .args(["set", "--uid", APK_ID, "MANAGE_EXTERNAL_STORAGE", "allow"])
         .output()?;
+
+    // Quest 1 specific permissions
+    if device_pre_v51 {
+        Command::new("appops")
+            .args(["set", "--uid", APK_ID, "WRITE_EXTERNAL_STORAGE", "allow"])
+            .output()?;
+        Command::new("appops")
+            .args(["set", "--uid", APK_ID, "READ_EXTERNAL_STORAGE", "allow"])
+            .output()?;    
+    }
 
     Ok(())
 }
