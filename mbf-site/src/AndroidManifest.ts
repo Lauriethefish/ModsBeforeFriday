@@ -124,7 +124,13 @@ export class AndroidManifest {
         // Quest 1 specific
         this.addPermission("android.permission.WRITE_EXTERNAL_STORAGE");
         this.addPermission("android.permission.READ_EXTERNAL_STORAGE");
-        this.setMetadata(`com.oculus.supportedDevices`, "quest|quest2");
+        this.setMetadata("com.oculus.supportedDevices", "quest|quest2");
+
+        // Increases gpu clock speed (+1 level to gpu, -1 level to cpu) on Quest 3.
+        // GPU: Level 4 -> Level 5 (545 MHz -> 599 MHz)
+        // CPU: Level 4 -> Level 3 (1.92 GHz -> 1.65 GHz)
+        // https://developers.meta.com/horizon/documentation/unity/po-quest-boost#enabling-cpu-and-gpu-level-trading
+        this.setMetadata("com.oculus.trade_cpu_for_gpu_amount", "1")
     }
 
     // Adds a <uses-permission> element for the specified permission underneath the manifest tag.
