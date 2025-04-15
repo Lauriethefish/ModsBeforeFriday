@@ -105,13 +105,17 @@ class WebSocketConnection {
               }
             };
             // Report errors to the stream controller.
-            this.socket.onerror = () => controller.error(new Error("WebSocket error"));
+            this.socket.onerror = (ev) => {
+              controller.error(new Error("WebSocket error"));
+              console.error("WebSocket error", ev);
+            };
             // Close the stream when the socket closes.
             this.socket.onclose = (event) => {
               try {
                 controller.close();
-              } catch {
-                // Ignore errors during stream close.
+              } catch (error) {
+                // Ignore errors during stream close, but logs them.
+                console.error(error);
               }
               this.closeDeferred.resolve({
                 closeCode: event.code,
@@ -129,8 +133,9 @@ class WebSocketConnection {
     };
 
     // If an error occurs before the socket opens, reject the openDeferred.
-    this.socket.onerror = () => {
+    this.socket.onerror = (ev) => {
       if (!hasOpened) {
+        console.error("WebSocket conenction error", ev);
         this.openDeferred.reject(new Error("WebSocket connection error"));
       }
     };
