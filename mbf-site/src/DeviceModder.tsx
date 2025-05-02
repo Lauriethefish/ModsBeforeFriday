@@ -76,16 +76,6 @@ export function DeviceModder(props: DeviceModderProps) {
             .catch(err => quit(err));
     }, [device, quit]);
 
-    useEffect(() => {
-        if (usingBridge) {
-            const timer = setInterval(async () => {
-                await checkForBridge();
-            }, 5000);
-
-            return () => clearInterval(timer);
-        }
-    })
-
     // Fun "ocean" of IF statements, hopefully covering every possible state of an installation!
     if (modStatus === null) {
         return <div className='container mainContainer fadeIn'>

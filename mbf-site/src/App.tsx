@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import './css/App.css';
 import { AdbDaemonWebUsbConnection, AdbDaemonWebUsbDeviceManager } from '@yume-chan/adb-daemon-webusb';
-import { AdbDaemonTransport, Adb, AdbServerClient, AdbServerTransport, } from '@yume-chan/adb';
+import { AdbDaemonTransport, Adb, AdbServerClient } from '@yume-chan/adb';
 
 import AdbWebCredentialStore from "@yume-chan/adb-credential-web";
 import { DeviceModder } from './DeviceModder';
@@ -14,20 +14,33 @@ import { setCoreModOverrideUrl } from './Agent';
 import { Log } from './Logging';
 import { OperationModals } from './components/OperationModals';
 import { OpenLogsButton } from './components/OpenLogsButton';
-import { isViewingOnIos, isViewingOnMobile, isViewingOnWindows, usingOculusBrowser } from './platformDetection';
-import { SourceUrl } from '.';
-import { AdbServerWebSocketConnector, bridgeData, checkForBridge } from './AdbServerWebSocketConnector';
+import { usingOculusBrowser } from './platformDetection';
+import { bridgeData, checkForBridge } from './AdbServerWebSocketConnector';
 import { waitForDisconnect } from "./waitForDisconnect";
+import { BridgeManager } from './BridgeManager';
+import { AllowAuth, DeviceInUse, NoCompatibleDevices, OculusBrowserMessage, OldOsVersion, QuestOneNotSupported, Title, UnsupportedMessage } from './AppMessages';
+import { PagePinger } from './PagePinger';
 
 type NoDeviceCause = "NoDeviceSelected" | "DeviceInUse";
 
 const MIN_SUPPORTED_ANDROID_VERSION: number = 11;
 
+/**
+ * Connects to the ADB server using the given client and device.
+ * @param client The ADB server client to use for the connection.
+ * @param device The device to connect to.
+ * @returns
+ */
 async function connectAdbDevice(client: AdbServerClient, device: AdbServerClient.Device): Promise<Adb> {
   const transport = await client.createTransport(device);
   return new Adb(transport);
 }
 
+/**
+ * Connects to the ADB server using WebUSB.
+ * @param setAuthing A function to call when the connection is being authenticated.
+ * @returns The connected ADB device or an error message.
+ */
 async function connect(
   setAuthing: () => void): Promise<Adb | NoDeviceCause> {
   const device_manager = new AdbDaemonWebUsbDeviceManager(navigator.usb);
@@ -64,7 +77,10 @@ async function connect(
   return new Adb(transport);
 }
 
-// Attempts to invoke mbf-adb-killer to disconnect the ADB server, avoiding the developer working on MBF having to manually do this.
+/**
+ * Attempts to stop the ADB server by sending a request to the ADB killer.
+ * @returns A promise that resolves when the ADB server is disconnected.
+ */
 async function tryDisconnectAdb() {
   try {
     await fetch("http://localhost:25898");
@@ -73,149 +89,193 @@ async function tryDisconnectAdb() {
   }
 }
 
+/**
+ * Retrieves the Android version of the connected device.
+ *
+ * @param device - The ADB device instance to query for the Android version.
+ * @returns A promise that resolves to the Android version as a number.
+ *          The version is extracted from the device's system property `ro.build.version.release`.
+ */
 export async function getAndroidVersion(device: Adb) {
   const result = await device.subprocess.spawnAndWait("getprop ro.build.version.release");
   return Number(result.stdout.trim());
 }
 
-function areDevicesEqual(devices1: Record<string, any>[], devices2: Record<string, any>[]): boolean {
-  if (devices1.length !== devices2.length) {
-    return false;
-  }
+type SetStateAction<T> = React.Dispatch<React.SetStateAction<T>>;
 
-  for (let i = 0; i < devices1.length; i++) {
-    const device1 = devices1[i];
-    const device2 = devices2[i];
-
-    if (!areObjectsEqual(device1, device2)) {
-      return false;
-    }
-  }
-
-  return true;
+enum ConnectedState {
+  NotConnected, WebUsb, Bridge
 }
 
-function areObjectsEqual(obj1: Record<string, any>, obj2: Record<string, any>): boolean {
-  const keys1 = Object.keys(obj1);
-  const keys2 = Object.keys(obj2);
+/**
+ * Handles the process of connecting to an ADB device and managing its connection state.
+ *
+ * 1. Retrieves the Android version of the device.
+ * 2. Sets a flag if the device is running an unsupported (pre-v51) OS version.
+ * 3. Updates authentication and device selection state.
+ * 4. Waits for the device to disconnect.
+ * 5. Resets the selected device state after disconnection.
+ *
+ * @param device - The connected ADB device instance.
+ * @param stateSetters - An object containing state setters.
+ */
+async function connectDevice(device: Adb, { setDevicePreV51, setAuthing, setChosenDevice }: {
+  /** State setter for indicating if the device is pre-v51 (unsupported). */
+  setDevicePreV51: SetStateAction<boolean>
 
-  if (keys1.length !== keys2.length) {
-    return false;
-  }
+  /** State setter for authentication status (false when done). */
+  setAuthing: SetStateAction<boolean>
 
-  for (const key of keys1) {
-    if (obj1[key] !== obj2[key]) {
-      return false;
-    }
-  }
+  /** State setter for the currently selected device. */
+  setChosenDevice: SetStateAction<Adb | null>
+}) {
+  const androidVersion = await getAndroidVersion(device);
+  Log.debug("Device android version: " + androidVersion);
+  setDevicePreV51(androidVersion < MIN_SUPPORTED_ANDROID_VERSION);
+  setAuthing(false);
+  setChosenDevice(device);
 
-  return true;
+  await waitForDisconnect(device);
+
+  setChosenDevice(null);
 }
 
+/**
+ * Connects to a device using the ADB bridge client and manages connection state.
+ *
+ * 1. Attempts to create an ADB connection to the specified device using the provided bridge client.
+ * 2. If successful, calls `connectDevice` to handle version checks and state updates.
+ * 3. Handles errors by logging, setting the connection error state, and resetting the selected device.
+ *
+ * @param bridgeClient - The ADB server client used for the bridge connection.
+ * @param device - The target device to connect to.
+ * @param stateSetters - An object containing state setters.
+ */
+async function connectBridgeDevice(bridgeClient: AdbServerClient, device: AdbServerClient.Device, { setDevicePreV51, setAuthing, setChosenDevice, setConnectError }: {
+  /** State setter for indicating if the device is pre-v51 (unsupported). */
+  setDevicePreV51: SetStateAction<boolean>
+
+  /** State setter for authentication status. */
+  setAuthing: SetStateAction<boolean>
+
+  /** State setter for the currently selected device. */
+  setChosenDevice: SetStateAction<Adb | null>
+
+  /** State setter for connection error messages. */
+  setConnectError: SetStateAction<string | null>
+}) {
+  try {
+    if (bridgeClient === null) {
+      Log.error("Bridge client is null, cannot connect to device");
+      return;
+    }
+
+    const adbDevice = await connectAdbDevice(bridgeClient, device);
+    await connectDevice(adbDevice, { setDevicePreV51, setAuthing, setChosenDevice });
+  } catch(error) {
+    Log.error("Failed to connect: " + error, error);
+    setConnectError(String(error));
+    setChosenDevice(null);
+  }
+}
+
+/**
+ * Connects to a Quest device using WebUSB and manages connection state.
+ *
+ * 1. Attempts to connect to a Quest device via WebUSB.
+ * 2. Handles device selection and device-in-use errors.
+ * 3. Updates authentication, device selection, and error state as appropriate.
+ *
+ * @param stateSetters - An object containing state setters.
+ */
+async function connectWebUsb({ setAuthing, setDeviceInUse, setChosenDevice, setConnectError }: {
+  /** State setter for authentication status. */
+  setAuthing: SetStateAction<boolean>
+
+  /** State setter for indicating if the device is in use by another process. */
+  setDeviceInUse: SetStateAction<boolean>
+
+  /** State setter for the currently selected device. */
+  setChosenDevice: SetStateAction<Adb | null>
+
+  /** State setter for connection error messages. */
+  setConnectError: SetStateAction<string | null>
+}) {
+  let device: Adb | null;
+
+  try {
+    const result = await connect(() => setAuthing(true));
+    if(result === "NoDeviceSelected") {
+      device = null;
+    } else if(result === "DeviceInUse") {
+      setDeviceInUse(true);
+      return;
+    } else  {
+      device = result;
+      setChosenDevice(device);
+    }
+
+  } catch(error) {
+    Log.error("Failed to connect: " + error);
+    setConnectError(String(error));
+    setChosenDevice(null);
+    return;
+  }
+}
+
+/**
+ * Main component for device selection and connection flow.
+ *
+ * Handles all UI and state for connecting to a Quest device via WebUSB or bridge.
+ * - Manages authentication, device selection, error, and compatibility states.
+ * - If a device is connected, checks for Quest 1 or unsupported OS and shows the appropriate message.
+ * - If authenticating, shows instructions for allowing ADB authorization.
+ * - Otherwise, shows device selection UI, detected devices, and error modals.
+ *
+ * State:
+ * - authing: Whether authentication is in progress.
+ * - chosenDevice: The currently connected ADB device, or null.
+ * - connectError: Any connection error message.
+ * - devicePreV51: True if the device is running an unsupported (pre-v51) OS.
+ * - deviceInUse: True if another app is using the device.
+ * - bridgeClient: The current ADB bridge client, if available.
+ * - adbDevices: List of detected ADB devices via bridge.
+ */
 function ChooseDevice() {
   const [authing, setAuthing] = useState(false);
   const [chosenDevice, setChosenDevice] = useState(null as Adb | null);
   const [connectError, setConnectError] = useState(null as string | null);
-  const [devicePreV51, setdevicePreV51] = useState(false);
+  const [devicePreV51, setDevicePreV51] = useState(false);
   const [deviceInUse, setDeviceInUse] = useState(false);
-  const [checkedForBridge, setCheckedForBridge] = useState(false);
   const [bridgeClient, setBridgeClient] = useState<AdbServerClient | null>(null);
   const [adbDevices, setAdbDevices] = useState<AdbServerClient.Device[]>([]);
+  const stateSetters = {
+    setAuthing,
+    setChosenDevice,
+    setConnectError,
+    setDevicePreV51,
+    setDeviceInUse,
+    setBridgeClient,
+    setAdbDevices
+  }
 
-  // Check if the bridge is running
   useEffect(() => {
-    if (!checkedForBridge) {
-      checkForBridge().then(haveBridge => {
-        if (haveBridge) {
-          setBridgeClient(new AdbServerClient(new AdbServerWebSocketConnector()));
-        }
-
-        setCheckedForBridge(true);
-      });
+    // If the user is using a bridge and there is only one device, connect to it automatically.
+    if (chosenDevice == null && bridgeClient != null && adbDevices.length == 1) {
+      connectBridgeDevice(bridgeClient, adbDevices[0],  stateSetters).catch(err => Log.error("Failed to connect to device: " + err, err));
     }
+
   });
-
-  // Update the available devices on an interval
-  useEffect(() => {
-    if (bridgeClient && !chosenDevice) {
-      const deviceUpdate = async () => {
-        try {
-          const client = new AdbServerClient(new AdbServerWebSocketConnector())
-          const devices = (await client.getDevices()).filter(device => device.authenticating === false);
-
-          if (!areDevicesEqual(devices, adbDevices)) {
-            setAdbDevices(devices);
-            if (devices.length == 1) {
-              await connectDevice(await connectAdbDevice(bridgeClient, devices[0]));
-            }
-          }
-        } catch (err) {
-          setBridgeClient(null);
-          setAdbDevices([]);
-          setCheckedForBridge(false);
-          Log.error("Failed to get devices: " + err, err);
-        }
-      }
-      const timer = setInterval(deviceUpdate, 1000);
-      deviceUpdate();
-
-      return () => clearInterval(timer);
-    }
-  })
-
-  async function connectDevice(device: Adb) {
-    const androidVersion = await getAndroidVersion(device);
-    Log.debug("Device android version: " + androidVersion);
-    setdevicePreV51(androidVersion < MIN_SUPPORTED_ANDROID_VERSION);
-    setAuthing(false);
-    setChosenDevice(device);
-
-    await waitForDisconnect(device);
-
-    setChosenDevice(null);
-  }
-
-  async function connectWebUsb() {
-    let device: Adb | null;
-
-    try {
-      const result = await connect(() => setAuthing(true));
-      if(result === "NoDeviceSelected") {
-        device = null;
-      } else if(result === "DeviceInUse") {
-        setDeviceInUse(true);
-        return;
-      } else  {
-        device = result;
-
-        setChosenDevice(device);
-      }
-
-    } catch(error) {
-      Log.error("Failed to connect: " + error);
-      setConnectError(String(error));
-      setChosenDevice(null);
-      return;
-    }
-  }
 
   if(chosenDevice !== null) {
     Log.debug("Device model: " + chosenDevice.banner.model);
     if(chosenDevice.banner.model === "Quest") { // "Quest" not "Quest 2/3"
-      return <div className='container mainContainer'>
-        <h1>Quest 1 Not Supported</h1>
-        <p>ModsBeforeFriday has detected that you're using a Quest 1, which is not supported by MBF. (and never will be)</p>
-        <p>This is because Quest 1 uses different builds of the Beat Saber game and so mods are stuck forever on version 1.28.0 of the game.</p>
-        <p>Follow <a href="https://bsmg.wiki/quest/modding-quest1.html">this link</a> for instructions on how to set up mods on Quest 1.</p>
-      </div>
+      return <QuestOneNotSupported />
     } else if(devicePreV51 && chosenDevice.banner.model?.includes("Quest")) {
-      return <div className="container mainContainer">
-        <h1>Pre-v51 OS Detected</h1>
-        <p>ModsBeforeFriday has detected that you have an outdated version of the Quest operating system installed which is no longer supported by mods.</p>
-        <p>Please ensure your operating system is up to date and then refresh the page.</p>
-      </div>
+      return <OldOsVersion />
     } else  {
       return <>
+        { bridgeClient && <PagePinger url={bridgeData.pingAddress} interval={5000} /> }
         <DeviceModder device={chosenDevice} usingBridge={bridgeClient != null} quit={(err) => {
           if(err != null) {
             setConnectError(String(err));
@@ -226,102 +286,59 @@ function ChooseDevice() {
       </>
     }
   } else if(authing) {
-    return <div className='container mainContainer fadeIn'>
-      <h2>Allow connection in headset</h2>
-      <p>Put on your headset and click <b>"Always allow from this computer"</b></p>
-      <p>(You should only have to do this once.)</p>
-      <h4>Prompt doesn't show up?</h4>
-      <ol>
-        <li>Refresh the page.</li>
-        <li>Put your headset <b>on your head</b>.</li>
-        <li>Attempt to connect to your quest again.</li>
-      </ol>
-      <p>(Sometimes the quest only shows the prompt if the headset is on your head.)</p>
-      <p>If these steps do not work, <b>reboot your quest and try once more.</b></p>
-    </div>
+    return <AllowAuth />
   } else  {
     return <>
-        <div className="container mainContainer">
-          <Title />
-          <p>To get started, plug your Quest in with a USB-C cable and click the button below.</p>
+      <BridgeManager onBridgeClientUpdated={setBridgeClient} onAdbDevicesUpdated={setAdbDevices} />
+      <div className="container mainContainer">
+        <Title />
+        <p>To get started, plug your Quest in with a USB-C cable and click the button below.</p>
 
-          <NoCompatibleDevices />
+        <NoCompatibleDevices />
 
-          {bridgeClient && <>
-            <div className="connectedDevicesContainer">
-              <h2>Detected devices</h2>
-              <ul>
-                {adbDevices.map(device =>
-                  <>
-                    <li key={device.serial}>
-                      <button onClick={async () => {
-                        try {
-                          const adbDevice = await connectAdbDevice(bridgeClient, device);
-                          await connectDevice(adbDevice)
-                        } catch(error) {
-                          Log.error("Failed to connect: " + error, error);
-                          setConnectError(String(error));
-                          setChosenDevice(null);
-                        }
-                      }}>Connect to {device.serial}</button>
-                    </li>
-                  </>)}
-              </ul>
-              <span><OpenLogsButton /></span>
-            </div>
-          </>}
-          {!bridgeClient && navigator.usb && <>
-            <div className="chooseDeviceContainer">
-              <span><OpenLogsButton /></span>
-              <button onClick={connectWebUsb}>Connect to Quest</button>
-            </div>
-          </>}
+        {bridgeClient && <>
+          <div className="connectedDevicesContainer">
+            <h2>Detected devices</h2>
+            <ul>
+              {adbDevices.map(device =>
+                <>
+                  <li key={device.serial}>
+                    <button onClick={() => connectBridgeDevice(bridgeClient, device, stateSetters)}>Connect to {device.serial}</button>
+                  </li>
+                </>)}
+            </ul>
+            <span><OpenLogsButton /></span>
+          </div>
+        </>}
+        {!bridgeClient && navigator.usb && <>
+          <div className="chooseDeviceContainer">
+            <span><OpenLogsButton /></span>
+            <button onClick={() => connectWebUsb(stateSetters)}>Connect to Quest</button>
+          </div>
+        </>}
 
-          <ErrorModal isVisible={connectError != null}
-            title="Failed to connect to device"
-            description={connectError}
-            onClose={() => setConnectError(null)}/>
+        <ErrorModal isVisible={connectError != null}
+          title="Failed to connect to device"
+          description={connectError}
+          onClose={() => setConnectError(null)}/>
 
-          <ErrorModal isVisible={deviceInUse}
-            onClose={() => setDeviceInUse(false)}
-            title="Device in use">
-              <DeviceInUse />
-          </ErrorModal>
-        </div>
-      </>
+        <ErrorModal isVisible={deviceInUse}
+          onClose={() => setDeviceInUse(false)}
+          title="Device in use">
+            <DeviceInUse />
+        </ErrorModal>
+      </div>
+    </>
   }
 }
 
-function DeviceInUse() {
- return <>
-  <p>Some other app is trying to access your Quest, e.g. SideQuest.</p>
-  {isViewingOnWindows() ?
-    <>
-      <p>To fix this, close SideQuest if you have it open, press <span className="codeBox">Win + R</span> and type the following text, and finally press enter.</p>
-      <span className="codeBox">taskkill /IM adb.exe /F</span>
-      <p>Alternatively, restart your computer.</p>
-    </>
-    : <p>To fix this, restart your {isViewingOnMobile() ? "phone" : "computer"}.</p>}
- </>
-}
-
-function Title() {
-  return <>
-    <h1>
-      <span className="initial">M</span>
-      <span className="title">ods</span>
-      <span className="initial">B</span>
-      <span className="title">efore</span>
-      <span className="initial">F</span>
-      <span className="title">riday</span>
-      <span className="initial">!</span>
-      <p className="williamGay">william gay</p>
-    </h1>
-    <a href={SourceUrl} target="_blank" rel="noopener noreferrer" className="mobileOnly">Source Code</a>
-    <p>The easiest way to install custom songs for Beat Saber on Quest!</p>
-  </>
-}
-
+/**
+ * Renders a UI for manually overriding the core mod JSON URL.
+ * Allows the user to input a URL to the raw core mod JSON, updates the app state and URL,
+ * and triggers the callback to indicate the core mods have been specified.
+ *
+ * @param setSpecifiedCoreMods - Callback to update state when the core mods URL is set.
+ */
 function ChooseCoreModUrl({ setSpecifiedCoreMods } : { setSpecifiedCoreMods: () => void}) {
   const inputFieldRef = useRef<HTMLInputElement | null>(null);
 
@@ -347,6 +364,14 @@ function ChooseCoreModUrl({ setSpecifiedCoreMods } : { setSpecifiedCoreMods: () 
   </div>
 }
 
+/**
+ * Main application logic for determining which UI to show based on state and environment.
+ *
+ * - Checks for a core mod override URL in the query string and updates state accordingly.
+ * - Detects if the user is using an unsupported browser or the Oculus browser and shows appropriate messages.
+ * - If a core mod URL is set or not required, shows the device selection flow.
+ * - Otherwise, prompts the user to enter a core mod URL.
+ */
 function AppContents() {
   const [ hasSetCoreUrl, setSetCoreUrl ] = useState(false);
   const [ hasBridge, setHasBridge ] = useState(false);
@@ -381,6 +406,9 @@ function AppContents() {
   }
 }
 
+/**
+ * Root application component. Renders the main app contents, corner menu, operation modals, and toast notifications.
+ */
 function App() {
   return <div className='main'>
     <AppContents />
@@ -393,93 +421,6 @@ function App() {
       transition={Bounce}
       hideProgressBar={true} />
   </div>
-}
-
-
-
-function OculusBrowserMessage() {
-  return <div className="container mainContainer">
-    <h1>Quest Browser Detected</h1>
-    <p>MBF has detected that you're trying to use the built-in Quest browser.</p>
-    <p>Unfortunately, <b>you cannot use MBF on the device you are attempting to mod.</b></p>
-    <DevicesSupportingModding />
-
-    <p>(MBF can be used on a Quest if you install a chromium browser, however this can only be used to mod <b>another Quest headset</b>, connected via USB.)</p>
-  </div>
-}
-
-function UnsupportedMessage() {
-  return <div className='container mainContainer'>
-    {isViewingOnIos() ? <>
-      <h1>iOS is not supported</h1>
-      <p>MBF has detected that you're trying to use it from an iOS device. Unfortunately, Apple does not allow WebUSB, which MBF needs to be able to interact with the Quest.</p>
-      <DevicesSupportingModding />
-
-      <p>.... and one of the following supported browsers:</p>
-    </> : <>
-      <h1>Browser Unsupported</h1>
-      <p>It looks like your browser doesn't support WebUSB, which this app needs to be able to access your Quest's files.</p>
-    </>}
-
-    <h2>Supported Browsers</h2>
-    <SupportedBrowsers />
-  </div>
-}
-
-function DevicesSupportingModding() {
-  return <>
-    <p>To mod your game, you will need one of: </p>
-    <ul>
-      <li>A PC or Mac (preferred)</li>
-      <li>An Android phone (still totally works)</li>
-    </ul>
-  </>
-}
-
-function SupportedBrowsers() {
-  if(isViewingOnMobile()) {
-    return <>
-      <ul>
-        <li>Google Chrome for Android 122 or newer</li>
-        <li>Edge for Android 123 or newer</li>
-      </ul>
-      <h3 className='fireFox'>Firefox for Android is NOT supported</h3>
-    </>
-  } else  {
-    return <>
-      <ul>
-        <li>Google Chrome 61 or newer</li>
-        <li>Opera 48 or newer</li>
-        <li>Microsoft Edge 79 or newer</li>
-      </ul>
-      <h3 className='fireFox'>Firefox and Safari are NOT supported.</h3>
-      <p>(There is no feasible way to add support for Firefox as Mozilla have chosen not to support WebUSB for security reasons.)</p>
-    </>
-  }
-}
-
-function NoCompatibleDevices() {
-  return <>
-    <h3>No compatible devices?</h3>
-
-    <p>
-      To use MBF, you must enable developer mode so that your Quest is accessible via USB.
-      <br />Follow the <a href="https://developer.oculus.com/documentation/native/android/mobile-device-setup/?locale=en_GB" target="_blank" rel="noopener noreferrer">official guide</a> -
-      you'll need to create a new organisation and enable USB debugging.
-    </p>
-
-    {isViewingOnMobile() && <>
-      <h4>Using Android?</h4>
-      <p>It's possible that the connection between your device and the Quest has been set up the wrong way around. To fix this:</p>
-      <ul>
-        <li>Swipe down from the top of the screen.</li>
-        <li>Click the dialog relating to the USB connection. This might be called "charging via USB".</li>
-        <li>Change "USB controlled by" to "Connected device". If "Connected device" is already selected, change it to "This device" and change it back.</li>
-      </ul>
-      <h4>Still not working?</h4>
-      <p>Try unplugging your cable and plugging the end that's currently in your phone into your Quest.</p>
-    </>}
-  </>
 }
 
 export default App;
