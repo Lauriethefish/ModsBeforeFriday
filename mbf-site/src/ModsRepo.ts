@@ -10,6 +10,7 @@ export interface ModRepoMod {
     cover: string | null,
     modloader: string,
     description: string
+    global?: boolean
 }
 
 const repoUrlTemplate: string = "https://mods.bsquest.xyz/{0}.json"
