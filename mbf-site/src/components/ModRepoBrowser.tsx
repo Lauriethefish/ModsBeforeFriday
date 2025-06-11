@@ -129,10 +129,13 @@ function prepareModRepoForDisplay(mods: ModRepoMod[],
             return -1;
         }
 
+        const nameA = a.mod.name.toLowerCase().trim();
+        const nameB = b.mod.name.toLowerCase().trim();
+
         // Sort the rest of the mods alphabetically
-        if(a.mod.name > b.mod.name) {
+        if(nameA > nameB) {
             return 1;
-        }   else if(a.mod.name < b.mod.name) {
+        }   else if(nameA < nameB) {
             return -1;
         }   else    {
             return 0;

@@ -32,7 +32,7 @@ export function ModManager(props: ModManagerProps) {
     const mods = modStatus.installed_mods;
     const [menu, setMenu] = useState('add' as SelectedMenu);
 
-    sortByIdAndIfCore(mods);
+    sortByNameAndIfCore(mods);
 
     return <>
         <Title menu={menu} setMenu={setMenu}/>
@@ -350,7 +350,7 @@ function AddModsMenu(props: ModMenuProps) {
 
 // Sorts mods by their ID alphabetically
 // Also sorts the mods so that core mods come last in the list.
-function sortByIdAndIfCore(mods: Mod[]) {
+function sortByNameAndIfCore(mods: Mod[]) {
     mods.sort((a, b) => {
         // Sort core mods after other mods
         // This is so that user-installed mods are more obvious in the list.
@@ -359,10 +359,13 @@ function sortByIdAndIfCore(mods: Mod[]) {
         }   else if(!a.is_core && b.is_core) {
             return -1;
         }
+        
+        const nameA = a.name.toLowerCase().trim();
+        const nameB = b.name.toLowerCase().trim();
 
-        if(a.id > b.id) {
+        if(nameA > nameB) {
             return 1;
-        }   else if(a.id < b.id) {
+        }   else if(nameA < nameB) {
             return -1;
         }   else    {
             return 0;
