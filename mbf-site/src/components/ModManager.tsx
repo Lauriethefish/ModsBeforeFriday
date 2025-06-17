@@ -15,6 +15,7 @@ import useFileDropper from "../hooks/useFileDropper";
 import { Log } from "../Logging";
 import { useSetWorking, useSyncStore, wrapOperation } from "../SyncStore";
 import { ModRepoMod } from "../ModsRepo";
+import SyncIcon from "../icons/sync.svg"
 
 interface ModManagerProps {
     gameVersion: string,
@@ -25,12 +26,14 @@ interface ModManagerProps {
     quit: (err: unknown) => void
 }
 
-type SelectedMenu = 'add' | 'current' | 'options';
+enum SelectedMenu {
+    add, current, options
+}
 
 export function ModManager(props: ModManagerProps) {
     const { modStatus, setModStatus, setMods, device, gameVersion, quit } = props;
     const mods = modStatus.installed_mods;
-    const [menu, setMenu] = useState('add' as SelectedMenu);
+    const [menu, setMenu] = useState(SelectedMenu.add as SelectedMenu);
 
     sortByIdAndIfCore(mods);
 
@@ -39,32 +42,29 @@ export function ModManager(props: ModManagerProps) {
         
         {/* We use a style with display: none when hiding this menu, as this avoids remounting the component,
             which would fetch the mods index again. */}
-        <div className={menu === 'add' ? "" : "hidden"}>
-            <AddModsMenu
-                mods={mods}
-                setMods={setMods}
-                gameVersion={gameVersion}
-                device={device}
-            />
-        </div>
+        <AddModsMenu
+            mods={mods}
+            setMods={setMods}
+            gameVersion={gameVersion}
+            device={device}
+            visible={menu === SelectedMenu.add}
+        />
         
-        <div className={menu === 'current' ? "" : "hidden"}>
-            <InstalledModsMenu
-                mods={mods}
-                setMods={setMods}
-                gameVersion={gameVersion}
-                device={device}
-            />
-        </div>
+        <InstalledModsMenu
+            mods={mods}
+            setMods={setMods}
+            gameVersion={gameVersion}
+            device={device}
+            visible={menu === SelectedMenu.current}
+        />
         
-        <div className={menu === 'options' ? "" : "hidden"}>
-            <OptionsMenu
-                device={device}
-                quit={quit}
-                modStatus={modStatus}
-                setModStatus={setModStatus}
-            />    
-        </div>
+        <OptionsMenu
+            device={device}
+            quit={quit}
+            modStatus={modStatus}
+            setModStatus={setModStatus}
+            visible={menu === SelectedMenu.options}
+        />
     </>
 }
 
@@ -77,16 +77,16 @@ function Title(props: TitleProps) {
     const { menu, setMenu } = props;
 
     return <div className='container noPadding horizontalCenter sticky coverScreen'>
-        <div className={`tab-header ${menu === 'current' ? "selected":""}`}
-            onClick={() => setMenu('current')}>
+        <div className={`tab-header ${menu === SelectedMenu.current ? "selected":""}`}
+            onClick={() => setMenu(SelectedMenu.current)}>
             <h1>Your Mods</h1>
         </div>
-        <span className={`tab-header settingsCog ${menu === 'options' ? "selected":""}`}
-            onClick={() => setMenu('options')}>
+        <span className={`tab-header settingsCog ${menu === SelectedMenu.options ? "selected":""}`}
+            onClick={() => setMenu(SelectedMenu.options)}>
             <img src={ToolsIcon} />
         </span>
-        <div className={`tab-header ${menu === 'add' ? "selected":""}`}
-            onClick={() => setMenu('add')}>
+        <div className={`tab-header ${menu === SelectedMenu.add ? "selected":""}`}
+            onClick={() => setMenu(SelectedMenu.add)}>
             <h1>Add Mods</h1>
         </div>
     </div>
@@ -97,6 +97,7 @@ interface ModMenuProps {
     setMods: (mods: Mod[]) => void,
     gameVersion: string,
     device: Adb
+    visible?: boolean
 }
 
 function InstalledModsMenu(props: ModMenuProps) {
@@ -107,10 +108,9 @@ function InstalledModsMenu(props: ModMenuProps) {
     } = props;
 
     const [changes, setChanges] = useState({} as { [id: string]: boolean });
-    const hasChanges = Object.keys(changes).length > 0;
 
-    return <div className="installedModsMenu">
-        {hasChanges && <button id="syncButton" onClick={async () => {
+    return <div className={`installedModsMenu fadeIn ${props.visible ? "" : "hidden"}`}>
+        {Object.keys(changes).length > 0 && <button className={`syncChanges fadeIn ${props.visible ? "" : "hidden"}`} onClick={async () => {
             setChanges({});
             Log.debug("Installing mods, statuses requested: " + JSON.stringify(changes));
             await wrapOperation("Syncing mods", "Failed to sync mods", async () => {
@@ -122,21 +122,38 @@ function InstalledModsMenu(props: ModMenuProps) {
                 }
             });
 
-        }}>Sync Changes</button>}
+        }}>
+            Sync Changes
+            <img src={SyncIcon} alt="Sync Icon" />
+        </button>}
 
 		<div className="mod-list">
 			{mods.map(mod => <ModCard
 				gameVersion={gameVersion}
 				mod={mod}
+                pendingChange={changes[mod.id]}
 				key={mod.id}
 				onRemoved={async () => {
                     await wrapOperation("Removing mod", "Failed to remove mod", async () => {
 						setMods(await removeMod(device, mod.id));
+                        const newChanges = { ...changes };
+                        
+                        delete newChanges[mod.id];
+                        
+                        setChanges(newChanges);
                     });
 				}}
 				onEnabledChanged={enabled => {
 					const newChanges = { ...changes };
-					newChanges[mod.id] = enabled;
+
+                    if (changes[mod.id] !== undefined) {
+                        // If the mod is in the original state, remove it from the changes
+                        delete newChanges[mod.id];
+                    }   else    {
+                        // Otherwise, add it to the changes
+                        newChanges[mod.id] = enabled;
+                    }
+
 					setChanges(newChanges);
 				}}/>
 			)}
@@ -325,7 +342,7 @@ function AddModsMenu(props: ModMenuProps) {
         }
     })
 
-    return <div className="verticalCenter">
+    return <div className={`verticalCenter ${props.visible ? "" : "hidden"}`}>
         <Modal isVisible={isDragging}>
             <div className="horizontalCenter">
                 <img src={UploadIcon}/>
@@ -337,7 +354,7 @@ function AddModsMenu(props: ModMenuProps) {
                 return { type: "File", file: file };
             }))} />
 
-        <ModRepoBrowser existingMods={mods} gameVersion={gameVersion} onDownload={async mods => {
+        <ModRepoBrowser existingMods={mods} gameVersion={gameVersion} visible={props.visible} onDownload={async mods => {
             const modRepoImports: QueuedModRepoImport[] = mods.map(mod => { return {
                 type: "ModRepo",
                 mod

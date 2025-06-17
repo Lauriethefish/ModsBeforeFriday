@@ -109,3 +109,24 @@
 #toolsContainer > button {
     margin-bottom: 12px;
 }
+
+.syncChanges {
+    position: fixed;
+    bottom: -5px;
+}
+
+.syncChanges {
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: none;
+    font-size: larger;
+    background-color: #444444;
+    font-weight: bold;
+    height: 51px;
+}
+
+.syncChanges > img {
+    height: 1.2em;
+}

@@ -12,6 +12,7 @@ interface ModRepoBrowserProps {
     gameVersion: string,
     onDownload: (urls: ModRepoMod[]) => void,
     existingMods: Mod[]
+    visible?: boolean
 }
 
 export function ModRepoBrowser(props: ModRepoBrowserProps) {
@@ -62,7 +63,7 @@ export function ModRepoBrowser(props: ModRepoBrowserProps) {
 
         return <>
             {flagged.length > 0 && 
-                <button className="installMarked fadeIn" onClick={() => {
+                <button className={`installMarked fadeIn ${props.visible ? "" : "hidden"}`} onClick={() => {
                     onDownload(flagged.map(mod => mod.mod));
                     setFlagged([]);
                 }}>
