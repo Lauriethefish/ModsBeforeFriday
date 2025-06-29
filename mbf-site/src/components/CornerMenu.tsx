@@ -4,6 +4,7 @@ import PreferencesIcon from '../icons/preferences.svg';
 import SparklesIcon from '../icons/sparkles.svg';
 import { CreditsModal } from './CreditsModal';
 import { SettingsModal } from './SettingsModal';
+import { LanguagePicker } from './LanguagePicker';
 
 export function CornerMenu() {
     const [creditsOpen, setCreditsOpen] = useState(false);
@@ -23,5 +24,6 @@ export function CornerMenu() {
 
         <CreditsModal isVisible={creditsOpen} onClose={() => setCreditsOpen(false)} />
         <SettingsModal isVisible={settingsOpen} onClose={() => setSettingsOpen(false)} />
+        <LanguagePicker />
     </>
 }

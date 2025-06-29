@@ -18,6 +18,7 @@ import { OpenLogsButton } from './components/OpenLogsButton';
 import { isViewingOnIos, isViewingOnMobile, isViewingOnWindows, usingOculusBrowser } from './platformDetection';
 import { SourceUrl } from '.';
 import { useDeviceStore } from './DeviceStore';
+import { getLang, initializeLocalization } from './localization/shared';
 
 type NoDeviceCause = "NoDeviceSelected" | "DeviceInUse";
 
@@ -210,8 +211,8 @@ function Title() {
       <span className="initial">!</span>
       <p className="williamGay">william gay</p>
     </h1>
-    <a href={SourceUrl} target="_blank" rel="noopener noreferrer" className="mobileOnly">Source Code</a>
-    <p>The easiest way to install custom songs for Beat Saber on Quest!</p>
+    <a href={SourceUrl} target="_blank" rel="noopener noreferrer" className="mobileOnly">{getLang().sourceCode}</a>
+    <p>{getLang().titleText}</p>
   </>
 }
 
@@ -268,6 +269,7 @@ function AppContents() {
 }
 
 function App() {
+  initializeLocalization()
   return <div className='main'>
     <AppContents />
     <CornerMenu />
