@@ -76,7 +76,7 @@ interface TitleProps {
 function Title(props: TitleProps) {
     const { menu, setMenu } = props;
 
-    return <div className='container noPadding horizontalCenter sticky coverScreen'>
+    return <div className='container noPadding horizontalCenter sticky'>
         <div className={`tab-header ${menu === 'current' ? "selected":""}`}
             onClick={() => setMenu('current')}>
             <h1>Your Mods</h1>
