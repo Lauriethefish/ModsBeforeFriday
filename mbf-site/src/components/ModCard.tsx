@@ -11,6 +11,7 @@ interface ModCardProps {
     gameVersion: string,
     onEnabledChanged: (enabled: boolean) => void,
     onRemoved: () => void
+    pendingChange?: boolean
 }
 
 function CoreModBadge() {
@@ -57,7 +58,7 @@ export function ModCard(props: ModCardProps) {
             <div id="removeMod" onClick={() => setRequestRemove(true)}>
                 <img src={TrashCan} alt="Remove mod icon" />
             </div>
-            <Slider on={props.mod.is_enabled} valueChanged={value => {
+            <Slider on={props.pendingChange !== undefined ? props.pendingChange : props.mod.is_enabled} valueChanged={value => {
                 if(value && props.mod.game_version != null 
                     && props.mod.game_version !== props.gameVersion
                     && !props.mod.is_core) { // Do not show the wrong game version prompt for core mods.
