@@ -28,20 +28,38 @@ export function ModRepoBrowser(props: ModRepoBrowserProps) {
     }
     
     useEffect(() => {
-        Log.debug("Loading mods");
-        loadRepo(gameVersion)
-            .then(repo => {
+        (async () => {
+            Log.debug("Loading mods");
+
+            try {
+                const gameRepo = await loadRepo(gameVersion);
+                const globalRepo = (await loadRepo("global"));
+
+                // Iterate and mark all global mods as global.
+                for (const packages of Object.values(globalRepo)) {
+                    for (const mod of Object.values(packages)) {
+                        mod.global = true;
+                    }
+                }
+
+                const combinedRepo = { ...globalRepo, ...gameRepo };
+
                 // Initially flag outdated mods for update
-                // NB: Currently this means that we prepare the mod repo for display twice, i.e. once just after loading it to flag mods needing updates
-                // and once before each render of the mod repo browser.
+                // NB: Currently this means that we prepare the mod repo for display twice, i.e. once just after
+                // loading it to flag mods needing updates and once before each render of the mod repo browser.
                 //
-                // We cannot just do it once here since each change to the installed mods requires properties such as whether a mod even needs an update or
-                // install to be changed.
-                const displayMods = prepareModRepoForDisplay(latestVersions(repo), props.existingMods);
-                setFlagged(displayMods.filter(mod => mod.needUpdate));
-                setModRepo(repo);
-            })
-            .catch(_ => setFailedToLoad(true))
+                // We cannot just do it once here since each change to the installed mods requires properties such as
+                // whether a mod even needs an update or install to be changed.
+                const displayMods = prepareModRepoForDisplay(
+                    latestVersions(combinedRepo),
+                    props.existingMods
+                );
+                setFlagged(displayMods.filter((mod) => mod.needUpdate));
+                setModRepo(combinedRepo);
+            } catch (e) {
+                setFailedToLoad(true);
+            }
+        })();
     }, []);
 
     if(modRepo === null) {
@@ -119,7 +137,7 @@ function prepareModRepoForDisplay(mods: ModRepoMod[],
                 && !existingInstall.is_core,
             mod: mod
         };
-    }).filter(mod => mod.needUpdate || !mod.alreadyInstalled) // Skip any mods that are already installed and up to date
+    }).filter(mod => mod.needUpdate || (!mod.alreadyInstalled && !mod.mod.global)) // Skip any mods that are already installed and up to date, or global mods
     .sort((a, b) => {
         // Show mods that need an update first in the list
         if(!a.needUpdate && b.needUpdate) {
