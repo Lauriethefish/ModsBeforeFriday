@@ -13,12 +13,16 @@ import { Log } from '../Logging';
 import { Modal } from './Modal';
 import { SplashScreenSelector } from './SplashScreenSelector';
 
-export function OptionsMenu({ device, quit, modStatus, setModStatus }: {
+interface OptionsMenuProps {
     device: Adb,
     setModStatus: (status: ModStatus) => void,
     quit: (err: unknown | null) => void
-    modStatus: ModStatus}) {
-    return <div className="container mainContainer" id="toolsContainer">
+    modStatus: ModStatus
+    visible?: boolean
+}
+    
+export function OptionsMenu({ device, quit, modStatus, setModStatus, visible }: OptionsMenuProps) {
+    return <div className={`container mainContainer ${visible ? '' : 'hidden'}`} id="toolsContainer">
         <Collapsible title="Mod tools" defaultOpen>
             <ModTools device={device} modStatus={modStatus} setModStatus={setModStatus} quit={() => quit(null)} />
         </Collapsible>

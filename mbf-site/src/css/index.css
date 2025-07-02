@@ -108,9 +108,12 @@ button:hover {
 }
 
 .hidden {
-    width: 0;
-    height: 0;
-    overflow: hidden;
+    position: fixed;
+    top: -9999vh;
+    right: -9999vw;
+    left: unset;
+    bottom: unset;
+    display: none;
 }
 
 ::-webkit-scrollbar-thumb {
