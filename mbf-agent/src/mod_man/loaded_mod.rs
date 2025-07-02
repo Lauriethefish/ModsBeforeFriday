@@ -4,7 +4,7 @@
 
 use std::{collections::HashSet, ffi::{OsStr, OsString}, path::{Path, PathBuf}};
 
-use crate::paths;
+use crate::parameters::PARAMETERS;
 
 use super::{util, ModInfo};
 use anyhow::{Result, Context};
@@ -84,17 +84,17 @@ impl Mod {
         util::copy_files_from_mod_folder(
             &self.loaded_from,
             &self.manifest().mod_files,
-            paths::EARLY_MODS,
+            &PARAMETERS.early_mods,
         )?;
         util::copy_files_from_mod_folder(
             &self.loaded_from,
             &self.manifest().library_files,
-            paths::LIBS,
+            &PARAMETERS.libs,
         )?;
         util::copy_files_from_mod_folder(
             &self.loaded_from,
             &self.manifest().late_mod_files,
-            paths::LATE_MODS,
+            &PARAMETERS.late_mods,
         )?;
 
         self.copy_file_copies().context("Copying auxillary files")?;
@@ -114,11 +114,11 @@ impl Mod {
         // Delete all mod binary files.
         util::remove_file_names_from_folder(
             self.manifest().mod_files.iter(),
-            paths::EARLY_MODS,
+            &PARAMETERS.early_mods,
         )?;
         util::remove_file_names_from_folder(
             self.manifest().late_mod_files.iter(),
-            paths::LATE_MODS,
+            &PARAMETERS.late_mods,
         )?;
         util::remove_file_names_from_folder(
             // Only delete libraries not in use (!)
@@ -127,7 +127,7 @@ impl Mod {
                 .library_files
                 .iter()
                 .filter(|lib_file| !retained_libs.contains(OsStr::new(lib_file))),
-            paths::LIBS,
+            &PARAMETERS.libs,
         )?;
 
         // Delete all file copies.
@@ -198,9 +198,9 @@ impl Mod {
     /// destinations.
     fn check_if_files_copied(manifest: &ModInfo) -> Result<bool> {
         Ok(
-            util::files_exist_in_dir(paths::EARLY_MODS, manifest.mod_files.iter())?
-                && util::files_exist_in_dir(paths::LATE_MODS, manifest.late_mod_files.iter())?
-                && util::files_exist_in_dir(paths::LIBS, manifest.library_files.iter())?
+            util::files_exist_in_dir(&PARAMETERS.early_mods, manifest.mod_files.iter())?
+                && util::files_exist_in_dir(&PARAMETERS.late_mods, manifest.late_mod_files.iter())?
+                && util::files_exist_in_dir(&PARAMETERS.libs, manifest.library_files.iter())?
                 && manifest
                     .file_copies
                     .iter()
