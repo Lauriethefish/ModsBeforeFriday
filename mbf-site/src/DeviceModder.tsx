@@ -17,6 +17,7 @@ import { lte as semverLte } from 'semver';
 
 interface DeviceModderProps {
     device: Adb,
+    devicePreV51: boolean,
     // Quits back to the main menu, optionally giving an error that caused the quit.
     quit: (err: unknown | null) => void
 }
@@ -66,7 +67,7 @@ export function CompareBeatSaberVersions(a: string, b: string): number {
 
 export function DeviceModder(props: DeviceModderProps) {
     const [modStatus, setModStatus] = useState(null as ModStatus | null);
-    const { device, quit } = props;
+    const { device, quit, devicePreV51 } = props;
 
     useEffect(() => {
         loadModStatus(device)
@@ -123,6 +124,7 @@ export function DeviceModder(props: DeviceModderProps) {
                 modStatus={modStatus}
                 onCompleted={status => setModStatus(status)}
                 device={device}
+                devicePreV51={devicePreV51}
                 initialDowngradingTo={downgradeVersions[0]}
             />
         }
@@ -140,6 +142,7 @@ export function DeviceModder(props: DeviceModderProps) {
         return <PatchingMenu
             quit={quit}
             device={device}
+            devicePreV51={devicePreV51}
             modStatus={modStatus}
             onCompleted={modStatus => setModStatus(modStatus)}
             initialDowngradingTo={null} />
@@ -276,6 +279,7 @@ function UpdateInfo({ modStatus, device, quit }: { modStatus: ModStatus, device:
 interface PatchingMenuProps {
     modStatus: ModStatus
     device: Adb,
+    devicePreV51: boolean,
     onCompleted: (newStatus: ModStatus) => void,
     initialDowngradingTo: string | null,
     quit: (err: unknown) => void
@@ -288,26 +292,26 @@ function PatchingMenu(props: PatchingMenuProps) {
     const [versionSelectOpen, setVersionSelectOpen] = useState(false);
     const [versionOverridden, setVersionOverridden] = useState(false);
 
-    const { onCompleted, modStatus, device, initialDowngradingTo } = props;
+    const { onCompleted, modStatus, device, initialDowngradingTo, devicePreV51 } = props;
     const [downgradingTo, setDowngradingTo] = useState(initialDowngradingTo);
     const downgradeChoices = GetSortedDowngradableVersions(modStatus)!
-        .filter(version => version != initialDowngradingTo);
-
+    .filter(version => version != initialDowngradingTo);
+    
     const [manifest, setManifest] = useState(null as null | AndroidManifest); 
     manifest?.applyPatchingManifestMod();
-
+    
     useEffect(() => {
         if(downgradingTo === null) {
             setManifest(new AndroidManifest(props.modStatus.app_info!.manifest_xml));
         }   else    {
             getDowngradedManifest(device, downgradingTo)
-                .then(manifest_xml => setManifest(new AndroidManifest(manifest_xml)))
-                .catch(error => {
-                    // TODO: Perhaps revert to "not downgrading" if this error comes up (but only if the latest version is moddable)
-                    // This is low priority as this error message should only show up very rarely - there is already a previous check for internet access.
-                    Log.error("Failed to fetch older manifest: " + error);
-                    props.quit("Failed to fetch AndroidManifest.xml for the selected downgrade version. Did your quest lose its internet connection suddenly?");
-                });
+            .then(manifest_xml => setManifest(new AndroidManifest(manifest_xml)))
+            .catch(error => {
+                // TODO: Perhaps revert to "not downgrading" if this error comes up (but only if the latest version is moddable)
+                // This is low priority as this error message should only show up very rarely - there is already a previous check for internet access.
+                Log.error("Failed to fetch older manifest: " + error);
+                props.quit("Failed to fetch AndroidManifest.xml for the selected downgrade version. Did your quest lose its internet connection suddenly?");
+            });
         }
     }, [downgradingTo]);
 
@@ -353,7 +357,7 @@ function PatchingMenu(props: PatchingMenuProps) {
                 <button className="largeCenteredButton" onClick={async () => {
                     setIsPatching(true);
                     try {
-                        onCompleted(await patchApp(device, modStatus, downgradingTo, manifest.toString(), false, isDeveloperUrl, null));
+                        onCompleted(await patchApp(device, modStatus, downgradingTo, manifest.toString(), false, isDeveloperUrl, devicePreV51, null));
                     } catch (e) {
                         setPatchingError(String(e));
                         setIsPatching(false);
