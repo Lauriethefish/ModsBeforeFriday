@@ -16,10 +16,11 @@ import { OperationModals } from './components/OperationModals';
 import { OpenLogsButton } from './components/OpenLogsButton';
 import { isViewingOnIos, isViewingOnMobile, isViewingOnWindows, usingOculusBrowser } from './platformDetection';
 import { SourceUrl } from '.';
+import { useDeviceStore } from './DeviceStore';
 
 type NoDeviceCause = "NoDeviceSelected" | "DeviceInUse";
 
-const MIN_SUPPORTED_ANDROID_VERSION: number = 11;
+const NON_LEGACY_ANDROID_VERSION: number = 11;
 
 async function connect(
   setAuthing: () => void): Promise<Adb | NoDeviceCause> {
@@ -73,37 +74,25 @@ export async function getAndroidVersion(device: Adb) {
 
 function ChooseDevice() {
   const [authing, setAuthing] = useState(false);
-  const [chosenDevice, setChosenDevice] = useState(null as Adb | null);
   const [connectError, setConnectError] = useState(null as string | null);
-  const [devicePreV51, setdevicePreV51] = useState(false);
   const [deviceInUse, setDeviceInUse] = useState(false);
+  const {
+    devicePreV51, setDevicePreV51,
+    device: chosenDevice, setDevice: setChosenDevice,
+    androidVersion, setAndroidVersion
+  } = useDeviceStore();
 
   if(chosenDevice !== null) {
     Log.debug("Device model: " + chosenDevice.banner.model);
-    if(chosenDevice.banner.model === "Quest") { // "Quest" not "Quest 2/3"
-      return <div className='container mainContainer'>
-        <h1>Quest 1 Not Supported</h1>
-        <p>ModsBeforeFriday has detected that you're using a Quest 1, which is not supported by MBF. (and never will be)</p>
-        <p>This is because Quest 1 uses different builds of the Beat Saber game and so mods are stuck forever on version 1.28.0 of the game.</p>
-        <p>Follow <a href="https://bsmg.wiki/quest/modding-quest1.html">this link</a> for instructions on how to set up mods on Quest 1.</p>
-      </div>
-    } else if(devicePreV51 && chosenDevice.banner.model?.includes("Quest")) {
-      return <div className="container mainContainer">
-        <h1>Pre-v51 OS Detected</h1>
-        <p>ModsBeforeFriday has detected that you have an outdated version of the Quest operating system installed which is no longer supported by mods.</p>
-        <p>Please ensure your operating system is up to date and then refresh the page.</p>
-      </div>
-    } else  {
-      return <>
-        <DeviceModder device={chosenDevice} quit={(err) => {
-          if(err != null) {
-            setConnectError(String(err));
-          }
-          chosenDevice.close().catch(err => Log.warn("Failed to close device " + err));
-          setChosenDevice(null);
-        }} />
-      </>
-    }
+    return <>
+      <DeviceModder device={chosenDevice} devicePreV51={devicePreV51} quit={(err) => {
+        if(err != null) {
+          setConnectError(String(err));
+        }
+        chosenDevice.close().catch(err => Log.warn("Failed to close device " + err));
+        setChosenDevice(null);
+      }} />
+    </>
   } else if(authing) {
     return <div className='container mainContainer fadeIn'>
       <h2>Allow connection in headset</h2>
@@ -142,8 +131,16 @@ function ChooseDevice() {
                   device = result;
 
                   const androidVersion = await getAndroidVersion(device);
+                  setAndroidVersion(androidVersion);
+
                   Log.debug("Device android version: " + androidVersion);
-                  setdevicePreV51(androidVersion < MIN_SUPPORTED_ANDROID_VERSION);
+
+                  const deviceName = device.banner.model;
+                  if (deviceName === "Quest") {
+                    Log.debug("Device is a Quest 1, switching to pre-v51 mode");
+                    setDevicePreV51(androidVersion < NON_LEGACY_ANDROID_VERSION);                  
+                  }
+
                   setAuthing(false);
                   setChosenDevice(device);
 

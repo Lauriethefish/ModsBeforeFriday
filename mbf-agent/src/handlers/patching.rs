@@ -32,6 +32,7 @@ pub(super) fn handle_patch(
     downgrade_to: Option<String>,
     repatch: bool,
     manifest_mod: String,
+    device_pre_v51: bool,
     allow_no_core_mods: bool,
     override_core_mod_url: Option<String>,
     vr_splash_path: Option<String>,
@@ -61,6 +62,7 @@ pub(super) fn handle_patch(
             &app_info,
             version_diffs,
             manifest_mod,
+            device_pre_v51,
             vr_splash_path.as_deref(),
             &res_cache,
         )
@@ -71,6 +73,7 @@ pub(super) fn handle_patch(
             &app_info,
             manifest_mod,
             repatch,
+            device_pre_v51,
             vr_splash_path.as_deref(),
             &res_cache,
         )

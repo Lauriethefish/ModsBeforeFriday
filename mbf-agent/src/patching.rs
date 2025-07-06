@@ -24,12 +24,14 @@ use mbf_zip::{signing, FileCompression, ZipFile, ZIP_CRC};
 const DEBUG_CERT_PEM: &[u8] = include_bytes!("debug_cert.pem");
 const LIB_MAIN: &[u8] = include_bytes!("../libs/libmain.so");
 const MODLOADER: &[u8] = include_bytes!("../libs/libsl2.so");
+const LEGACY_OVRPLATFORMLOADER: &[u8] = include_bytes!("../libs/libovrplatformloader.so");
 
 const MODLOADER_NAME: &str = "libsl2.so";
 const MOD_TAG_PATH: &str = "modded.json";
 
 const LIB_MAIN_PATH: &str = "lib/arm64-v8a/libmain.so";
 const LIB_UNITY_PATH: &str = "lib/arm64-v8a/libunity.so";
+const LIB_OVR_PATH: &str = "lib/arm64-v8a/libovrplatformloader.so";
 
 // Aligment to use for ZIP entries with the STORE compression method, in bytes.
 // 4 is the standard value.
@@ -42,6 +44,7 @@ pub fn mod_current_apk(
     app_info: &AppInfo,
     manifest_mod: String,
     manifest_only: bool,
+    device_pre_v51: bool,
     vr_splash_path: Option<&str>,
     res_cache: &ResCache,
 ) -> Result<()> {
@@ -78,6 +81,7 @@ pub fn mod_current_apk(
         obb_backups,
         manifest_mod,
         manifest_only,
+        device_pre_v51,
         vr_splash_path,
     )
     .context("Patching and reinstalling APK")?;
@@ -91,6 +95,7 @@ pub fn downgrade_and_mod_apk(
     app_info: &AppInfo,
     diffs: VersionDiffs,
     manifest_mod: String,
+    device_pre_v51: bool,
     vr_splash_path: Option<&str>,
     res_cache: &ResCache,
 ) -> Result<bool> {
@@ -149,6 +154,7 @@ pub fn downgrade_and_mod_apk(
         obb_backup_paths,
         manifest_mod,
         false,
+        device_pre_v51,
         vr_splash_path,
     )
     .context("Patching and reinstall APK")?;
@@ -182,6 +188,7 @@ fn patch_and_reinstall(
     obb_paths: Vec<PathBuf>,
     manifest_mod: String,
     manifest_only: bool,
+    device_pre_v51: bool,
     vr_splash_path: Option<&str>,
 ) -> Result<()> {
     info!("Patching APK");
@@ -190,6 +197,7 @@ fn patch_and_reinstall(
         libunity_path,
         manifest_mod,
         manifest_only,
+        device_pre_v51,
         vr_splash_path,
     )
     .context("Patching APK")?;
@@ -209,7 +217,7 @@ fn patch_and_reinstall(
         }
     }
 
-    reinstall_modded_app(&temp_apk_path).context("Reinstalling modded APK")?;
+    reinstall_modded_app(&temp_apk_path, device_pre_v51).context("Reinstalling modded APK")?;
     std::fs::remove_file(temp_apk_path)?;
 
     info!("Restoring OBB files");
@@ -239,7 +247,10 @@ pub fn backup_player_data() -> Result<()> {
     Ok(())
 }
 
-fn reinstall_modded_app(temp_apk_path: &Path) -> Result<()> {
+fn reinstall_modded_app(
+    temp_apk_path: &Path,
+    device_pre_v51: bool,
+) -> Result<()> {
     info!("Reinstalling modded app");
     Command::new("pm")
         .args(["uninstall", APK_ID])
@@ -255,6 +266,17 @@ fn reinstall_modded_app(temp_apk_path: &Path) -> Result<()> {
     Command::new("appops")
         .args(["set", "--uid", APK_ID, "MANAGE_EXTERNAL_STORAGE", "allow"])
         .output()?;
+
+    // Quest 1 specific permissions
+    if device_pre_v51 {
+        info!("Granting WRITE_EXTERNAL_STORAGE and READ_EXTERNAL_STORAGE (Quest 1)");
+        Command::new("pm")
+            .args(["grant", APK_ID, "android.permission.WRITE_EXTERNAL_STORAGE"])
+            .output()?;
+        Command::new("pm")
+            .args(["grant", APK_ID, "android.permission.READ_EXTERNAL_STORAGE"])
+            .output()?;    
+    }
 
     Ok(())
 }
@@ -431,6 +453,7 @@ fn patch_apk_in_place(
     libunity_path: Option<PathBuf>,
     manifest_mod: String,
     manifest_only: bool,
+    device_pre_v51: bool,
     vr_splash_path: Option<&str>,
 ) -> Result<()> {
     let file = OpenOptions::new()
@@ -473,6 +496,15 @@ fn patch_apk_in_place(
                 zip.write_file(LIB_UNITY_PATH, &mut unity_stream, FileCompression::Deflate)?;
             }
             None => warn!("No unstripped unity added to the APK! This might cause issues later"),
+        }
+
+        if device_pre_v51 {
+            info!("Replacing ovrplatformloader");
+            zip.write_file(
+                LIB_OVR_PATH, 
+                &mut Cursor::new(LEGACY_OVRPLATFORMLOADER), 
+                FileCompression::Deflate
+            )?;
         }
     }
 
