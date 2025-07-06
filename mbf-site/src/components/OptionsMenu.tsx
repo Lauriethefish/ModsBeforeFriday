@@ -14,11 +14,15 @@ import { Modal } from './Modal';
 import { SplashScreenSelector } from './SplashScreenSelector';
 import { useDeviceStore } from '../DeviceStore';
 
-export function OptionsMenu({ quit, modStatus, setModStatus }: {
+interface OptionsMenuProps {
     setModStatus: (status: ModStatus) => void,
     quit: (err: unknown | null) => void
-    modStatus: ModStatus}) {
-    return <div className="container mainContainer" id="toolsContainer">
+    modStatus: ModStatus
+    visible?: boolean
+}
+    
+export function OptionsMenu({ quit, modStatus, setModStatus, visible }: OptionsMenuProps) {
+    return <div className={`container mainContainer ${visible ? '' : 'hidden'}`} id="toolsContainer">
         <Collapsible title="Mod tools" defaultOpen>
             <ModTools modStatus={modStatus} setModStatus={setModStatus} quit={() => quit(null)} />
         </Collapsible>
