@@ -48,7 +48,6 @@ export function ModManager(props: ModManagerProps) {
             mods={mods}
             setMods={setMods}
             gameVersion={gameVersion}
-            device={device}
             visible={menu === SelectedMenu.add}
         />
         
