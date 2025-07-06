@@ -12,33 +12,36 @@ import { useSetError, wrapOperation } from '../SyncStore';
 import { Log } from '../Logging';
 import { Modal } from './Modal';
 import { SplashScreenSelector } from './SplashScreenSelector';
+import { useDeviceStore } from '../DeviceStore';
 
-export function OptionsMenu({ device, quit, modStatus, setModStatus }: {
-    device: Adb,
+export function OptionsMenu({ quit, modStatus, setModStatus }: {
     setModStatus: (status: ModStatus) => void,
     quit: (err: unknown | null) => void
     modStatus: ModStatus}) {
     return <div className="container mainContainer" id="toolsContainer">
         <Collapsible title="Mod tools" defaultOpen>
-            <ModTools device={device} modStatus={modStatus} setModStatus={setModStatus} quit={() => quit(null)} />
+            <ModTools modStatus={modStatus} setModStatus={setModStatus} quit={() => quit(null)} />
         </Collapsible>
         <Collapsible title="ADB log" defaultOpen>
-            <AdbLogger device={device}/>
+            <AdbLogger />
         </Collapsible>
         <Collapsible title="Change Permissions/Repatch">
-            <RepatchMenu device={device} quit={quit} modStatus={modStatus}/>
+            <RepatchMenu quit={quit} modStatus={modStatus}/>
         </Collapsible>
     </div>
 }
 
 // Basic tools to do with managing the install, including a fix for a previously introduced bug.
-function ModTools({ device, quit, modStatus, setModStatus }: {
-    device: Adb,
+function ModTools({ quit, modStatus, setModStatus }: {
     quit: () => void,
     modStatus: ModStatus,
     setModStatus: (status: ModStatus) => void}) {
+    const { device } = useDeviceStore((store) => ({ device: store.device }));
+
     return <div id="modTools">
         <button onClick={async () => {
+            if (!device) return;
+
             const setError = useSetError("Failed to kill Beat Saber process");
             try {
                 await device.subprocess.spawnAndWait("am force-stop com.beatgames.beatsaber");
@@ -51,6 +54,8 @@ function ModTools({ device, quit, modStatus, setModStatus }: {
 
         <br />
         <button onClick={async () => {
+            if (!device) return;
+
             await wrapOperation("Reinstalling only core mods", "Failed to reinstall only core mods", async () => {
                 setModStatus(await quickFix(device, modStatus, true));
                 toast.success("All non-core mods removed!");
@@ -60,6 +65,8 @@ function ModTools({ device, quit, modStatus, setModStatus }: {
         <br/>
 
         <button onClick={async () => {
+            if (!device) return;
+
             const setError = useSetError("Failed to uninstall Beat Saber");
             try {
                 await uninstallBeatSaber(device);
@@ -72,6 +79,7 @@ function ModTools({ device, quit, modStatus, setModStatus }: {
         <br/>
 
         <button onClick={async () => {
+            if (!device) return;
             const setError = useSetError("Failed to fix player data");
             try {
                 if(await fixPlayerData(device)) {
@@ -89,14 +97,19 @@ function ModTools({ device, quit, modStatus, setModStatus }: {
     </div>
 }
 
-function RepatchMenu({ device, modStatus, quit }: {
-    device: Adb,
+function RepatchMenu({ modStatus, quit }: {
     modStatus: ModStatus,
-    quit: (err: unknown) => void}) {
+    quit: (err: unknown) => void
+}
+) {
+    const { device, devicePreV51 } = useDeviceStore((store) => ({ 
+        device: store.device,
+        devicePreV51: store.devicePreV51
+    }));
 
     let manifest = useRef(new AndroidManifest(modStatus.app_info!.manifest_xml));
     useEffect(() => {
-        manifest.current.applyPatchingManifestMod();
+        manifest.current.applyPatchingManifestMod(devicePreV51);
     }, []);
     const [splashScreen, setSplashScreen] = useState(null as File | null);
 
@@ -106,6 +119,8 @@ function RepatchMenu({ device, modStatus, quit }: {
         <PermissionsMenu manifest={manifest.current} />
         <br/>
         <button onClick={async () => {
+            if (!device) return;
+
             await wrapOperation("Repatching Beat Saber", "Failed to repatch", async () => {
                 // TODO: Right now we do not set the mod status back to the DeviceModder state for it.
                 // This is fine at the moment since repatching does not update this state in any important way,
@@ -156,13 +171,14 @@ async function logcatToBlob(device: Adb, getCancelled: () => boolean): Promise<B
     return new Blob(logs, { type: 'text/plain' })
 }
 
-function AdbLogger({ device }: { device: Adb }) {
+function AdbLogger() {
     const [logging, setLogging] = useState(false);
     const [logFile, setLogFile] = useState(null as Blob | null);
     const [waitingForLog, setWaitingForLog] = useState(false);
+    const { device } = useDeviceStore((store)=> ({device: store.device}));
 
     useEffect(() => {
-        if(!logging) {
+        if(!logging || !device) {
             return () => {};
         }
 

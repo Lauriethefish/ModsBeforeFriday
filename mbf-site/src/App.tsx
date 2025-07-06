@@ -16,10 +16,11 @@ import { OperationModals } from './components/OperationModals';
 import { OpenLogsButton } from './components/OpenLogsButton';
 import { isViewingOnIos, isViewingOnMobile, isViewingOnWindows, usingOculusBrowser } from './platformDetection';
 import { SourceUrl } from '.';
+import { useDeviceStore } from './DeviceStore';
 
 type NoDeviceCause = "NoDeviceSelected" | "DeviceInUse";
 
-const MIN_SUPPORTED_ANDROID_VERSION: number = 11;
+const NON_LEGACY_ANDROID_VERSION: number = 11;
 
 async function connect(
   setAuthing: () => void): Promise<Adb | NoDeviceCause> {
@@ -73,10 +74,13 @@ export async function getAndroidVersion(device: Adb) {
 
 function ChooseDevice() {
   const [authing, setAuthing] = useState(false);
-  const [chosenDevice, setChosenDevice] = useState(null as Adb | null);
   const [connectError, setConnectError] = useState(null as string | null);
-  const [devicePreV51, setdevicePreV51] = useState(false);
   const [deviceInUse, setDeviceInUse] = useState(false);
+  const {
+    devicePreV51, setDevicePreV51,
+    device: chosenDevice, setDevice: setChosenDevice,
+    androidVersion, setAndroidVersion
+  } = useDeviceStore();
 
   if(chosenDevice !== null) {
     Log.debug("Device model: " + chosenDevice.banner.model);
@@ -127,13 +131,14 @@ function ChooseDevice() {
                   device = result;
 
                   const androidVersion = await getAndroidVersion(device);
+                  setAndroidVersion(androidVersion);
 
                   Log.debug("Device android version: " + androidVersion);
 
                   const deviceName = device.banner.model;
                   if (deviceName === "Quest") {
                     Log.debug("Device is a Quest 1, switching to pre-v51 mode");
-                    setdevicePreV51(androidVersion < MIN_SUPPORTED_ANDROID_VERSION);                  
+                    setDevicePreV51(androidVersion < NON_LEGACY_ANDROID_VERSION);                  
                   }
 
                   setAuthing(false);

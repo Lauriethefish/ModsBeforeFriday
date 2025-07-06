@@ -15,20 +15,20 @@ import useFileDropper from "../hooks/useFileDropper";
 import { Log } from "../Logging";
 import { useSetWorking, useSyncStore, wrapOperation } from "../SyncStore";
 import { ModRepoMod } from "../ModsRepo";
+import { useDeviceStore } from "../DeviceStore";
 
 interface ModManagerProps {
     gameVersion: string,
     setMods: (mods: Mod[]) => void,
     modStatus: ModStatus,
     setModStatus: (status: ModStatus) => void,
-    device: Adb,
     quit: (err: unknown) => void
 }
 
 type SelectedMenu = 'add' | 'current' | 'options';
 
 export function ModManager(props: ModManagerProps) {
-    const { modStatus, setModStatus, setMods, device, gameVersion, quit } = props;
+    const { modStatus, setModStatus, setMods, gameVersion, quit } = props;
     const mods = modStatus.installed_mods;
     const [menu, setMenu] = useState('add' as SelectedMenu);
 
@@ -44,7 +44,6 @@ export function ModManager(props: ModManagerProps) {
                 mods={mods}
                 setMods={setMods}
                 gameVersion={gameVersion}
-                device={device}
             />
         </div>
         
@@ -53,13 +52,11 @@ export function ModManager(props: ModManagerProps) {
                 mods={mods}
                 setMods={setMods}
                 gameVersion={gameVersion}
-                device={device}
             />
         </div>
         
         <div className={menu === 'options' ? "" : "hidden"}>
             <OptionsMenu
-                device={device}
                 quit={quit}
                 modStatus={modStatus}
                 setModStatus={setModStatus}
@@ -96,21 +93,20 @@ interface ModMenuProps {
     mods: Mod[],
     setMods: (mods: Mod[]) => void,
     gameVersion: string,
-    device: Adb
 }
 
 function InstalledModsMenu(props: ModMenuProps) {
     const { mods,
         setMods,
-        gameVersion,
-        device
+        gameVersion
     } = props;
-
+    const { device } = useDeviceStore((state) => ({ device: state.device }));
     const [changes, setChanges] = useState({} as { [id: string]: boolean });
     const hasChanges = Object.keys(changes).length > 0;
 
     return <div className="installedModsMenu">
         {hasChanges && <button id="syncButton" onClick={async () => {
+            if (!device) return;
             setChanges({});
             Log.debug("Installing mods, statuses requested: " + JSON.stringify(changes));
             await wrapOperation("Syncing mods", "Failed to sync mods", async () => {
@@ -130,6 +126,8 @@ function InstalledModsMenu(props: ModMenuProps) {
 				mod={mod}
 				key={mod.id}
 				onRemoved={async () => {
+                    if (!device) return;
+
                     await wrapOperation("Removing mod", "Failed to remove mod", async () => {
 						setMods(await removeMod(device, mod.id));
                     });
@@ -193,13 +191,15 @@ function AddModsMenu(props: ModMenuProps) {
     const {
         mods,
         setMods,
-        gameVersion,
-        device
+        gameVersion
     } = props;
+    const { device } = useDeviceStore((state) => ({ device: state.device }));
 
     // Automatically installs a mod when it is imported, or warns the user if it isn't designed for the current game version.
     // Gives appropriate toasts/reports errors in each case.
     async function onModImported(result: ImportedMod) {
+        if (!device) return;
+
         const { installed_mods, imported_id } = result;
         setMods(installed_mods);
 
@@ -245,6 +245,8 @@ function AddModsMenu(props: ModMenuProps) {
     }
 
     async function handleFileImport(file: File) {
+        if (!device) return;
+
         try {
             const importResult = await importFile(device, file);
             await onImportResult(importResult);
@@ -254,6 +256,7 @@ function AddModsMenu(props: ModMenuProps) {
     }
 
     async function handleUrlImport(url: string) {
+        if (!device) return;
         if (url.startsWith("file:///")) {
             toast.error("Cannot process dropped file from this source, drag from the file picker instead. (Drag from OperaGX file downloads popup does not work)");
             return;
@@ -267,6 +270,8 @@ function AddModsMenu(props: ModMenuProps) {
     }
 
     async function enqueueImports(imports: QueuedImport[]) {
+        if (!device) return;
+
         // Add the new imports to the queue
         importQueue.push(...imports);
         // If somebody else is processing the queue already, stop and let them finish processing the whole queue.
