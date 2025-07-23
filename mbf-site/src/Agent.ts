@@ -366,6 +366,7 @@ export async function patchApp(device: Adb,
   manifestMod: string,
   remodding: boolean,
   allow_no_core_mods: boolean,
+  device_pre_v51: boolean,
   splashScreen: File | null): Promise<ModStatus> {
   Log.debug("Patching with manifest: " + manifestMod);
 
@@ -390,6 +391,7 @@ export async function patchApp(device: Adb,
       manifest_mod: manifestMod,
       allow_no_core_mods: allow_no_core_mods,
       override_core_mod_url: CORE_MOD_OVERRIDE_URL,
+      device_pre_v51: device_pre_v51,
       remodding,
       vr_splash_path: splashPath
   }) as Patched;

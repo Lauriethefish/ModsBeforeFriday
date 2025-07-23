@@ -20,10 +20,11 @@ import { waitForDisconnect } from "./waitForDisconnect";
 import { BridgeManager } from './BridgeManager';
 import { AllowAuth, DeviceInUse, NoCompatibleDevices, OculusBrowserMessage, OldOsVersion, QuestOneNotSupported, Title, UnsupportedMessage } from './AppMessages';
 import { PagePinger } from './PagePinger';
+import { useDeviceStore } from './DeviceStore';
 
 type NoDeviceCause = "NoDeviceSelected" | "DeviceInUse";
 
-const MIN_SUPPORTED_ANDROID_VERSION: number = 11;
+const NON_LEGACY_ANDROID_VERSION: number = 11;
 
 /**
  * Connects to the ADB server using the given client and device.
@@ -119,25 +120,29 @@ enum ConnectedState {
  * @param device - The connected ADB device instance.
  * @param stateSetters - An object containing state setters.
  */
-async function connectDevice(device: Adb, { setDevicePreV51, setAuthing, setChosenDevice }: {
+async function connectDevice(device: Adb, { setDevicePreV51, setAuthing, setChosenDevice, setConnecting }: {
   /** State setter for indicating if the device is pre-v51 (unsupported). */
-  setDevicePreV51: SetStateAction<boolean>
+  setDevicePreV51: (isPreV51: boolean) => void
 
-  /** State setter for authentication status (false when done). */
+  /** State setter for authentication status. */
   setAuthing: SetStateAction<boolean>
 
   /** State setter for the currently selected device. */
-  setChosenDevice: SetStateAction<Adb | null>
+  setChosenDevice: (adb: Adb | null) => void
+
+  /** State setter for connecting status. */
+  setConnecting: SetStateAction<boolean>
 }) {
   const androidVersion = await getAndroidVersion(device);
   Log.debug("Device android version: " + androidVersion);
-  setDevicePreV51(androidVersion < MIN_SUPPORTED_ANDROID_VERSION);
+  setDevicePreV51(androidVersion < NON_LEGACY_ANDROID_VERSION);
   setAuthing(false);
   setChosenDevice(device);
 
   await waitForDisconnect(device);
 
   setChosenDevice(null);
+  setConnecting(false);
 }
 
 /**
@@ -151,31 +156,37 @@ async function connectDevice(device: Adb, { setDevicePreV51, setAuthing, setChos
  * @param device - The target device to connect to.
  * @param stateSetters - An object containing state setters.
  */
-async function connectBridgeDevice(bridgeClient: AdbServerClient, device: AdbServerClient.Device, { setDevicePreV51, setAuthing, setChosenDevice, setConnectError }: {
+async function connectBridgeDevice(bridgeClient: AdbServerClient, device: AdbServerClient.Device, { setDevicePreV51, setAuthing, setChosenDevice, setConnectError, setConnecting }: {
   /** State setter for indicating if the device is pre-v51 (unsupported). */
-  setDevicePreV51: SetStateAction<boolean>
+  setDevicePreV51: (isPreV51: boolean) => void
 
   /** State setter for authentication status. */
   setAuthing: SetStateAction<boolean>
 
   /** State setter for the currently selected device. */
-  setChosenDevice: SetStateAction<Adb | null>
+  setChosenDevice: (adb: Adb | null) => void
 
   /** State setter for connection error messages. */
   setConnectError: SetStateAction<string | null>
+
+  /** State setter for connecting status. */
+  setConnecting: SetStateAction<boolean>
 }) {
   try {
     if (bridgeClient === null) {
       Log.error("Bridge client is null, cannot connect to device");
       return;
     }
+    
+    setConnecting(true);
 
     const adbDevice = await connectAdbDevice(bridgeClient, device);
-    await connectDevice(adbDevice, { setDevicePreV51, setAuthing, setChosenDevice });
+    await connectDevice(adbDevice, { setDevicePreV51, setAuthing, setChosenDevice, setConnecting });
   } catch(error) {
     Log.error("Failed to connect: " + error, error);
     setConnectError(String(error));
     setChosenDevice(null);
+    setConnecting(false);
   }
 }
 
@@ -188,7 +199,7 @@ async function connectBridgeDevice(bridgeClient: AdbServerClient, device: AdbSer
  *
  * @param stateSetters - An object containing state setters.
  */
-async function connectWebUsb({ setAuthing, setDeviceInUse, setChosenDevice, setConnectError }: {
+async function connectWebUsb({ setAuthing, setDeviceInUse, setChosenDevice, setConnectError, setConnecting }: {
   /** State setter for authentication status. */
   setAuthing: SetStateAction<boolean>
 
@@ -196,29 +207,36 @@ async function connectWebUsb({ setAuthing, setDeviceInUse, setChosenDevice, setC
   setDeviceInUse: SetStateAction<boolean>
 
   /** State setter for the currently selected device. */
-  setChosenDevice: SetStateAction<Adb | null>
+  setChosenDevice: (adb: Adb | null) => void
 
   /** State setter for connection error messages. */
   setConnectError: SetStateAction<string | null>
+
+  /** State setter for connecting status. */
+  setConnecting: SetStateAction<boolean>
 }) {
   let device: Adb | null;
 
   try {
+    setConnecting(true);
     const result = await connect(() => setAuthing(true));
     if(result === "NoDeviceSelected") {
       device = null;
     } else if(result === "DeviceInUse") {
       setDeviceInUse(true);
+      setConnecting(false);
       return;
     } else  {
       device = result;
       setChosenDevice(device);
+      setConnecting(false);
     }
 
   } catch(error) {
     Log.error("Failed to connect: " + error);
     setConnectError(String(error));
     setChosenDevice(null);
+    setConnecting(false);
     return;
   }
 }
@@ -243,10 +261,14 @@ async function connectWebUsb({ setAuthing, setDeviceInUse, setChosenDevice, setC
  */
 function ChooseDevice() {
   const [authing, setAuthing] = useState(false);
-  const [chosenDevice, setChosenDevice] = useState(null as Adb | null);
   const [connectError, setConnectError] = useState(null as string | null);
-  const [devicePreV51, setDevicePreV51] = useState(false);
+  const [connecting, setConnecting] = useState(false);
   const [deviceInUse, setDeviceInUse] = useState(false);
+  const {
+    devicePreV51, setDevicePreV51,
+    device: chosenDevice, setDevice: setChosenDevice, usingBridge, setUsingBridge,
+    androidVersion, setAndroidVersion
+  } = useDeviceStore();
   const [bridgeClient, setBridgeClient] = useState<AdbServerClient | null>(null);
   const [adbDevices, setAdbDevices] = useState<AdbServerClient.Device[]>([]);
   const stateSetters = {
@@ -256,35 +278,30 @@ function ChooseDevice() {
     setDevicePreV51,
     setDeviceInUse,
     setBridgeClient,
-    setAdbDevices
+    setAdbDevices,
+    setConnecting
   }
-
+  
   useEffect(() => {
     // If the user is using a bridge and there is only one device, connect to it automatically.
-    if (chosenDevice == null && bridgeClient != null && adbDevices.length == 1) {
+    if (!connecting && chosenDevice == null && bridgeClient != null && adbDevices.length == 1) {
       connectBridgeDevice(bridgeClient, adbDevices[0],  stateSetters).catch(err => Log.error("Failed to connect to device: " + err, err));
     }
-
   });
 
   if(chosenDevice !== null) {
     Log.debug("Device model: " + chosenDevice.banner.model);
-    if(chosenDevice.banner.model === "Quest") { // "Quest" not "Quest 2/3"
-      return <QuestOneNotSupported />
-    } else if(devicePreV51 && chosenDevice.banner.model?.includes("Quest")) {
-      return <OldOsVersion />
-    } else  {
-      return <>
-        { bridgeClient && <PagePinger url={bridgeData.pingAddress} interval={5000} /> }
-        <DeviceModder device={chosenDevice} usingBridge={bridgeClient != null} quit={(err) => {
-          if(err != null) {
-            setConnectError(String(err));
-          }
-          chosenDevice.close().catch(err => Log.error("Failed to close device " + err, err));
-          setChosenDevice(null);
-        }} />
-      </>
-    }
+    return <>
+      { bridgeClient && <PagePinger url={bridgeData.pingAddress} interval={5000} /> }
+      <DeviceModder quit={(err) => {
+        if(err != null) {
+          setConnectError(String(err));
+        }
+        chosenDevice.close().catch(err => Log.error("Failed to close device " + err, err));
+        setChosenDevice(null);
+        setConnecting(false);
+      }} />
+    </>
   } else if(authing) {
     return <AllowAuth />
   } else  {
@@ -303,7 +320,7 @@ function ChooseDevice() {
               {adbDevices.map(device =>
                 <>
                   <li key={device.serial}>
-                    <button onClick={() => connectBridgeDevice(bridgeClient, device, stateSetters)}>Connect to {device.serial}</button>
+                    <button onClick={() => !connecting && connectBridgeDevice(bridgeClient, device, stateSetters)}>Connect to {device.serial}</button>
                   </li>
                 </>)}
             </ul>
@@ -313,7 +330,7 @@ function ChooseDevice() {
         {!bridgeClient && navigator.usb && <>
           <div className="chooseDeviceContainer">
             <span><OpenLogsButton /></span>
-            <button onClick={() => connectWebUsb(stateSetters)}>Connect to Quest</button>
+            <button onClick={() => !connecting && connectWebUsb(stateSetters)}>Connect to Quest</button>
           </div>
         </>}
 
