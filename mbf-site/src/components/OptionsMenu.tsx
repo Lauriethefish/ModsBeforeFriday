@@ -1,6 +1,6 @@
 import { Adb, decodeUtf8 } from '@yume-chan/adb';
 import { uninstallBeatSaber } from '../DeviceModder';
-import { useEffect, useRef, useState } from 'react';
+import { Children, ReactNode, useEffect, useRef, useState } from 'react';
 import { fixPlayerData, patchApp, quickFix } from '../Agent';
 import { toast } from 'react-toastify';
 import { PermissionsMenu } from './PermissionsMenu';
@@ -35,6 +35,15 @@ export function OptionsMenu({ quit, modStatus, setModStatus, visible }: OptionsM
     </div>
 }
 
+function ModToolButton({ onClick, text, description }: { onClick: () => void, text: string, description: string }) {
+    return <div>
+      <div>
+        <button onClick={onClick}>{text}</button>
+      </div>
+      <span>{description}</span>
+    </div>
+}
+
 // Basic tools to do with managing the install, including a fix for a previously introduced bug.
 function ModTools({ quit, modStatus, setModStatus }: {
     quit: () => void,
@@ -42,63 +51,88 @@ function ModTools({ quit, modStatus, setModStatus }: {
     setModStatus: (status: ModStatus) => void}) {
     const { device } = useDeviceStore((store) => ({ device: store.device }));
 
-    return <div id="modTools">
-        <button onClick={async () => {
+    return (
+      <div id="modTools">
+        <ModToolButton
+          text="Kill Beat Saber"
+          description="Immediately closes the game."
+          onClick={async () => {
             if (!device) return;
 
             const setError = useSetError("Failed to kill Beat Saber process");
             try {
-                await device.subprocess.spawnAndWait("am force-stop com.beatgames.beatsaber");
-                toast.success("Successfully killed Beat Saber");
-            }   catch(e) {
-                setError(e);
+              await device.subprocess.spawnAndWait("am force-stop com.beatgames.beatsaber");
+              toast.success("Successfully killed Beat Saber");
+            } catch (e) {
+              setError(e);
             }
-        }}>Kill Beat Saber</button>
-        Immediately closes the game.
-
-        <br />
-        <button onClick={async () => {
+          }}
+        />
+        <ModToolButton
+          text="Restart Beat Saber"
+          description="Immediately closes and restarts the game."
+          onClick={async () => {
             if (!device) return;
 
-            await wrapOperation("Reinstalling only core mods", "Failed to reinstall only core mods", async () => {
+            const setError = useSetError("Failed to kill Beat Saber process");
+            try {
+              await device.subprocess.spawnAndWait("sh -c 'am force-stop com.beatgames.beatsaber; monkey -p com.beatgames.beatsaber -c android.intent.category.LAUNCHER 1'");
+              toast.success("Successfully restarted Beat Saber");
+            } catch (e) {
+              setError(e);
+            }
+          }}
+        />
+        <ModToolButton
+          text="Reinstall only core mods"
+          description="Deletes all installed mods, then installs only the core mods."
+          onClick={async () => {
+            if (!device) return;
+
+            await wrapOperation(
+              "Reinstalling only core mods",
+              "Failed to reinstall only core mods",
+              async () => {
                 setModStatus(await quickFix(device, modStatus, true));
                 toast.success("All non-core mods removed!");
-            });
-        }}>Reinstall only core mods</button>
-        Deletes all installed mods, then installs only the core mods.
-        <br/>
-
-        <button onClick={async () => {
+              }
+            );
+          }}
+        />
+        <ModToolButton
+          text="Uninstall Beat Saber"
+          description="Uninstalls the game: this will remove all mods and quit MBF."
+          onClick={async () => {
             if (!device) return;
 
             const setError = useSetError("Failed to uninstall Beat Saber");
             try {
-                await uninstallBeatSaber(device);
-                quit();
-            }   catch(e)   {
-                setError(e)
+              await uninstallBeatSaber(device);
+              quit();
+            } catch (e) {
+              setError(e);
             }
-        }}>Uninstall Beat Saber</button>
-        Uninstalls the game: this will remove all mods and quit MBF.
-        <br/>
-
-        <button onClick={async () => {
+          }}
+        />
+        <ModToolButton
+          text="Fix Player Data"
+          description="Fixes an issue with player data permissions."
+          onClick={async () => {
             if (!device) return;
             const setError = useSetError("Failed to fix player data");
             try {
-                if(await fixPlayerData(device)) {
-                    toast.success("Successfully fixed player data issues");
-                }   else    {
-                    toast.error("No player data file found to fix");
-                }
-            }   catch(e) {
-                setError(e);
+              if (await fixPlayerData(device)) {
+                toast.success("Successfully fixed player data issues");
+              } else {
+                toast.error("No player data file found to fix");
+              }
+            } catch (e) {
+              setError(e);
             }
-        }}>Fix Player Data</button>
-        Fixes an issue with player data permissions.
-        
-        <br/>
-    </div>
+          }}
+        />
+      </div>
+    );
 }
 
 function RepatchMenu({ modStatus, quit }: {

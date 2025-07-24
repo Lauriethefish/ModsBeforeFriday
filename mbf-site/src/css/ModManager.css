@@ -122,9 +122,13 @@
     gap: 5px;
     color: none;
     font-size: larger;
-    background-color: red;
+    background-color: rgb(179, 10, 10);
     font-weight: bold;
     height: 51px;
+}
+    
+.syncChanges:hover {
+    background-color: rgb(209, 10, 10);
 }
 
 .syncChanges > img {
