@@ -14,21 +14,28 @@ export interface DeviceStore {
      */
     devicePreV51 : boolean;
     /**
+     * Is the device using a bridge connection?
+     */
+    usingBridge: boolean;
+    /**
      * The device name, if available.
      */
     androidVersion: number | null;
     setDevicePreV51: (isPreV51: boolean) => void;
     setAndroidVersion: (version: number | null) => void;
     setDevice: (adb: Adb | null) => void;
+    setUsingBridge: (usingBridge: boolean) => void;
 
 }
 
 export const useDeviceStore = create<DeviceStore>(set => ({
     device: null,
     devicePreV51: false,
+    usingBridge: false,
     androidVersion: null,
     Adb: null,
     setDevicePreV51: (isPreV51: boolean) => set(() => ({ devicePreV51: isPreV51 })),
     setAndroidVersion: (version: number | null) => set(() => ({ androidVersion: version })),
-    setDevice: (device: Adb | null) => set(() => ({ device: device }))
+    setDevice: (device: Adb | null) => set(() => ({ device: device })),
+    setUsingBridge: (usingBridge: boolean) => set(() => ({ usingBridge }))
 }));

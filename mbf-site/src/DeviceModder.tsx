@@ -14,11 +14,10 @@ import { Log } from './Logging';
 import { wrapOperation } from './SyncStore';
 import { OpenLogsButton } from './components/OpenLogsButton';
 import { lte as semverLte } from 'semver';
+import { checkForBridge } from './AdbServerWebSocketConnector';
 import { useDeviceStore } from './DeviceStore';
 
 interface DeviceModderProps {
-    device: Adb,
-    devicePreV51: boolean,
     // Quits back to the main menu, optionally giving an error that caused the quit.
     quit: (err: unknown | null) => void
 }
@@ -312,13 +311,13 @@ function PatchingMenu(props: PatchingMenuProps) {
             setManifest(new AndroidManifest(props.modStatus.app_info!.manifest_xml));
         }   else    {
             getDowngradedManifest(device, downgradingTo)
-            .then(manifest_xml => setManifest(new AndroidManifest(manifest_xml)))
-            .catch(error => {
-                // TODO: Perhaps revert to "not downgrading" if this error comes up (but only if the latest version is moddable)
-                // This is low priority as this error message should only show up very rarely - there is already a previous check for internet access.
-                Log.error("Failed to fetch older manifest: " + error);
-                props.quit("Failed to fetch AndroidManifest.xml for the selected downgrade version. Did your quest lose its internet connection suddenly?");
-            });
+                .then(manifest_xml => setManifest(new AndroidManifest(manifest_xml)))
+                .catch(error => {
+                    // TODO: Perhaps revert to "not downgrading" if this error comes up (but only if the latest version is moddable)
+                    // This is low priority as this error message should only show up very rarely - there is already a previous check for internet access.
+                    Log.error("Failed to fetch older manifest: " + error, error);
+                    props.quit("Failed to fetch AndroidManifest.xml for the selected downgrade version. Did your quest lose its internet connection suddenly?");
+                });
         }
     }, [downgradingTo]);
 
