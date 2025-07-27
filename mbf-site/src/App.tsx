@@ -112,7 +112,8 @@ function ChooseDevice() {
         <div className="container mainContainer">
           <Title />
           <p>To get started, plug your Quest in with a USB-C cable and click the button below.</p>
-
+          <p>Want see what mods are available? You can find a full list <a href="https://mods.bsquest.xyz" target="_blank" rel="noopener noreferrer">here!</a></p>
+         
           <NoCompatibleDevices />
 
           <div className="chooseDeviceContainer">
