@@ -8,16 +8,47 @@
     gap: 15px;
 }
 
-#toolsContainer button {
-    margin-top: 3px;
-    margin-bottom: 3px;
-}
 
 #modTools {
+    display: table;
     padding-top: 10px;
 }
 
-#modTools > button {
-    margin-right: 10px;
-    margin-bottom: 5px;
+#modTools > div {
+    display: table-row;
+}
+
+#modTools > div > * {
+    display: table-cell;
+    vertical-align: middle;
+    
+}
+
+#modTools span {
+    text-align: left;
+}
+
+#modTools button {
+    min-width: 100%;
+    white-space: nowrap;
+}
+
+#modTools > div > * {
+    padding: 3px;
+}
+
+#modTools > div > *:first-child {
+    padding-left: 0;
+}
+
+#modTools > div > *:last-child {
+    padding-right: 0;
+}
+
+#modTools > div:first-child > * {
+    padding-top: 0;
+}
+
+#modTools > div:last-child > * {
+    padding-bottom: 0;
 }
