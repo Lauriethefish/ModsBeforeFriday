@@ -1,8 +1,5 @@
 use std::{
-    fs::{File, OpenOptions},
-    io::{BufReader, BufWriter, Cursor, Read, Write},
-    path::{Path, PathBuf},
-    process::Command,
+    ffi::OsStr, fs::{File, OpenOptions}, io::{BufReader, BufWriter, Cursor, Read, Write}, path::{Path, PathBuf}, process::Command
 };
 
 use crate::{
@@ -13,7 +10,7 @@ use crate::{
     ModTag, parameters::PARAMETERS,
 };
 use anyhow::{anyhow, Context, Result};
-use log::{info, warn};
+use log::{debug, info, warn};
 use mbf_res_man::{
     external_res,
     models::{Diff, VersionDiffs},
@@ -375,12 +372,14 @@ fn save_obbs(obb_dir: &Path, obb_backups_path: &Path) -> Result<Vec<PathBuf>> {
     for err_or_stat in std::fs::read_dir(obb_dir)? {
         if let Ok(stat) = err_or_stat {
             let path = stat.path();
+            if path.extension() == Some(OsStr::new("obb")) && path.is_file() {
+                debug!("Saving OBB path {:?}", path);
+                // Make a backup copy of the obb to restore later after patching.
+                let obb_backup_path = obb_backups_path.join(path.file_name().unwrap());
+                std::fs::copy(&path, &obb_backup_path)?;
 
-            // Make a backup copy of the obb to restore later after patching.
-            let obb_backup_path = obb_backups_path.join(path.file_name().unwrap());
-            std::fs::copy(&path, &obb_backup_path)?;
-
-            paths.push(obb_backup_path);
+                paths.push(obb_backup_path);
+            }
         }
     }
 
