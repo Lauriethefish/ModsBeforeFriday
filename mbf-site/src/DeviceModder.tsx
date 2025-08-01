@@ -15,6 +15,7 @@ import { wrapOperation } from './SyncStore';
 import { OpenLogsButton } from './components/OpenLogsButton';
 import { lte as semverLte } from 'semver';
 import { useDeviceStore } from './DeviceStore';
+import { gameId } from './game_info';
 
 interface DeviceModderProps {
     device: Adb,
@@ -24,7 +25,7 @@ interface DeviceModderProps {
 }
 
 export async function uninstallBeatSaber(device: Adb) {
-    await device.subprocess.spawnAndWait("pm uninstall com.beatgames.beatsaber");
+    await device.subprocess.spawnAndWait(`pm uninstall ${gameId}`);
 }
 
 const isDeveloperUrl: boolean = new URLSearchParams(window.location.search).get("dev") === "true";

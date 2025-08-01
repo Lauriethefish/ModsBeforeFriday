@@ -4,7 +4,7 @@ use std::path::Path;
 
 use log::{info, warn};
 
-use crate::{mod_man::ModManager, models::response::Response, patching, paths};
+use crate::{mod_man::ModManager, models::response::Response, parameters::PARAMETERS, patching};
 use anyhow::{anyhow, Context, Result};
 
 /// Handles `GetDowngradedManifest` [Requests](requests::Request).
@@ -41,7 +41,7 @@ pub(super) fn handle_patch(
         super::mod_status::get_app_info()?.ok_or(anyhow!("Cannot patch when app not installed"))?;
     let res_cache = crate::load_res_cache()?;
 
-    std::fs::create_dir_all(paths::TEMP)?;
+    std::fs::create_dir_all(&PARAMETERS.temp)?;
 
     // Either downgrade or just patch the current APK depending on the caller's choice.
     let patching_result = if let Some(to_version) = &downgrade_to {
@@ -58,7 +58,7 @@ pub(super) fn handle_patch(
             ))?;
 
         patching::downgrade_and_mod_apk(
-            Path::new(paths::TEMP),
+            Path::new(&PARAMETERS.temp),
             &app_info,
             version_diffs,
             manifest_mod,
@@ -69,7 +69,7 @@ pub(super) fn handle_patch(
         .context("Downgrading and patching APK")
     } else {
         patching::mod_current_apk(
-            Path::new(paths::TEMP),
+            Path::new(&PARAMETERS.temp),
             &app_info,
             manifest_mod,
             repatch,
@@ -82,7 +82,7 @@ pub(super) fn handle_patch(
     };
 
     // No matter what, make sure that all temporary files are gone.
-    std::fs::remove_dir_all(paths::TEMP)?;
+    std::fs::remove_dir_all(&PARAMETERS.temp)?;
     if let Some(splash_path) = vr_splash_path {
         std::fs::remove_file(splash_path)?;
     }
