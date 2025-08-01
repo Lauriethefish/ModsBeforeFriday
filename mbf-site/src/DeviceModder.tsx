@@ -336,6 +336,7 @@ function PatchingMenu(props: PatchingMenuProps) {
                 wasUserSelected={versionOverridden}
                 requestedVersionChange={() => setVersionSelectOpen(true)}
                 canChooseAnotherVersion={downgradeChoices.length > 0}
+                devicePreV51={devicePreV51}
                 requestedResetToDefault={() => {
                 setDowngradingTo(initialDowngradingTo);
                 setVersionOverridden(false);
@@ -441,19 +442,28 @@ function VersionSupportedMessage({ version, requestedVersionChange, canChooseAno
     </>
 }
 
-function DowngradeMessage({ toVersion, wasUserSelected, requestedVersionChange, requestedResetToDefault, canChooseAnotherVersion }: { toVersion: string, wasUserSelected: boolean,
+function DowngradeMessage({ toVersion,
+    wasUserSelected,
+    requestedVersionChange,
+    devicePreV51,
+    requestedResetToDefault,
+    canChooseAnotherVersion }: { toVersion: string, wasUserSelected: boolean,
     requestedVersionChange: () => void,
     requestedResetToDefault: () => void,
+    devicePreV51: boolean,
     canChooseAnotherVersion: boolean }) {
     return <>
-        <h1>Downgrade and set up mods</h1>
-        {wasUserSelected ? (<><p>You have decided to downgrade to a version older than the latest moddable version. <b>Only do this if you know why you want to!</b> <ClickableLink onClick={requestedResetToDefault}>(reverse decision)</ClickableLink></p></>)
-        : <>
-            <p>MBF has detected that your version of Beat Saber doesn't support mods!</p>
-            <p>Fortunately for you, your version can be downgraded automatically to the latest moddable version: {trimGameVersion(toVersion)} {canChooseAnotherVersion && <ClickableLink onClick={requestedVersionChange}>(choose another version)</ClickableLink>}</p>
-        </>}
-        <p><span className='warning'><b>NOTE:</b></span> By downgrading, you will lose access to any DLC or other content that is not present in version {trimGameVersion(toVersion)}. If you decide to stop using mods and reinstall vanilla Beat Saber, however, then you will get this content back.</p>
-    </>
+        <h1>{devicePreV51 ? "Update" : "Downgrade"} and set up mods</h1>
+        {wasUserSelected ? (<><p>You have decided to change to a version older than the latest moddable version. <b>Only do this if you know why you want to!</b> <ClickableLink onClick={requestedResetToDefault}>(reverse decision)</ClickableLink></p></>)
+        : devicePreV51 ? (<>
+            <p>MBF has detected that you're running on a Quest 1. To get the latest mods, MBF will automatically update Beat Saber to the latest moddable version ({trimGameVersion(toVersion)}).
+                Even though Meta only officially supports Quest 1 up to Beat Saber v1.36.2, MBF can patch version  {trimGameVersion(toVersion)} so it still works!
+            </p>
+        </>) : <>
+                <p>MBF has detected that your version of Beat Saber doesn't support mods!</p>
+                <p>Fortunately for you, your version can be downgraded automatically to the latest moddable version: {trimGameVersion(toVersion)} {canChooseAnotherVersion && <ClickableLink onClick={requestedVersionChange}>(choose another version)</ClickableLink>}</p>
+            </>}
+        </>
 }
 
 interface IncompatibleLoaderProps {
