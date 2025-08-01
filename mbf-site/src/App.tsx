@@ -83,7 +83,6 @@ function ChooseDevice() {
   } = useDeviceStore();
 
   if(chosenDevice !== null) {
-    Log.debug("Device model: " + chosenDevice.banner.model);
     return <>
       <DeviceModder device={chosenDevice} devicePreV51={devicePreV51} quit={(err) => {
         if(err != null) {
