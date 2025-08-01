@@ -76,7 +76,7 @@ export function DeviceModder(props: DeviceModderProps) {
         loadModStatus(device)
             .then(loadedModStatus => setModStatus(loadedModStatus))
             .catch(err => quit(err));
-    }, [device, quit]);
+    }, [device]);
 
     // Fun "ocean" of IF statements, hopefully covering every possible state of an installation!
     if (modStatus === null) {
