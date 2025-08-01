@@ -77,7 +77,7 @@ function ModTools({ quit, modStatus, setModStatus }: {
 
             const setError = useSetError("Failed to kill Beat Saber process");
             try {
-              await device.subprocess.spawnAndWait("sh -c 'am force-stop com.beatgames.beatsaber; monkey -p com.beatgames.beatsaber -c android.intent.category.LAUNCHER 1'");
+              await device.subprocess.spawnAndWait(`sh -c 'am force-stop ${gameId}; monkey -p com.beatgames.beatsaber -c android.intent.category.LAUNCHER 1'`);
               toast.success("Successfully restarted Beat Saber");
             } catch (e) {
               setError(e);
