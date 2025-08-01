@@ -25,3 +25,5 @@ yarn-error.log*
 mbf-agent
 mbf-agent.sha1
 agent_manifest.ts
+
+*.mjs
