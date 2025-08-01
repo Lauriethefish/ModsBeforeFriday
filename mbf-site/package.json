@@ -30,6 +30,7 @@
     "web-vitals": "^2.1.0",
     "zustand": "^4.5.5"
   },
+  "license": "AGPL-3.0-only",
   "scripts": {
     "start": "concurrently \"yarn run dev\" \"cd .. && cargo run --release --bin mbf-adb-killer\"",
     "dev": "vite",
