@@ -44,48 +44,22 @@ pub(super) fn handle_patch(
     std::fs::create_dir_all(&PARAMETERS.temp)?;
 
     // Either downgrade or just patch the current APK depending on the caller's choice.
-    let patching_result = if let Some(to_version) = &downgrade_to {
-        let diff_index = mbf_res_man::external_res::get_diff_index(&res_cache)
-            .context("Getting diff index to downgrade")?;
-        let version_diffs = diff_index
-            .into_iter()
-            .filter(|diff| diff.from_version == app_info.version && &diff.to_version == to_version)
-            .next()
-            .ok_or(anyhow!(
-                "No diff existed to go from {} to {}",
-                app_info.version,
-                to_version
-            ))?;
-
-        patching::downgrade_and_mod_apk(
-            Path::new(&PARAMETERS.temp),
-            &app_info,
-            version_diffs,
-            manifest_mod,
-            device_pre_v51,
-            vr_splash_path.as_deref(),
-            &res_cache,
-        )
-        .context("Downgrading and patching APK")
-    } else {
-        patching::mod_current_apk(
-            Path::new(&PARAMETERS.temp),
-            &app_info,
-            manifest_mod,
-            repatch,
-            device_pre_v51,
-            vr_splash_path.as_deref(),
-            &res_cache,
-        )
-        .context("Patching APK")
-        .map(|_| false) // Modding the currently installed APK will never remove DLC as they are restored automatically.
-    };
+    let patching_result = patching::mod_beat_saber(
+        Path::new(&PARAMETERS.temp),
+        &app_info,
+        downgrade_to.clone(),
+        manifest_mod,
+        repatch,
+        device_pre_v51,
+        vr_splash_path.as_deref(),
+        &res_cache,
+    ).context("Modding the game");
 
     // No matter what, make sure that all temporary files are gone.
     std::fs::remove_dir_all(&PARAMETERS.temp)?;
     if let Some(splash_path) = vr_splash_path {
         std::fs::remove_file(splash_path)?;
-    }
+    } // TODO add back once I fix the bugs
 
     let removed_dlc = patching_result?;
     patching::install_modloader().context("Installing external modloader")?;

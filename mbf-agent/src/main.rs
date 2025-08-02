@@ -7,6 +7,7 @@ mod mod_man;
 mod models;
 mod patching;
 mod parameters;
+mod downgrading;
 
 use anyhow::{Context, Result};
 use downloads::DownloadConfig;
