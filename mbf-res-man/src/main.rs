@@ -154,12 +154,7 @@ fn install_bs_version(bs_version: &str, fuzzy_lookup: bool) -> Result<()> {
 // Loads the current diff index from disk.
 fn load_current_diffs() -> Result<DiffIndex> {
     info!("Loading current diff index");
-    if !Path::new(DIFF_INDEX_PATH).exists() {
-        return Ok(Vec::new());
-    }
-
-    let mut handle = std::fs::File::open(DIFF_INDEX_PATH)?;
-    Ok(serde_json::from_reader(&mut handle).context("Existing diff index was invalid JSON")?)
+    external_res::get_diff_index(&get_res_cache()?).context("Downloading diff index")
 }
 
 // Saves the given diff index to its location on disk.
