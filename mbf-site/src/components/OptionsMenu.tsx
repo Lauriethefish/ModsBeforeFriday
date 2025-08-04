@@ -62,7 +62,7 @@ function ModTools({ quit, modStatus, setModStatus }: {
 
             const setError = useSetError("Failed to kill Beat Saber process");
             try {
-                await device.subprocess.spawnAndWait(`am force-stop ${gameId}`);
+                await device.subprocess.noneProtocol.spawnWait(`am force-stop ${gameId}`);
                 toast.success("Successfully killed Beat Saber");
             }   catch(e) {
                 setError(e);
@@ -77,7 +77,7 @@ function ModTools({ quit, modStatus, setModStatus }: {
 
             const setError = useSetError("Failed to kill Beat Saber process");
             try {
-              await device.subprocess.spawnAndWait(`sh -c 'am force-stop ${gameId}; monkey -p com.beatgames.beatsaber -c android.intent.category.LAUNCHER 1'`);
+              await device.subprocess.noneProtocol.spawnWait(`sh -c 'am force-stop ${gameId}; monkey -p com.beatgames.beatsaber -c android.intent.category.LAUNCHER 1'`);
               toast.success("Successfully restarted Beat Saber");
             } catch (e) {
               setError(e);
@@ -180,13 +180,13 @@ async function logcatToBlob(device: Adb, getCancelled: () => boolean): Promise<B
     Log.debug("Starting `logcat` process");
 
     // First clear the logcat buffer - we only want logs from events happening after the "start logcat" button is pressed.
-    await device.subprocess.spawnAndWait("logcat -c");
+    await device.subprocess.noneProtocol.spawnWait("logcat -c");
     
-    const process = await device.subprocess.spawn("logcat");
+    const process = await device.subprocess.noneProtocol.spawn("logcat");
     let killed = false;
 
     Log.debug("Generating logs");
-    const stdout = process.stdout.getReader();
+    const stdout = process.output.getReader();
     const logs = [];
 
     while(true) {

@@ -1,4 +1,4 @@
-import { AdbSync, AdbSyncWriteOptions, Adb, encodeUtf8 } from '@yume-chan/adb';
+import { AdbSync, AdbSyncWriteOptions, Adb, encodeUtf8, AdbShellProtocolProcessImpl } from '@yume-chan/adb';
 import { Consumable, ConcatStringStream, TextDecoderStream, MaybeConsumable, ReadableStream } from '@yume-chan/stream-extra';
 import { Request, Response, LogMsg, ModStatus, Mods, FixedPlayerData, ImportResult, DowngradedManifest, Patched, ModSyncResult, AgentParameters } from "./Messages";
 import { AGENT_SHA1 } from './agent_manifest';
@@ -24,7 +24,7 @@ export async function prepareAgent(adb: Adb) {
 
   Log.debug("Latest agent SHA1 " + AGENT_SHA1);
 
-  const existingSha1 = (await adb.subprocess.spawnAndWait(`sha1sum ${AgentPath} | cut -f 1 -d " "`)).stdout
+  const existingSha1 = (await adb.subprocess.noneProtocol.spawnWaitText(`sha1sum ${AgentPath} | cut -f 1 -d " "`))
     .trim()
     .toUpperCase();
   Log.debug("Existing agent SHA1: " + existingSha1);
@@ -41,11 +41,11 @@ export async function overwriteAgent(adb: Adb) {
   console.group("Downloading and overwriting agent on Quest");
   try {
     Log.debug("Removing existing agent");
-    await adb.subprocess.spawnAndWait("rm " + AgentPath)
+    await adb.subprocess.noneProtocol.spawnWait("rm " + AgentPath)
     Log.debug("Downloading agent, this might take a minute")
     await saveAgent(sync);
     Log.debug("Making agent executable");
-    await adb.subprocess.spawnAndWait("chmod +x " + AgentPath);
+    await adb.subprocess.noneProtocol.spawnWait("chmod +x " + AgentPath);
 
     Log.info("Agent is ready");
   } finally {
@@ -148,7 +148,7 @@ async function sendRequest(adb: Adb, request: Request): Promise<Response> {
   }
   let command_buffer = encodeUtf8(JSON.stringify(wrappedRequest) + "\n");
 
-  let agentProcess = await adb.subprocess.spawn(AgentPath);
+  let agentProcess = await adb.subprocess.noneProtocol.spawn(AgentPath);
 
   const stdin = agentProcess.stdin.getWriter();
   try {
@@ -158,10 +158,10 @@ async function sendRequest(adb: Adb, request: Request): Promise<Response> {
   }
 
   let exited = false;
-  agentProcess.exit.then(() => exited = true);
+  agentProcess.exited.then(() => exited = true);
   adb.disconnected.then(() => exited = true);
 
-  const reader = agentProcess.stdout
+  const reader = agentProcess.output
     // TODO: Not totally sure if this will handle non-ASCII correctly.
     // Doesn't seem to consider that a chunk might not be valid UTF-8 on its own
     .pipeThrough(new TextDecoderStream())
@@ -208,26 +208,21 @@ async function sendRequest(adb: Adb, request: Request): Promise<Response> {
   }
   console.groupEnd();
 
-  if((await agentProcess.exit) === 0) {
-    if(response === null) {
-      throw new Error("Received error response from agent");
-    } else if(response.type === 'LogMsg') {
-      const log = response as LogMsg;
-      throw new Error("`" + log.message + "`");
-    } else  {
-      return response;
-    }
-  } else  {
-    // If the agent exited with a non-zero code then it failed to actually write a response to stdout: 
-    // Since the agent in its current form catches all panics and other errors it should always return exit code 0
-    // Hence, the agent is most likely corrupt or not executable for some other reason.
-    // We will delete the agent before we quit so it is redownloaded next time MBF is restarted.
-    await adb.subprocess.spawnAndWait("rm " + AgentPath)
+  // "None" protocol is necessary as we pass input strings longer than one line in terminal sometimes
+  // So using the shell protocol can cause messages to fail: particularly, when patching the game,
+  // we need to send the whole manifest over.
+  // Unfortunately, it seems yume chan ADB doesn't support getting the exit code from the none protocol, so we can't tell if the
+  // agent quit prematurely.
 
-    throw new Error("Failed to invoke agent: is the executable corrupt or permissions not properly set?\nThe agent has been deleted automatically: refresh the page and the agent will be redownloaded, hopefully fixing the problem: \n" + 
-      await agentProcess.stderr
-        .pipeThrough(new TextDecoderStream())
-        .pipeThrough(new ConcatStringStream()))
+  // Don't worry too much! The agent should always return 0, even if it encounters an error, since errors are sent via a JSON message.
+
+  if(response === null) {
+    throw new Error("Received error response from agent");
+  } else if(response.type === 'LogMsg') {
+    const log = response as LogMsg;
+    throw new Error("`" + log.message + "`");
+  } else  {
+    return response;
   }
 }
 

@@ -68,8 +68,7 @@ async function tryDisconnectAdb() {
 }
 
 export async function getAndroidVersion(device: Adb) {
-  const result = await device.subprocess.spawnAndWait("getprop ro.build.version.release");
-  return Number(result.stdout.trim());
+  return Number((await device.subprocess.noneProtocol.spawnWaitText("getprop ro.build.version.release")));
 }
 
 function ChooseDevice() {
