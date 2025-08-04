@@ -25,7 +25,7 @@ interface DeviceModderProps {
 }
 
 export async function uninstallBeatSaber(device: Adb) {
-    await device.subprocess.spawnAndWait(`pm uninstall ${gameId}`);
+    await device.subprocess.noneProtocol.spawnWait(`pm uninstall ${gameId}`);
 }
 
 const isDeveloperUrl: boolean = new URLSearchParams(window.location.search).get("dev") === "true";
