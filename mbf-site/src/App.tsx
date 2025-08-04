@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+/// <reference types="w3c-web-usb" />
+import { useRef, useState } from 'react';
 
 import './css/App.css';
 import { AdbDaemonWebUsbConnection, AdbDaemonWebUsbDeviceManager } from '@yume-chan/adb-daemon-webusb';
