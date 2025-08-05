@@ -24,6 +24,8 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: 'true'
 
       - name: Agent Hash
         id: agent_hash
@@ -101,6 +103,17 @@ jobs:
         if: steps.site_cache.outputs.cache-hit != 'true'
         with:
           node-version: 20.x
+
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 9.5.0
+          run_install: true
+
+      - name: Build webadb
+        run: cd ./ya-webadb && pnpm run build
+
+      - name: Link dependencies
+        run: cd ./ya-webadb/libraries/adb && yarn link && cd ../adb-daemon-webusb && yarn link && cd ../../mbf-site && yarn link "@yume-chan/adb" && yarn link "@yume-chan/adb-daemon-webusb"
 
       - name: Modules Cache
         if: steps.site_cache.outputs.cache-hit != 'true'
