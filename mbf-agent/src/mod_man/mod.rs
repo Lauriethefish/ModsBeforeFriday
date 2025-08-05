@@ -689,11 +689,6 @@ impl<'cache> ModManager<'cache> {
                 Some(dep_rc) => {
                     let dep_ref = dep_rc.borrow();
 
-                    // Check if the dependency is within the required version range, if not then the mod definitely isn't installed.
-                    if !dependency.version_range.matches(&dep_ref.manifest().version) {
-                        return Ok(false);
-                    }
-
                     // If the dependency exists and is within the required range, we need to verify that it is installed also
                     if !match dep_ref.installed {
                         None => {
@@ -703,10 +698,14 @@ impl<'cache> ModManager<'cache> {
                         }
                         Some(installed) => installed,
                     } {
+                        // If dependency not installed, mod is installed only if the dependency is optional (i.e. non required)
+                        return Ok(!dependency.required);
+                    }   else if !dependency.version_range.matches(&dep_rc.borrow().manifest().version) { // If dependency is installed
+                        // If dependency not within required range needs fixing no matter if the dependency is required.
                         return Ok(false);
                     }
                 }
-                None => return Ok(false),
+                None => return Ok(!dependency.required), // If dependency not present, the mod is still installed if the dependency isn't required
             }
         }
 
