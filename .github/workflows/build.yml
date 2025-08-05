@@ -108,9 +108,11 @@ jobs:
         with:
           version: 9.5.0
           run_install: true
+      - name: Get WebADB dependencies
+        run: pnpm install
 
       - name: Build webadb
-        run: cd ./ya-webadb && pnpm run build
+        run: cd ./ya-webadb && pnpm build
 
       - name: Link dependencies
         run: cd ./ya-webadb/libraries/adb && yarn link && cd ../adb-daemon-webusb && yarn link && cd ../../mbf-site && yarn link "@yume-chan/adb" && yarn link "@yume-chan/adb-daemon-webusb"
