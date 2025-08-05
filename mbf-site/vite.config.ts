@@ -12,10 +12,7 @@ export default defineConfig({
         https: true,
     },
     build: {
-        sourcemap: true,
-        rollupOptions: {
-            external: "@yume-chan/async"
-        }
+        sourcemap: true
     },
     resolve: {
     }

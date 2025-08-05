@@ -1,5 +1,5 @@
-import { AdbSync, AdbSyncWriteOptions, Adb, encodeUtf8, packetListeners, AdbPacketData, AdbCommand } from '@yume-chan/adb';
-import { Consumable, ConcatStringStream, TextDecoderStream, MaybeConsumable, ReadableStream } from '@yume-chan/stream-extra';
+import { AdbSync, AdbSyncWriteOptions, Adb, encodeUtf8, AdbPacketData, AdbCommand } from "@yume-chan/adb";
+import { Consumable, TextDecoderStream, MaybeConsumable, ReadableStream } from "@yume-chan/stream-extra";
 import { Request, Response, LogMsg, ModStatus, Mods, FixedPlayerData, ImportResult, DowngradedManifest, Patched, ModSyncResult, AgentParameters } from "./Messages";
 import { AGENT_SHA1 } from './agent_manifest';
 import { toast } from 'react-toastify';
@@ -63,8 +63,8 @@ function adbPacketToString(data: AdbPacketData): string {
 }
 
 export function installLoggers() {
-  packetListeners.onPacketRead = packet => console.log("READ: " + adbPacketToString(packet));
-  packetListeners.onPacketWritten = packet => console.log("Sent: " + adbPacketToString(packet));
+  //packetListeners.onPacketRead = packet => console.log("READ: " + adbPacketToString(packet));
+  //packetListeners.onPacketWritten = packet => console.log("Sent: " + adbPacketToString(packet));
 }
 
 export async function overwriteAgent(adb: Adb) {
