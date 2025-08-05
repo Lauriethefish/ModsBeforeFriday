@@ -111,7 +111,10 @@ jobs:
       - name: pnpm install
         run: cd mbf-site && pnpm install
 
-      - name: yarn build
+      - name: pnpm build (ya-webadb)
+        run: cd ya-webadb && pnpm build
+
+      - name: pnpm build
         run: cd mbf-site && pnpm build
 
       - name: Setup Pages
