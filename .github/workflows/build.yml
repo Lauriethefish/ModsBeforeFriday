@@ -113,9 +113,6 @@ jobs:
       - name: Build webadb
         run: cd ./ya-webadb && pnpm build
 
-      - name: Link dependencies
-        run: cd ./ya-webadb/libraries/adb && yarn link && cd ../adb-daemon-webusb && yarn link && cd ../../../mbf-site && yarn link "@yume-chan/adb" && yarn link "@yume-chan/adb-daemon-webusb"
-
       #- name: Modules Cache
       #  if: steps.site_cache.outputs.cache-hit != 'true'
       #  id: modules_cache
