@@ -107,30 +107,12 @@ jobs:
       - uses: pnpm/action-setup@v2
         with:
           version: 9.5.0
-      - name: Get WebADB dependencies
-        run: cd ./ya-webadb && pnpm install
 
-      - name: Build webadb
-        run: cd ./ya-webadb && pnpm build
-
-      #- name: Modules Cache
-      #  if: steps.site_cache.outputs.cache-hit != 'true'
-      #  id: modules_cache
-      #  uses: actions/cache@v4
-      #  with:
-      #    key: site-modules-${{ hashFiles('mbf-site/yarn.lock')}}
-     #     path: |
-     #       mbf-site/node_modules"""
-
-      - name: yarn install
-        if: steps.modules_cache.outputs.cache-hit != 'true' && steps.site_cache.outputs.cache-hit != 'true'
-        run: yarn --cwd ./mbf-site install
+      - name: pnpm install
+        run: cd mbf-site && pnpm install
 
       - name: yarn build
-        if: steps.site_cache.outputs.cache-hit != 'true'
-        run: |
-          find mbf-site -type f
-          yarn --cwd ./mbf-site build
+        run: cd mbf-site && pnpm build
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
