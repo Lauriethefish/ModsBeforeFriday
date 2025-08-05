@@ -108,11 +108,14 @@ jobs:
         with:
           version: 9.5.0
 
-      - name: pnpm install
-        run: cd mbf-site && pnpm install
+      - name: pnpm install (ya-webadb)
+        run: cd ya-webadb && pnpm install
 
       - name: pnpm build (ya-webadb)
         run: cd ya-webadb && pnpm build
+
+      - name: pnpm install
+        run: cd mbf-site && pnpm install
 
       - name: pnpm build
         run: cd mbf-site && pnpm build
