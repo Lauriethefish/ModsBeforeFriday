@@ -109,7 +109,7 @@ jobs:
           version: 9.5.0
           run_install: true
       - name: Get WebADB dependencies
-        run: pnpm install
+        run: cd ./ya-webadb && pnpm install
 
       - name: Build webadb
         run: cd ./ya-webadb && pnpm build
