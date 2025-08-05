@@ -11,7 +11,7 @@ import { ErrorModal } from './components/Modal';
 import { Bounce, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { CornerMenu } from './components/CornerMenu';
-import { setCoreModOverrideUrl } from './Agent';
+import { installLoggers, setCoreModOverrideUrl } from './Agent';
 import { Log } from './Logging';
 import { OperationModals } from './components/OperationModals';
 import { OpenLogsButton } from './components/OpenLogsButton';
@@ -39,6 +39,7 @@ async function connect(
     }
 
     connection = await quest.connect();
+    installLoggers();
   } catch(err) {
     if(String(err).includes("The device is already in used")) {
       Log.warn("Full interface error: " + err);

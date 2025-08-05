@@ -20,7 +20,6 @@ function readableStreamFromByteArray(array: Uint8Array): ReadableStream<Uint8Arr
 }
 
 export async function prepareAgent(adb: Adb) {
-  installLoggers();
   Log.info("Preparing agent: used to communicate with your Quest.");
 
   Log.debug("Latest agent SHA1 " + AGENT_SHA1);
@@ -63,10 +62,9 @@ function adbPacketToString(data: AdbPacketData): string {
   return `ADB command: ${commandString}, arg0: ${data.arg0}, arg1: ${data.arg1}, payload size: ${data.payload.length}`;
 }
 
-function installLoggers() {
+export function installLoggers() {
   packetListeners.onPacketRead = packet => console.log("READ: " + adbPacketToString(packet));
   packetListeners.onPacketWritten = packet => console.log("Sent: " + adbPacketToString(packet));
-
 }
 
 export async function overwriteAgent(adb: Adb) {

@@ -15,6 +15,5 @@ export default defineConfig({
         sourcemap: true
     },
     resolve: {
-        preserveSymlinks: true
     }
 });
