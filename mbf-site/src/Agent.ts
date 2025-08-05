@@ -1,4 +1,4 @@
-import { AdbSync, AdbSyncWriteOptions, Adb, encodeUtf8, AdbShellProtocolProcessImpl } from '@yume-chan/adb';
+import { AdbSync, AdbSyncWriteOptions, Adb, encodeUtf8, packetListeners, AdbPacketData, AdbCommand } from '@yume-chan/adb';
 import { Consumable, ConcatStringStream, TextDecoderStream, MaybeConsumable, ReadableStream } from '@yume-chan/stream-extra';
 import { Request, Response, LogMsg, ModStatus, Mods, FixedPlayerData, ImportResult, DowngradedManifest, Patched, ModSyncResult, AgentParameters } from "./Messages";
 import { AGENT_SHA1 } from './agent_manifest';
@@ -20,6 +20,7 @@ function readableStreamFromByteArray(array: Uint8Array): ReadableStream<Uint8Arr
 }
 
 export async function prepareAgent(adb: Adb) {
+  installLoggers();
   Log.info("Preparing agent: used to communicate with your Quest.");
 
   Log.debug("Latest agent SHA1 " + AGENT_SHA1);
@@ -34,6 +35,38 @@ export async function prepareAgent(adb: Adb) {
   } else  {
     await overwriteAgent(adb);
   }
+}
+
+function adbPacketToString(data: AdbPacketData): string {
+  let commandString: string = "<unknown>";
+  switch(data.command) {
+    case AdbCommand.Auth:
+      commandString = "AUTH";
+      break;
+    case AdbCommand.Close:
+      commandString = "CLSE";
+      break;
+    case AdbCommand.Connect:
+      commandString = "CNXN";
+      break;
+    case AdbCommand.Okay:
+      commandString = "OKAY";
+      break;
+    case AdbCommand.Open:
+      commandString = "OPEN";
+      break;
+    case AdbCommand.Write:
+      commandString = "WRTE";
+      break;
+  }
+
+  return `ADB command: ${commandString}, arg0: ${data.arg0}, arg1: ${data.arg1}, payload size: ${data.payload.length}`;
+}
+
+function installLoggers() {
+  packetListeners.onPacketRead = packet => console.log("READ: " + adbPacketToString(packet));
+  packetListeners.onPacketWritten = packet => console.log("Sent: " + adbPacketToString(packet));
+
 }
 
 export async function overwriteAgent(adb: Adb) {
