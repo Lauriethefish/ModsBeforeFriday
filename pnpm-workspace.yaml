@@ -1,5 +1,5 @@
 packages:
-  - ./ya-webadb/apps/*
-  - ./ya-webadb/libraries/*
-  - ./ya-webadb/toolchain/*
-  - ./mbf-site
+  - ya-webadb/apps/*
+  - ya-webadb/libraries/*
+  - ya-webadb/toolchain/*
+  - mbf-site
