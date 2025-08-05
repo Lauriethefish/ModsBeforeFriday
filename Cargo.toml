@@ -1,11 +1,12 @@
 [workspace]
 resolver = "2"
 
-members = [ 
+members = [
     "mbf-adb-killer",
-    "mbf-agent",
+    "mbf-agent-core",
+    "mbf-agent-runnable",
     "mbf-res-man",
-    "mbf-zip",    
+    "mbf-zip",
 ]
 
 [profile.dev.package."*"]

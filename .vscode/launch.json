@@ -11,7 +11,7 @@
             "cargo": {
                 "args": [
                     "build",
-                    "--manifest-path=mbf-agent/Cargo.toml"
+                    "--manifest-path=mbf-agent-runnable/Cargo.toml"
                 ]
             },
             "args": []

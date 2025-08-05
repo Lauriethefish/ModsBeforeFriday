@@ -10,7 +10,7 @@ $TARGET = "aarch64-linux-android"
 $OutputDirectory = "$PSScriptRoot/mbf-site/public"
 $AgentDetailsOutputPath = "$PSScriptRoot/mbf-site/src/agent_manifest.ts"
 $OutputPath = "$OutputDirectory/mbf-agent"
-$CargoManifestPath = "$PSScriptRoot/mbf-agent/Cargo.toml"
+$CargoManifestPath = "$PSScriptRoot/mbf-agent-runnable/Cargo.toml"
 
 $Command = "cargo build --manifest-path `"$CargoManifestPath`" --target $TARGET"
 if ( $release -eq $true )
