@@ -47,7 +47,7 @@ export function LogWindow() {
                 .filter(event => {
                     const isDebug = event.level == 'Debug' || event.level == 'Trace';
 
-                    return !isDebug || enableDebugLogs;
+                    return (!isDebug || enableDebugLogs) && event.level !== 'Trace'; // Disable trace logs as these log every USB packet
                 })
                 .map((event, idx) => <LogItem event={event} key={idx} />)}
 

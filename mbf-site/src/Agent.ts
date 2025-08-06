@@ -63,8 +63,8 @@ function adbPacketToString(data: AdbPacketData): string {
 }
 
 export function installLoggers() {
-  packetListeners.onPacketRead = packet => console.log("READ: " + adbPacketToString(packet));
-  packetListeners.onPacketWritten = packet => console.log("Sent: " + adbPacketToString(packet));
+  packetListeners.onPacketRead = packet => Log.trace("READ: " + adbPacketToString(packet));
+  packetListeners.onPacketWritten = packet => Log.trace("Sent: " + adbPacketToString(packet));
 }
 
 export async function overwriteAgent(adb: Adb) {
