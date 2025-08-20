@@ -137,7 +137,7 @@ function prepareModRepoForDisplay(mods: ModRepoMod[],
                 && !existingInstall.is_core,
             mod: mod
         };
-    }).filter(mod => mod.needUpdate || (!mod.alreadyInstalled && !mod.mod.global)) // Skip any mods that are already installed and up to date, or global mods
+    }).filter(mod => mod.needUpdate || (!mod.alreadyInstalled && !mod.mod.global && !mod.mod.isLibrary)) // Skip any mods that are already installed and up to date, or global mods, or library mods
     .sort((a, b) => {
         // Show mods that need an update first in the list
         if(!a.needUpdate && b.needUpdate) {
