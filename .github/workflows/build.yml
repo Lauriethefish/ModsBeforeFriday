@@ -27,6 +27,17 @@ jobs:
         with:
           submodules: 'true'
 
+      - name: Set BASE_URL
+        run: |
+          if [ "${{ github.repository_owner }}" = "Lauriethefish" ]; then
+            BASE_URL=./
+          else
+            BASE_URL=/ModsBeforeFriday/
+          fi
+      
+          echo "BASE_URL=$BASE_URL" >> $GITHUB_ENV   # export for subsequent steps
+          echo "Using BASE_URL=$BASE_URL"           # local log
+
       - name: Agent Hash
         id: agent_hash
         run: |
