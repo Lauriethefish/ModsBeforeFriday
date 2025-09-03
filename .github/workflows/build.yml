@@ -24,6 +24,8 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: 'true'
 
       - name: Agent Hash
         id: agent_hash
@@ -102,24 +104,21 @@ jobs:
         with:
           node-version: 20.x
 
-      - name: Modules Cache
-        if: steps.site_cache.outputs.cache-hit != 'true'
-        id: modules_cache
-        uses: actions/cache@v4
+      - uses: pnpm/action-setup@v2
         with:
-          key: site-modules-${{ hashFiles('mbf-site/yarn.lock')}}
-          path: |
-            mbf-site/node_modules
+          version: 9.5.0
 
-      - name: yarn install
-        if: steps.modules_cache.outputs.cache-hit != 'true' && steps.site_cache.outputs.cache-hit != 'true'
-        run: yarn --cwd ./mbf-site install
+      - name: pnpm install 
+        run: pnpm install
 
-      - name: yarn build
-        if: steps.site_cache.outputs.cache-hit != 'true'
-        run: |
-          find mbf-site -type f
-          yarn --cwd ./mbf-site build
+      - name: pnpm build
+        run: pnpm recursive run build
+
+      - name: pnpm install
+        run: cd mbf-site && pnpm install
+
+      - name: pnpm build
+        run: cd mbf-site && pnpm build
 
       - name: Setup Pages
         uses: actions/configure-pages@v4

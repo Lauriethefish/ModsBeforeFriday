@@ -1,3 +1,9 @@
 target/
 .yarn-integrity
 package-id-work/
+
+multi-user.ps1
+multiple-accounts.md
+
+mbf-usb-driver-fix/*
+node_modules/**

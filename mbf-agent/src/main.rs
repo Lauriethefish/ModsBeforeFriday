@@ -6,13 +6,15 @@ mod manifest;
 mod mod_man;
 mod models;
 mod patching;
-mod paths;
+mod parameters;
+mod downgrading;
 
 use anyhow::{Context, Result};
 use downloads::DownloadConfig;
 use log::{debug, error, warn, Level};
 use mbf_res_man::res_cache::ResCache;
 use models::{request, response};
+use parameters::{init_parameters, PARAMETERS};
 use serde::{Deserialize, Serialize};
 use std::{
     io::{BufRead, BufReader, Write},
@@ -22,9 +24,6 @@ use std::{
     sync,
 };
 
-/// The ID of the APK file that MBF manages.
-pub const APK_ID: &str = "com.beatgames.beatsaber";
-
 #[cfg(feature = "request_timing")]
 use log::info;
 #[cfg(feature = "request_timing")]
@@ -33,7 +32,7 @@ use std::time::Instant;
 /// Attempts to delete legacy directories no longer used by MBF to free up space
 /// Logs on failure
 pub fn try_delete_legacy_dirs() {
-    for dir in paths::LEGACY_DIRS {
+    for dir in &PARAMETERS.legacy_dirs {
         if Path::new(dir).exists() {
             match std::fs::remove_dir_all(dir) {
                 Ok(_) => debug!("Successfully removed legacy dir {dir}"),
@@ -62,16 +61,16 @@ pub fn get_dl_cfg() -> &'static DownloadConfig<'static> {
 /// Creates a ResCache for downloading files using mbf_res_man
 /// This should be reused where possible.
 pub fn load_res_cache() -> Result<ResCache<'static>> {
-    std::fs::create_dir_all(paths::RES_CACHE).expect("Failed to create resource cache folder");
+    std::fs::create_dir_all(&PARAMETERS.res_cache).expect("Failed to create resource cache folder");
     Ok(ResCache::new(
-        paths::RES_CACHE.into(),
+        (&PARAMETERS.res_cache).into(),
         mbf_res_man::default_agent::get_agent(),
     ))
 }
 
 pub fn get_apk_path() -> Result<Option<String>> {
     let pm_output = Command::new("pm")
-        .args(["path", APK_ID])
+        .args(["path", &PARAMETERS.apk_id])
         .output()
         .context("Working out APK path")?;
     if 8 > pm_output.stdout.len() {
@@ -152,6 +151,9 @@ fn main() -> Result<()> {
     let mut line = String::new();
     reader.read_line(&mut line)?;
     let req: request::Request = serde_json::from_str(&line)?;
+
+    // Set the parameters for this instance of the agent
+    init_parameters(&req.agent_parameters.game_id, req.agent_parameters.ignore_package_id);
 
     // Set a panic hook that writes the panic as a JSON Log
     // (we don't do this in catch_unwind as we get an `Any` there, which doesn't implement Display)

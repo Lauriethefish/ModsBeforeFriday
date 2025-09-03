@@ -1,3 +1,4 @@
+/// <reference types="w3c-web-usb" />
 import { useEffect, useRef, useState } from 'react';
 
 import './css/App.css';
@@ -10,17 +11,18 @@ import { ErrorModal } from './components/Modal';
 import { Bounce, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { CornerMenu } from './components/CornerMenu';
-import { setCoreModOverrideUrl } from './Agent';
+import { installLoggers, setCoreModOverrideUrl } from './Agent';
 import { Log } from './Logging';
 import { OperationModals } from './components/OperationModals';
 import { OpenLogsButton } from './components/OpenLogsButton';
-import { usingOculusBrowser } from './platformDetection';
+import { isViewingOnMobile, isViewingOnWindows, usingOculusBrowser } from './platformDetection';
 import { bridgeData, checkForBridge } from './AdbServerWebSocketConnector';
 import { waitForDisconnect } from "./waitForDisconnect";
 import { BridgeManager } from './BridgeManager';
-import { AllowAuth, DeviceInUse, NoCompatibleDevices, OculusBrowserMessage, OldOsVersion, QuestOneNotSupported, Title, UnsupportedMessage } from './AppMessages';
+import { AllowAuth, AskLaurie, DeviceInUse, NoCompatibleDevices, OculusBrowserMessage, OldOsVersion, QuestOneNotSupported, Title, UnsupportedMessage } from './AppMessages';
 import { PagePinger } from './PagePinger';
 import { useDeviceStore } from './DeviceStore';
+import { SourceUrl } from '.';
 
 type NoDeviceCause = "NoDeviceSelected" | "DeviceInUse";
 
@@ -58,8 +60,10 @@ async function connect(
     }
 
     connection = await quest.connect();
+    installLoggers();
   } catch(err) {
-    if(String(err).includes("Unable to claim interface")) {
+    if(String(err).includes("The device is already in used")) {
+      Log.warn("Full interface error: " + err);
       // Some other ADB daemon is hogging the connection, so we can't get to the Quest.
       return "DeviceInUse";
     } else  {
@@ -98,8 +102,7 @@ async function tryDisconnectAdb() {
  *          The version is extracted from the device's system property `ro.build.version.release`.
  */
 export async function getAndroidVersion(device: Adb) {
-  const result = await device.subprocess.spawnAndWait("getprop ro.build.version.release");
-  return Number(result.stdout.trim());
+  return Number((await device.subprocess.noneProtocol.spawnWaitText("getprop ro.build.version.release")));
 }
 
 type SetStateAction<T> = React.Dispatch<React.SetStateAction<T>>;
@@ -290,7 +293,6 @@ function ChooseDevice() {
   });
 
   if(chosenDevice !== null) {
-    Log.debug("Device model: " + chosenDevice.banner.model);
     return <>
       { bridgeClient && <PagePinger url={bridgeData.pingAddress} interval={5000} /> }
       <DeviceModder quit={(err) => {
@@ -310,7 +312,8 @@ function ChooseDevice() {
       <div className="container mainContainer">
         <Title />
         <p>To get started, plug your Quest in with a USB-C cable and click the button below.</p>
-
+          <p>Want see what mods are available? You can find a full list <a href="https://mods.bsquest.xyz" target="_blank" rel="noopener noreferrer">here!</a></p>
+         
         <NoCompatibleDevices />
 
         {bridgeClient && <>
@@ -334,10 +337,12 @@ function ChooseDevice() {
           </div>
         </>}
 
-        <ErrorModal isVisible={connectError != null}
-          title="Failed to connect to device"
-          description={connectError}
-          onClose={() => setConnectError(null)}/>
+          <ErrorModal isVisible={connectError != null}
+            title="Failed to connect to device"
+            description={connectError}
+            onClose={() => setConnectError(null)}>
+              <AskLaurie />
+          </ErrorModal>
 
         <ErrorModal isVisible={deviceInUse}
           onClose={() => setDeviceInUse(false)}

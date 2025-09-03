@@ -109,6 +109,12 @@ h1:hover > .williamGay {
     display: none;
 }
 
+button, .tab-header {
+    cursor: pointer;
+    user-select: none;
+    text-transform: capitalize;
+}
+
 @media screen and (max-width: 1200px) {
     .mobileOnly {
         display: inline;

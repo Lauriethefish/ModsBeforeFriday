@@ -7,11 +7,13 @@ export default defineConfig({
     base: process.env.BASE_URL ?? './',
     plugins: [react(), viteTsconfigPaths(), mkcert()],
     server: {
-        open: true,
+        open: process.env.BROWSER='chrome',
         port: 3000,
-        https: true
+        https: true,
     },
     build: {
         sourcemap: true
+    },
+    resolve: {
     }
-})
+});

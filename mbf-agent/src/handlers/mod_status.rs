@@ -4,17 +4,12 @@ use std::{fs::File, io::Cursor};
 
 use log::{error, info, warn};
 use mbf_res_man::{
-    models::{CoreMod, VersionDiffs},
-    res_cache::{self, ResCache},
+    external_res, models::{CoreMod, VersionDiffs}, res_cache::{self, ResCache}
 };
 use mbf_zip::ZipFile;
 
 use crate::{
-    axml::{self, AxmlReader},
-    manifest::ManifestInfo,
-    mod_man::ModManager,
-    models::response::{self, CoreModsInfo, Response},
-    patching,
+    axml::{self, AxmlReader}, downgrading, manifest::ManifestInfo, mod_man::ModManager, models::response::{self, CoreModsInfo, Response}, patching
 };
 use anyhow::{Context, Result};
 
@@ -165,16 +160,12 @@ fn get_core_mods_info(
         // even if there was a diff available.
         (Vec::new(), false)
     } else {
-        let diff_index = mbf_res_man::external_res::get_diff_index(res_cache)
-            .context("Fetching downgrading information")?;
+        let diff_index = downgrading::get_all_accessible_versions(res_cache, apk_version)
+            .context("Formatting downgrading information")?;
 
-        let newer_than_latest = is_version_newer_than_latest_diff(apk_version, &diff_index);
+        let newer_than_latest = is_version_newer_than_latest_diff(apk_version, &external_res::get_diff_index(res_cache)?);
         (
-            diff_index
-                .into_iter()
-                .filter(|diff| diff.from_version == apk_version)
-                .map(|diff| diff.to_version)
-                .collect(),
+            diff_index.into_keys().collect(),
             newer_than_latest,
         )
     };

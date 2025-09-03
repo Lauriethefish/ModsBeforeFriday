@@ -1,25 +1,17 @@
 use std::{
-    fs::{File, OpenOptions},
-    io::{BufReader, BufWriter, Cursor, Read, Write},
-    path::{Path, PathBuf},
-    process::Command,
+    ffi::OsStr, fs::{File, OpenOptions}, io::{Cursor, Read, Write}, path::{Path, PathBuf}, process::Command
 };
 
 use crate::{
-    axml::{self, AxmlWriter},
-    data_fix::fix_colour_schemes,
-    downloads,
-    models::response::{AppInfo, InstallStatus, ModLoader},
-    paths, ModTag, APK_ID,
+    axml::{self, AxmlWriter}, data_fix::fix_colour_schemes, downgrading, downloads, models::response::{AppInfo, InstallStatus, ModLoader}, parameters::PARAMETERS, ModTag
 };
-use anyhow::{anyhow, Context, Result};
-use log::{info, warn};
+use anyhow::{Context, Result};
+use log::{debug, info, warn};
 use mbf_res_man::{
     external_res,
-    models::{Diff, VersionDiffs},
     res_cache::ResCache,
 };
-use mbf_zip::{signing, FileCompression, ZipFile, ZIP_CRC};
+use mbf_zip::{signing, FileCompression, ZipFile};
 
 const DEBUG_CERT_PEM: &[u8] = include_bytes!("debug_cert.pem");
 const LIB_MAIN: &[u8] = include_bytes!("../libs/libmain.so");
@@ -37,22 +29,25 @@ const LIB_OVR_PATH: &str = "lib/arm64-v8a/libovrplatformloader.so";
 // 4 is the standard value.
 const STORE_ALIGNMENT: u16 = 4;
 
-// Mods the currently installed version of the given app and reinstalls it, without doing any downgrading.
+// Mods the given app and reinstalls it, optionally applying patches to downgrade the game, if `downgrade_to` is not None.
 // If `manifest_only` is true, patching will only overwrite the manifest and will not add a modloader.
-pub fn mod_current_apk(
+// If this returns true, reinstalling the game deleted installed DLC, which will need to be redownloaded.
+pub fn mod_beat_saber(
     temp_path: &Path,
     app_info: &AppInfo,
+    downgrade_to: Option<String>,
     manifest_mod: String,
     manifest_only: bool,
     device_pre_v51: bool,
     vr_splash_path: Option<&str>,
     res_cache: &ResCache,
-) -> Result<()> {
+) -> Result<bool> {
     let libunity_path = if manifest_only {
         None
     } else {
         info!("Downloading unstripped libunity.so (this could take a minute)");
-        save_libunity(res_cache, temp_path, &app_info.version).context("Preparing libunity.so")?
+        save_libunity(res_cache, temp_path, downgrade_to.as_ref().unwrap_or(&app_info.version))
+            .context("Preparing libunity.so")?
     };
 
     kill_app().context("Killing Beat Saber")?;
@@ -63,17 +58,28 @@ pub fn mod_current_apk(
 
     // Make sure the APK is writable.  Sometimes Android will mark it as read-only and
     // the resulting copy will inherit those permissions.
-    {
-        let mut permissions = std::fs::metadata(&temp_apk_path).context("Reading temp APK permissions")?.permissions();
-        permissions.set_readonly(false);
-        std::fs::set_permissions(&temp_apk_path, permissions).context("Making temp APK writable")?;
-    }
+    ensure_can_write_apk(&temp_apk_path).context("Marking APK as writable")?;
 
     info!("Saving OBB files");
     let obb_backup = temp_path.join("obbs");
     std::fs::create_dir_all(&obb_backup)?;
-    let obb_backups =
-        save_obbs(Path::new(paths::OBB_DIR), &obb_backup).context("Saving OBB files")?;
+    let mut obb_backups =
+        save_obbs(Path::new(&PARAMETERS.obb_dir), &obb_backup,
+        downgrade_to.is_none()).context("Saving OBB files")?;
+
+    // Beat Saber DLC asset files do not have the .obb suffix.
+    // If there are any DLC, then these have been deleted by the patching process so we return true so that the user can later be informed of this.
+    // They just need to redownload the relevant DLC - they aren't deleted permanently.
+    let contains_dlc = has_file_with_no_extension(&PARAMETERS.obb_dir).context("Checking for DLC")?;
+
+    // Determine a diff sequence and apply it, if we're downgrading
+    if let Some(to_version) = downgrade_to.clone() {
+        obb_backups = downgrading::get_and_apply_diff_sequence(&app_info.version,
+            &to_version,
+            temp_path,
+            &temp_apk_path,
+            obb_backups, res_cache).context("Downgrading game")?;
+    }
 
     patch_and_reinstall(
         libunity_path,
@@ -85,80 +91,15 @@ pub fn mod_current_apk(
         vr_splash_path,
     )
     .context("Patching and reinstalling APK")?;
-    Ok(())
+
+    Ok(contains_dlc && downgrade_to.is_some()) // We only delete DLC if we're downgrading.
 }
 
-// Downgrades the APK/OBB files for the given app using the diffs provided, then reinstalls the app.
-// Returns true if any DLC were found while modding the APK, false otherwise.
-pub fn downgrade_and_mod_apk(
-    temp_path: &Path,
-    app_info: &AppInfo,
-    diffs: VersionDiffs,
-    manifest_mod: String,
-    device_pre_v51: bool,
-    vr_splash_path: Option<&str>,
-    res_cache: &ResCache,
-) -> Result<bool> {
-    // Download libunity.so *for the downgraded version*
-    info!("Downloading unstripped libunity.so (this could take a minute)");
-    let libunity_path =
-        save_libunity(res_cache, temp_path, &diffs.to_version).context("Saving libunity.so")?;
-
-    // Download the diff files
-    let diffs_path = temp_path.join("diffs");
-    std::fs::create_dir_all(&diffs_path).context("Creating diffs directory")?;
-    info!("Downloading diffs needed to downgrade Beat Saber (this could take a LONG time, make a cup of tea)");
-    download_diffs(&diffs_path, &diffs).context("Downloading diffs")?;
-
-    kill_app().context("Killing Beat Saber")?;
-
-    // Copy the APK to temp, downgrading it in the process.
-    info!("Downgrading APK");
-    let temp_apk_path = temp_path.join("mbf-downgraded.apk");
-    apply_diff(
-        Path::new(&app_info.path),
-        &temp_apk_path,
-        &diffs.apk_diff,
-        &diffs_path,
-    )
-    .context("Applying diff to APK")?;
-
-    // Downgrade the obb files, copying them to a temporary directory in the process.
-    let obb_backup_dir = temp_path.join("obbs");
-    std::fs::create_dir_all(&obb_backup_dir).context("Creating OBB backup directory")?;
-    let mut obb_backup_paths = Vec::new();
-    for obb_diff in &diffs.obb_diffs {
-        let obb_path = Path::new(paths::OBB_DIR).join(&obb_diff.file_name);
-        if !obb_path.exists() {
-            return Err(anyhow!(
-                "Obb file {} did not exist, is the Beat Saber installation corrupt",
-                obb_diff.file_name
-            ));
-        }
-
-        let obb_backup_path = obb_backup_dir.join(&obb_diff.output_file_name);
-
-        info!("Downgrading obb {}", obb_diff.file_name);
-        apply_diff(&obb_path, &obb_backup_path, obb_diff, &diffs_path)
-            .context("Applying diff to OBB")?;
-        obb_backup_paths.push(obb_backup_path);
-    }
-
-    // Beat Saber DLC asset files do not have the .obb suffix.
-    // If there are any DLC, then these have been deleted by the patching process so we return true so that the user can later be informed of this.
-    let contains_dlc = has_file_with_no_extension(paths::OBB_DIR).context("Checking for DLC")?;
-
-    patch_and_reinstall(
-        libunity_path,
-        &temp_apk_path,
-        obb_backup_paths,
-        manifest_mod,
-        false,
-        device_pre_v51,
-        vr_splash_path,
-    )
-    .context("Patching and reinstall APK")?;
-    Ok(contains_dlc)
+fn ensure_can_write_apk(temp_apk_path: &Path) -> Result<()> {
+    let mut permissions = std::fs::metadata(&temp_apk_path).context("Reading temp APK permissions")?.permissions();
+    permissions.set_readonly(false);
+    std::fs::set_permissions(&temp_apk_path, permissions).context("Making temp APK writable")?;
+    Ok(())
 }
 
 // Returns true if the given folder contains any files with no file extension.
@@ -178,7 +119,7 @@ fn has_file_with_no_extension(obb_dir: impl AsRef<Path>) -> Result<bool> {
 
 pub fn kill_app() -> Result<()> {
     info!("Killing Beat Saber");
-    Command::new("am").args(&["force-stop", APK_ID]).output()?;
+    Command::new("am").args(&["force-stop", &PARAMETERS.apk_id]).output()?;
     Ok(())
 }
 
@@ -202,16 +143,16 @@ fn patch_and_reinstall(
     )
     .context("Patching APK")?;
 
-    if Path::new(paths::PLAYER_DATA).exists() {
+    if Path::new(&PARAMETERS.player_data).exists() {
         info!("Backing up player data");
         backup_player_data().context("Backing up player data")?;
     } else {
         info!("No player data to backup");
     }
 
-    if Path::new(paths::DATAKEEPER_PLAYER_DATA).exists() {
+    if Path::new(&PARAMETERS.datakeeper_player_data).exists() {
         info!("Fixing colour schemes in backed up PlayerData.dat");
-        match fix_colour_schemes(paths::DATAKEEPER_PLAYER_DATA) {
+        match fix_colour_schemes(&PARAMETERS.datakeeper_player_data) {
             Ok(_) => {}
             Err(err) => warn!("Failed to fix colour schemes: {err}"),
         }
@@ -221,7 +162,7 @@ fn patch_and_reinstall(
     std::fs::remove_file(temp_apk_path)?;
 
     info!("Restoring OBB files");
-    restore_obb_files(Path::new(paths::OBB_DIR), obb_paths).context("Restoring OBB files")?;
+    restore_obb_files(Path::new(&PARAMETERS.obb_dir), obb_paths).context("Restoring OBB files")?;
 
     // Player data is not restored back to the `files` directory as we cannot correctly set its permissions so that BS can access it.
     // (which causes a black screen that can only be fixed by manually deleting the file)
@@ -230,18 +171,18 @@ fn patch_and_reinstall(
 }
 
 pub fn backup_player_data() -> Result<()> {
-    info!("Copying to {}", paths::AUX_DATA_BACKUP);
+    info!("Copying to {}", &PARAMETERS.aux_data_backup);
 
-    std::fs::create_dir_all(Path::new(paths::AUX_DATA_BACKUP).parent().unwrap())?;
-    std::fs::copy(paths::PLAYER_DATA, paths::AUX_DATA_BACKUP)?;
+    std::fs::create_dir_all(Path::new(&PARAMETERS.aux_data_backup).parent().unwrap())?;
+    std::fs::copy(&PARAMETERS.player_data, &PARAMETERS.aux_data_backup)?;
 
-    if Path::new(paths::DATAKEEPER_PLAYER_DATA).exists() {
-        warn!("Did not backup PlayerData.dat to datakeeper folder as there was already a PlayerData.dat there. 
-            The player data is still safe in {}", paths::AUX_DATA_BACKUP);
+    if Path::new(&PARAMETERS.datakeeper_player_data).exists() {
+        warn!("Did not backup PlayerData.dat to datakeeper folder as there was already a PlayerData.dat there.
+            The player data is still safe in {}", &PARAMETERS.aux_data_backup);
     } else {
-        info!("Copying to {}", paths::DATAKEEPER_PLAYER_DATA);
-        std::fs::create_dir_all(Path::new(paths::DATAKEEPER_PLAYER_DATA).parent().unwrap())?;
-        std::fs::copy(paths::PLAYER_DATA, paths::DATAKEEPER_PLAYER_DATA)?;
+        info!("Copying to {}", &PARAMETERS.datakeeper_player_data);
+        std::fs::create_dir_all(Path::new(&PARAMETERS.datakeeper_player_data).parent().unwrap())?;
+        std::fs::copy(&PARAMETERS.player_data, &PARAMETERS.datakeeper_player_data)?;
     }
 
     Ok(())
@@ -253,7 +194,7 @@ fn reinstall_modded_app(
 ) -> Result<()> {
     info!("Reinstalling modded app");
     Command::new("pm")
-        .args(["uninstall", APK_ID])
+        .args(["uninstall", &PARAMETERS.apk_id])
         .output()
         .context("Uninstalling vanilla APK")?;
 
@@ -264,91 +205,20 @@ fn reinstall_modded_app(
 
     info!("Granting external storage permission");
     Command::new("appops")
-        .args(["set", "--uid", APK_ID, "MANAGE_EXTERNAL_STORAGE", "allow"])
+        .args(["set", "--uid", &PARAMETERS.apk_id, "MANAGE_EXTERNAL_STORAGE", "allow"])
         .output()?;
 
     // Quest 1 specific permissions
     if device_pre_v51 {
         info!("Granting WRITE_EXTERNAL_STORAGE and READ_EXTERNAL_STORAGE (Quest 1)");
         Command::new("pm")
-            .args(["grant", APK_ID, "android.permission.WRITE_EXTERNAL_STORAGE"])
+            .args(["grant", &PARAMETERS.apk_id, "android.permission.WRITE_EXTERNAL_STORAGE"])
             .output()?;
         Command::new("pm")
-            .args(["grant", APK_ID, "android.permission.READ_EXTERNAL_STORAGE"])
+            .args(["grant", &PARAMETERS.apk_id, "android.permission.READ_EXTERNAL_STORAGE"])
             .output()?;    
     }
 
-    Ok(())
-}
-
-// Reads the content of the given file path as a Vec
-fn read_file_vec(path: impl AsRef<Path>) -> Result<Vec<u8>> {
-    let handle = std::fs::File::open(path)?;
-
-    let mut file_content = Vec::with_capacity(handle.metadata()?.len() as usize);
-    let mut reader = BufReader::new(handle);
-    reader.read_to_end(&mut file_content)?;
-
-    Ok(file_content)
-}
-
-// Loads the file from from_path into memory, verifies it matches the checksum of the given diff,
-// applies the diff and then outputs it to to_path
-fn apply_diff(from_path: &Path, to_path: &Path, diff: &Diff, diffs_path: &Path) -> Result<()> {
-    let diff_content = read_file_vec(diffs_path.join(&diff.diff_name))
-        .context("Diff could not be opened. Was it downloaded")?;
-
-    let patch = qbsdiff::Bspatch::new(&diff_content).context("Diff file was invalid")?;
-
-    let file_content = read_file_vec(from_path).context("Reading diff file from disk")?;
-
-    // Verify the CRC32 hash of the file content.
-    info!("Verifying installation is unmodified");
-    let before_crc = ZIP_CRC.checksum(&file_content);
-    if before_crc != diff.file_crc {
-        return Err(anyhow!("File CRC {} did not match expected value of {}. 
-            Your installation is corrupted, so MBF can't downgrade it. Reinstall Beat Saber to fix this issue!
-            Alternatively, if your game is pirated, purchase a legitimate copy of the game.", before_crc, diff.file_crc));
-    }
-
-    // Carry out the downgrade
-    info!("Applying patch (This step may take a few minutes)");
-    let mut output_handle = BufWriter::new(
-        OpenOptions::new()
-            .truncate(true)
-            .create(true)
-            .read(true)
-            .write(true)
-            .open(to_path)?,
-    );
-    patch.apply(&file_content, &mut output_handle)?;
-
-    // TODO: Verify checksum on the result of downgrading?
-
-    Ok(())
-}
-
-// Downloads the deltas needed for downgrading with the given version_diffs.
-// The diffs are saved with names matching `diff_name` in the `Diff` struct.
-fn download_diffs(to_path: impl AsRef<Path>, version_diffs: &VersionDiffs) -> Result<()> {
-    for diff in version_diffs.obb_diffs.iter() {
-        info!("Downloading diff for OBB {}", diff.file_name);
-        download_diff_retry(diff, &to_path)?;
-    }
-
-    info!("Downloading diff for APK");
-    download_diff_retry(&version_diffs.apk_diff, to_path)?;
-
-    Ok(())
-}
-
-// Attempts to download the given diff DIFF_DOWNLOAD_ATTEMPTS times, returning an error if the final attempt fails.
-fn download_diff_retry(diff: &Diff, to_dir: impl AsRef<Path>) -> Result<()> {
-    let url = external_res::get_diff_url(diff);
-    let output_path = to_dir.as_ref().join(&diff.diff_name);
-
-    downloads::download_file_with_attempts(&crate::get_dl_cfg(), &output_path, &url)
-        .context("Downloading diff file")?;
     Ok(())
 }
 
@@ -357,7 +227,7 @@ fn save_libunity(
     temp_path: impl AsRef<Path>,
     version: &str,
 ) -> Result<Option<PathBuf>> {
-    let url = match external_res::get_libunity_url(res_cache, APK_ID, version)? {
+    let url = match external_res::get_libunity_url(res_cache, &PARAMETERS.apk_id, version)? {
         Some(url) => url,
         None => return Ok(None), // No libunity for this version
     };
@@ -370,17 +240,19 @@ fn save_libunity(
 }
 
 // Moves the OBB file to a backup location and returns the path that the OBB needs to be restored to
-fn save_obbs(obb_dir: &Path, obb_backups_path: &Path) -> Result<Vec<PathBuf>> {
+fn save_obbs(obb_dir: &Path, obb_backups_path: &Path, include_dlc: bool) -> Result<Vec<PathBuf>> {
     let mut paths = Vec::new();
     for err_or_stat in std::fs::read_dir(obb_dir)? {
         if let Ok(stat) = err_or_stat {
             let path = stat.path();
+            if (include_dlc || path.extension() == Some(OsStr::new("obb"))) && path.is_file() {
+                debug!("Saving OBB path {:?}", path);
+                // Make a backup copy of the obb to restore later after patching.
+                let obb_backup_path = obb_backups_path.join(path.file_name().unwrap());
+                std::fs::copy(&path, &obb_backup_path)?;
 
-            // Make a backup copy of the obb to restore later after patching.
-            let obb_backup_path = obb_backups_path.join(path.file_name().unwrap());
-            std::fs::copy(&path, &obb_backup_path)?;
-
-            paths.push(obb_backup_path);
+                paths.push(obb_backup_path);
+            }
         }
     }
 
@@ -404,7 +276,7 @@ fn restore_obb_files(restore_dir: &Path, obb_backups: Vec<PathBuf>) -> Result<()
 }
 
 pub fn get_modloader_path() -> Result<PathBuf> {
-    let modloaders_path = format!("/sdcard/ModData/{APK_ID}/Modloader/");
+    let modloaders_path = format!("{}/", &PARAMETERS.modloader_dir);
 
     std::fs::create_dir_all(&modloaders_path)?;
     Ok(PathBuf::from(modloaders_path).join(MODLOADER_NAME))
@@ -572,12 +444,12 @@ pub fn get_modloader_installed(apk: &mut ZipFile<File>) -> Result<Option<ModLoad
 /// MBF only supports BS versions >1.35.0, which all use OBBs so if the obb is not present
 /// the installation is invalid and we need to prompt the user to uninstall it.
 pub fn check_obb_present() -> Result<bool> {
-    if !Path::new(paths::OBB_DIR).exists() {
+    if !Path::new(&PARAMETERS.obb_dir).exists() {
         return Ok(false);
     }
 
     // Check if any of the files in the OBB directory have extension OBB
-    Ok(std::fs::read_dir(paths::OBB_DIR)?.any(|stat_res| {
+    Ok(std::fs::read_dir(&PARAMETERS.obb_dir)?.any(|stat_res| {
         stat_res.is_ok_and(|path| {
             path.path()
                 .extension()

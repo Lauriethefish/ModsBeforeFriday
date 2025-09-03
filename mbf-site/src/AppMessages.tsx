@@ -1,6 +1,12 @@
 import { SourceUrl } from "."
 import { isViewingOnWindows, isViewingOnMobile, isViewingOnIos } from "./platformDetection"
 
+// I might regret this
+export function AskLaurie() {
+  return <p>If you can't fix the issue, PLEASE hit up <code>Lauriethefish</code> on Discord for further support. We're working on fixing connection/driver issues
+  right now and can only do so with <i>your help!</i></p>
+}
+
 /**
  * Displays a message when an outdated (pre-v51) Quest OS version is detected.
  * Informs the user that mods are not supported on this OS version and prompts them to update.
@@ -51,16 +57,18 @@ export function OldOsVersion() {
    * Provides platform-specific instructions for resolving ADB conflicts.
    */
   export function DeviceInUse() {
-   return <>
-    <p>Some other app is trying to access your Quest, e.g. SideQuest.</p>
-    {isViewingOnWindows() ?
-      <>
-        <p>To fix this, close SideQuest if you have it open, press <span className="codeBox">Win + R</span> and type the following text, and finally press enter.</p>
-        <span className="codeBox">taskkill /IM adb.exe /F</span>
-        <p>Alternatively, restart your computer.</p>
-      </>
-      : <p>To fix this, restart your {isViewingOnMobile() ? "phone" : "computer"}.</p>}
-   </>
+    return <>
+      <p>Some other app is trying to access your Quest, e.g. SideQuest.</p>
+      {isViewingOnWindows() ? 
+        <>
+          <p>To fix this, close SideQuest if you have it open, press <span className="codeBox">Win + R</span> and type the following text, and finally press enter.</p>
+          <span className="codeBox">taskkill /IM adb.exe /F</span>  
+          <p>Alternatively, restart your computer.</p>
+
+          <AskLaurie />
+        </>
+        : <p>To fix this, restart your {isViewingOnMobile() ? "phone" : "computer"}.</p>}
+    </>
   }
 
   /**

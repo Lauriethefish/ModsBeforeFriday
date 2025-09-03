@@ -27,7 +27,7 @@ export async function waitForDisconnect(device: Adb) {
     if (disconnectedEarly) {
         try {
             Log.debug(`Waiting for ${device.serial} to disconnect using subprocess`, device);
-            await device.subprocess.spawnAndWait("read");
+            await device.subprocess.noneProtocol.spawnWait("read");
         } catch (error) {
             console.error("ADB server process exited: " + error, error);
         }

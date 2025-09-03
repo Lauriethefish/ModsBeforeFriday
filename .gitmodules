@@ -1,0 +1,3 @@
+[submodule "ya-webadb"]
+	path = ya-webadb
+	url = https://github.com/Lauriethefish/ya-webadb
