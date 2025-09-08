@@ -5,7 +5,8 @@ members = [
     "mbf-adb-killer",
     "mbf-agent",
     "mbf-res-man",
-    "mbf-zip",    
+    "mbf-zip",
+    "mbf-axml"
 ]
 
 [profile.dev.package."*"]

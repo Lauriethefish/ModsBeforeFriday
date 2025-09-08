@@ -9,8 +9,9 @@ use mbf_res_man::{
 use mbf_zip::ZipFile;
 
 use crate::{
-    axml::{self, AxmlReader}, downgrading, manifest::ManifestInfo, mod_man::ModManager, models::response::{self, CoreModsInfo, Response}, patching
+    downgrading, manifest::ManifestInfo, mod_man::ModManager, models::response::{self, CoreModsInfo, Response}, patching
 };
+use mbf_axml::{self, AxmlReader};
 use anyhow::{Context, Result};
 
 /// Handles `GetModStatus` [Requests](response::Request).
@@ -105,7 +106,7 @@ pub(super) fn axml_bytes_to_xml_string(bytes: &[u8]) -> Result<String> {
         .perform_indent(true)
         .create_writer(Cursor::new(&mut xml_output));
 
-    axml::axml_to_xml(&mut xml_writer, &mut axml_reader).context("Converting AXML to XML")?;
+    mbf_axml::axml_to_xml(&mut xml_writer, &mut axml_reader).context("Converting AXML to XML")?;
 
     Ok(String::from_utf8(xml_output).expect("XML output should be valid UTF-8"))
 }
