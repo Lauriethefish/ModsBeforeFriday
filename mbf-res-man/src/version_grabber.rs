@@ -32,9 +32,9 @@ pub struct ObbInfo {
 // The different Beat Saber builds available for a particular version.
 pub struct VersionBinaries {
     // The build with the newest version code.
-    main: AndroidBinary,
+    pub main: AndroidBinary,
     // Any builds with older version codes.
-    older_versions: Vec<AndroidBinary>,
+    pub older_versions: Vec<AndroidBinary>,
 }
 
 // For the given Beat Saber version, attempts to find an OBB file needed for its installation.
