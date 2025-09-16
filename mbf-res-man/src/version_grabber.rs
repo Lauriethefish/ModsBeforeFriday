@@ -169,17 +169,17 @@ fn download_binaries(
 /// Downloads the Beat Saber version with version name `version`
 /// This will be stored in a directory with name `version` within `output_dir`
 /// Iff `include_older_binaries` is `true`, this will also download Quest 1 only binaries.
-pub fn download_version(
+pub fn download_version<'a>(
     access_token: &str,
-    versions: &HashMap<SemiSemVer, VersionBinaries>,
+    versions: &'a HashMap<SemiSemVer, VersionBinaries>,
     version: &str,
     include_older_binaries: bool,
     to_dir: impl AsRef<Path>,
     skip_existing: bool,
-) -> Result<()> {
+) -> Result<Option<&'a VersionBinaries>> {
     let ver_path = to_dir.as_ref().join(version);
     if ver_path.exists() && skip_existing {
-        return Ok(());
+        return Ok(None);
     }
 
     // Get a map of all available BS versions
@@ -206,7 +206,7 @@ pub fn download_version(
         }
     }
 
-    Ok(())
+    Ok(Some(binaries))
 }
 
 // Downloads the currently available Beat Saber versions (skipping any that already have been downloaded.)
