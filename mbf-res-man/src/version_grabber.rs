@@ -51,15 +51,16 @@ fn get_obb_info(android_bin: &AndroidBinary, access_token: &str) -> Result<Optio
 
 /// Fetches all of the live (i.e. publicly accessible) Beat Saber versions newer than (or equal to) the specified minimum version.
 /// If a version is invalid semver, it will be skipped.
-pub fn get_live_bs_versions(
+pub fn get_live_versions(
     access_token: &str,
     min_version: Version,
+    graph_app_id: &str,
 ) -> Result<HashMap<SemiSemVer, VersionBinaries>> {
     // Each version may potentially have multiple binaries as there may be a quest 1 and quest 2+ binary.
     let mut versions_map: HashMap<String, Vec<AndroidBinary>> = HashMap::new();
 
     info!("Listing all app versions");
-    let resp = oculus_db::list_app_versions(&access_token, BEATSABER_GRAPH_APP_ID)?;
+    let resp = oculus_db::list_app_versions(&access_token, graph_app_id)?;
     for mut binary in resp {
         // Skip non-live releases: these are private.
         if !binary
@@ -224,7 +225,7 @@ pub fn download_bs_versions(
     };
     let output_dir = output_dir.as_ref();
 
-    let versions = get_live_bs_versions(access_token, min_version)?;
+    let versions = get_live_versions(access_token, min_version, BEATSABER_GRAPH_APP_ID)?;
     for (ver, binaries) in &versions {
         if ver.semver > latest_ver.semver {
             latest_ver = ver.clone();
