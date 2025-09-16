@@ -4,10 +4,7 @@ use anyhow::{anyhow, Context, Result};
 use log::{error, info, warn};
 use semver::Version;
 
-use crate::{
-    oculus_db::{self, AndroidBinary, ObbBinary},
-    APK_ID,
-};
+use crate::oculus_db::{self, AndroidBinary, ObbBinary};
 
 const BEATSABER_GRAPH_APP_ID: &str = "2448060205267927";
 
@@ -153,7 +150,7 @@ fn download_binaries(
     to: impl AsRef<Path>,
     suffix: &str,
 ) -> Result<()> {
-    let apk_path = to.as_ref().join(format!("{APK_ID}{suffix}.apk"));
+    let apk_path = to.as_ref().join(format!("{}{suffix}.apk", apk_binary.id));
     info!("Downloading APK");
 
     download_and_warn_on_err(&apk_binary.id, apk_path, access_token);
