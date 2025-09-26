@@ -3,8 +3,9 @@ use std::{
 };
 
 use crate::{
-    axml::{self, AxmlWriter}, data_fix::fix_colour_schemes, downgrading, downloads, models::response::{AppInfo, InstallStatus, ModLoader}, parameters::PARAMETERS, ModTag
+    data_fix::fix_colour_schemes, downgrading, downloads, models::response::{AppInfo, InstallStatus, ModLoader}, parameters::PARAMETERS, ModTag
 };
+use mbf_axml::{self, AxmlWriter};
 use anyhow::{Context, Result};
 use log::{debug, info, warn};
 use mbf_res_man::{
@@ -464,7 +465,7 @@ fn patch_manifest(zip: &mut ZipFile<File>, additional_properties: String) -> Res
     let mut data_output = Cursor::new(Vec::new());
     let mut axml_writer = AxmlWriter::new(&mut data_output);
 
-    axml::xml_to_axml(&mut axml_writer, &mut xml_reader)
+    mbf_axml::xml_to_axml(&mut axml_writer, &mut xml_reader)
         .context("Converting XML back to (binary) AXML")?;
     axml_writer
         .finish()

@@ -790,6 +790,7 @@ dependencies = [
  "const_format",
  "jsonschema",
  "log",
+ "mbf-axml",
  "mbf-res-man",
  "mbf-zip",
  "qbsdiff",
@@ -798,6 +799,15 @@ dependencies = [
  "serde",
  "serde_json",
  "ureq",
+ "xml",
+]
+
+[[package]]
+name = "mbf-axml"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "byteorder",
  "xml",
 ]
 
@@ -1820,9 +1830,9 @@ dependencies = [
 
 [[package]]
 name = "xml-rs"
-version = "0.8.20"
+version = "0.8.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "791978798f0597cfc70478424c2b4fdc2b7a8024aaff78497ef00f24ef674193"
+checksum = "6fd8403733700263c6eb89f192880191f1b83e332f7a20371ddcf421c4a337c7"
 
 [[package]]
 name = "zerocopy"

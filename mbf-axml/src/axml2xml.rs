@@ -28,7 +28,7 @@ use anyhow::{Context, Result};
 use std::collections::HashMap;
 use xml::common::Position;
 
-use crate::axml::{ResourceIds, ANDROID_NS_URI};
+use crate::{ResourceIds, ANDROID_NS_URI};
 
 use super::{AxmlReader, AxmlWriter};
 type AxmlAttrValue = super::AttributeValue;

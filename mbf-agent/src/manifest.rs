@@ -4,7 +4,7 @@ use std::io::{Read, Seek};
 
 use anyhow::{anyhow, Result};
 
-use crate::axml::{AttributeValue, AxmlReader, Event};
+use mbf_axml::{AttributeValue, AxmlReader, Event};
 
 /// Useful struct to read key details from the APK manifest.
 pub struct ManifestInfo {
