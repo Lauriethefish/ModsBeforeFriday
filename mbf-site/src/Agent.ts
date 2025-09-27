@@ -232,12 +232,6 @@ async function sendRequest(adb: Adb, request: Request): Promise<Response> {
   let exited = false;
   agentProcess.exited.then(() => exited = true);
   adb.disconnected.then(() => exited = true);
-
-  const reader = agentProcess.output
-    // TODO: Not totally sure if this will handle non-ASCII correctly.
-    // Doesn't seem to consider that a chunk might not be valid UTF-8 on its own
-    .pipeThrough(new TextDecoderStream())
-    .getReader();
   
   console.group("Agent Request");
   console.log(request);
