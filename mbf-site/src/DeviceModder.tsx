@@ -11,12 +11,11 @@ import { PermissionsMenu } from './components/PermissionsMenu';
 import { SelectableList } from './components/SelectableList';
 import { AndroidManifest } from './AndroidManifest';
 import { Log } from './Logging';
-import { wrapOperation } from './SyncStore';
 import { OpenLogsButton } from './components/OpenLogsButton';
 import { lte as semverLte } from 'semver';
-import { checkForBridge } from './AdbServerWebSocketConnector';
-import { useDeviceStore } from './DeviceStore';
 import { gameId } from './game_info';
+import { useDeviceConnectorContext } from './hooks/DeviceConnector';
+import { useOperationModalsContext } from './components/OperationModals';
 
 interface DeviceModderProps {
     // Quits back to the main menu, optionally giving an error that caused the quit.
@@ -69,14 +68,14 @@ export function CompareBeatSaberVersions(a: string, b: string): number {
 export function DeviceModder(props: DeviceModderProps) {
     const [modStatus, setModStatus] = useState(null as ModStatus | null);
     const { quit } = props;
-    const { device } = useDeviceStore((state) => ({ device: state.device }));
+    const { chosenDevice } = useDeviceConnectorContext();
 
     useEffect(() => {
-        if (!device) { return; } // If the device is not set, do not attempt to load mod status.
-        loadModStatus(device)
+        if (!chosenDevice) { return; } // If the device is not set, do not attempt to load mod status.
+        loadModStatus(chosenDevice)
             .then(loadedModStatus => setModStatus(loadedModStatus))
             .catch(err => quit(err));
-    }, [device]);
+    }, [chosenDevice]);
 
     // Fun "ocean" of IF statements, hopefully covering every possible state of an installation!
     if (modStatus === null) {
@@ -149,16 +148,16 @@ export function DeviceModder(props: DeviceModderProps) {
 }
 
 function NoObb({ quit }: { quit: () => void }) {
-    const { device } = useDeviceStore((state) => ({ device: state.device }));
+    const { chosenDevice } = useDeviceConnectorContext();
 
      return <div className="container mainContainer">
         <h1>OBB not present</h1>
         <p>MBF has detected that the OBB file, which contains asset files required for Beat Saber to load, is not present in the installation.</p>
         <p>This means your installation is corrupt. You will need to uninstall Beat Saber with the button below, and reinstall the latest version from the Meta store.</p>
         <button onClick={async () => {
-            if (!device) return;
+            if (!chosenDevice) return;
 
-            await uninstallBeatSaber(device);
+            await uninstallBeatSaber(chosenDevice);
             quit();
         }}>Uninstall Beat Saber</button>
      </div>
@@ -168,7 +167,7 @@ function ValidModLoaderMenu({ modStatus, setModStatus, quit }: {
     modStatus: ModStatus,
     setModStatus: (status: ModStatus) => void
     quit: () => void}) {
-    const { device } = useDeviceStore((state) => ({ device: state.device }));
+    const { chosenDevice } = useDeviceConnectorContext();
 
     return <>
         <div className='container mainContainer'>
@@ -214,11 +213,12 @@ interface InstallStatusProps {
 }
 
 function InstallStatus(props: InstallStatusProps) {
+    const { wrapOperation } = useOperationModalsContext();
     const { modStatus, onFixed } = props;
 
     const modloaderStatus = modStatus.modloader_install_status;
     const coreModStatus = modStatus.core_mods!.core_mod_install_status;
-    const { device } = useDeviceStore((state) => ({ device: state.device }));
+    const { chosenDevice } = useDeviceConnectorContext();
     
     if (modloaderStatus === "Ready" && coreModStatus === "Ready") {
         return <p>Everything should be ready to go! &#9989;</p>
@@ -237,10 +237,10 @@ function InstallStatus(props: InstallStatusProps) {
                     <li>Core mod updates need to be installed.</li>}
             </ul>
             <button onClick={async () => {
-                if (!device) return;
+                if (!chosenDevice) return;
 
                 wrapOperation("Fixing issues", "Failed to fix install", async () =>
-                    onFixed(await quickFix(device, modStatus, false)));
+                    onFixed(await quickFix(chosenDevice, modStatus, false)));
             }}>Fix issues</button>
         </div>
     }
@@ -249,7 +249,7 @@ function InstallStatus(props: InstallStatusProps) {
 function UpdateInfo({ modStatus, quit }: { modStatus: ModStatus, quit: () => void }) {
     const sortedModdableVersions = modStatus.core_mods!.supported_versions.sort(CompareBeatSaberVersions);
     const newerUpdateExists = modStatus.app_info?.version !== sortedModdableVersions[0];
-    const { device } = useDeviceStore((state) => ({ device: state.device }));
+    const { chosenDevice } = useDeviceConnectorContext();
 
     const [updateWindowOpen, setUpdateWindowOpen] = useState(false);
     
@@ -266,8 +266,8 @@ function UpdateInfo({ modStatus, quit }: { modStatus: ModStatus, quit: () => voi
                 <li>Open back up MBF to mod the version you just installed.</li>
             </ol>
             <button onClick={async () => {
-                if (!device) return;
-                await uninstallBeatSaber(device);
+                if (!chosenDevice) return;
+                await uninstallBeatSaber(chosenDevice);
                 quit();
             }}>Uninstall Beat Saber</button>
             <button onClick={() => setUpdateWindowOpen(false)} className="discreetButton">Cancel</button>
@@ -297,7 +297,8 @@ function PatchingMenu(props: PatchingMenuProps) {
     const [versionOverridden, setVersionOverridden] = useState(false);
 
     const { onCompleted, modStatus, initialDowngradingTo } = props;
-    const { device, devicePreV51 } = useDeviceStore((state) => ({ device: state.device, devicePreV51: state.devicePreV51 }));
+    
+    const { chosenDevice, devicePreV51 } = useDeviceConnectorContext();
     const [downgradingTo, setDowngradingTo] = useState(initialDowngradingTo);
     const downgradeChoices = GetSortedDowngradableVersions(modStatus)!
     .filter(version => version != initialDowngradingTo);
@@ -306,12 +307,12 @@ function PatchingMenu(props: PatchingMenuProps) {
     manifest?.applyPatchingManifestMod(devicePreV51);
     
     useEffect(() => {
-        if (!device) return;
+        if (!chosenDevice) return;
 
         if(downgradingTo === null) {
             setManifest(new AndroidManifest(props.modStatus.app_info!.manifest_xml));
         }   else    {
-            getDowngradedManifest(device, downgradingTo)
+            getDowngradedManifest(chosenDevice, downgradingTo)
                 .then(manifest_xml => setManifest(new AndroidManifest(manifest_xml)))
                 .catch(error => {
                     // TODO: Perhaps revert to "not downgrading" if this error comes up (but only if the latest version is moddable)
@@ -362,12 +363,12 @@ function PatchingMenu(props: PatchingMenuProps) {
             <p>Mods and custom songs are not supported by Beat Games. You may experience bugs and crashes that you wouldn't in a vanilla game.</p>
             <div>
                 <button className="discreetButton" id="permissionsButton" onClick={() => setSelectingPerms(true)}>Permissions</button>
-                <button disabled={!device} className="largeCenteredButton" onClick={async () => {
-                    if (!device) return;
+                <button disabled={!chosenDevice} className="largeCenteredButton" onClick={async () => {
+                    if (!chosenDevice) return;
 
                     setIsPatching(true);
                     try {
-                        onCompleted(await patchApp(device, modStatus, downgradingTo, manifest.toString(), false, isDeveloperUrl, devicePreV51, null));
+                        onCompleted(await patchApp(chosenDevice, modStatus, downgradingTo, manifest.toString(), false, isDeveloperUrl, devicePreV51, null));
                     } catch (e) {
                         setPatchingError(String(e));
                         setIsPatching(false);
@@ -472,7 +473,7 @@ interface IncompatibleLoaderProps {
 }
 
 function NotSupported({ version, quit }: { version: string, quit: () => void }) {
-    const { device } = useDeviceStore((state) => ({ device: state.device }));
+    const { chosenDevice } = useDeviceConnectorContext();
     const isLegacy = isVersionLegacy(version);
 
     return <div className='container mainContainer'>
@@ -494,9 +495,9 @@ function NotSupported({ version, quit }: { version: string, quit: () => void }) 
         </>}
 
         <button onClick={async () => {
-            if (!device) return;
+            if (!chosenDevice) return;
 
-            await uninstallBeatSaber(device);
+            await uninstallBeatSaber(chosenDevice);
             quit();
         }}>Uninstall Beat Saber</button>
     </div>
@@ -523,7 +524,7 @@ function NoDiffAvailable({ version }: { version: string }) {
 
 function IncompatibleLoader(props: IncompatibleLoaderProps) {
     const { loader, quit } = props;
-    const { device } = useDeviceStore((state) => ({ device: state.device }));
+    const { chosenDevice } = useDeviceConnectorContext();
 
     return <div className='container mainContainer'>
         <h1>Incompatible Modloader</h1>
@@ -532,9 +533,9 @@ function IncompatibleLoader(props: IncompatibleLoaderProps) {
         <p>Do not be alarmed! Your custom songs will not be lost.</p>
 
         <button onClick={async () => {
-            if (!device) return;
+            if (!chosenDevice) return;
 
-            await uninstallBeatSaber(device);
+            await uninstallBeatSaber(chosenDevice);
             quit();
         }}>Uninstall Beat Saber</button>
     </div>
@@ -543,7 +544,7 @@ function IncompatibleLoader(props: IncompatibleLoaderProps) {
 function IncompatibleAlreadyModded({ quit, installedVersion }: {
     quit: () => void, installedVersion: string
 }) {
-    const { device } = useDeviceStore((state) => ({ device: state.device }));
+    const { chosenDevice } = useDeviceConnectorContext();
 
     return <div className='container mainContainer'>
         <h1>Incompatible Version Patched</h1>
@@ -552,9 +553,9 @@ function IncompatibleAlreadyModded({ quit, installedVersion }: {
         <p>To fix this, uninstall Beat Saber and reinstall the latest version. MBF can then downgrade this automatically to the latest moddable version.</p>
 
         <button onClick={async () => {
-            if (!device) return;
+            if (!chosenDevice) return;
             
-            await uninstallBeatSaber(device);
+            await uninstallBeatSaber(chosenDevice);
             quit();
         }}>Uninstall Beat Saber</button>
     </div>
