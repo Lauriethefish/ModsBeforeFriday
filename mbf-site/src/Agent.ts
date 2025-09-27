@@ -64,8 +64,8 @@ function adbPacketToString(data: AdbPacketData): string {
 }
 
 export function installLoggers() {
-  packetListeners.onPacketRead = packet => Log.trace("READ: " + adbPacketToString(packet));
-  packetListeners.onPacketWritten = packet => Log.trace("Sent: " + adbPacketToString(packet));
+  packetListeners.onPacketRead = (packet: AdbPacketData) => Log.trace("READ: " + adbPacketToString(packet));
+  packetListeners.onPacketWritten = (packet: AdbPacketData) => Log.trace("Sent: " + adbPacketToString(packet));
 }
 
 export async function overwriteAgent(adb: Adb) {
@@ -285,7 +285,7 @@ async function sendRequest(adb: Adb, request: Request): Promise<Response> {
   });
   outputCapturePromise.finally(console.groupEnd);
 
-  // Pipe the agent output to the logging stream
+  // Pipe the agent stdout and stderr to the logging streams
   agentProcess.output.pipeThrough(new TextDecoderStream()).pipeTo(outputCaptureStream);
 
   // Wait for everything to finish
