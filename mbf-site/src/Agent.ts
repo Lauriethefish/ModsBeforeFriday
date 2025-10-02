@@ -1,5 +1,6 @@
 import { AdbSync, AdbSyncWriteOptions, Adb, encodeUtf8, AdbPacketData, AdbCommand, packetListeners } from "@yume-chan/adb";
-import { Consumable, TextDecoderStream, MaybeConsumable, ReadableStream } from "@yume-chan/stream-extra";
+import { PromiseResolver } from '@yume-chan/async';
+import { Consumable, ConcatStringStream, TextDecoderStream, MaybeConsumable, ReadableStream, WritableStream } from '@yume-chan/stream-extra';
 import { Request, Response, LogMsg, ModStatus, Mods, FixedPlayerData, ImportResult, DowngradedManifest, Patched, ModSyncResult, AgentParameters } from "./Messages";
 import { AGENT_SHA1 } from './agent_manifest';
 import { toast } from 'react-toastify';
@@ -169,6 +170,46 @@ async function downloadAgent(): Promise<Uint8Array> {
   throw new Error("Failed to fetch agent after multiple attempts.\nDid you lose internet connection just after you loaded the site?\n\nIf not, then please report this issue, including a screenshot of the browser console window!");
 }
 
+/**
+ * Creates a WritableStream that can be used to log messages from the agent.
+ * @returns
+ */
+function createLoggingWritableStream<ChunkType>(chunkCallback?: (chunks: ChunkType[], closed: boolean, error: unknown) => any): { promise: Promise<ChunkType[]>, stream: WritableStream<ChunkType> } {
+  let streamResolver = new PromiseResolver<ChunkType[]>();
+  let chunks: ChunkType[] = [];
+  let promiseResolved = false;
+
+  setTimeout(async () => {
+    await streamResolver.promise
+      .then(() => chunkCallback?.(chunks, true, undefined))
+      .catch((error) => chunkCallback?.(chunks, true, error))
+      .finally();
+
+    promiseResolved = true;
+  });
+
+  // Create a WritableStream that will log messages from the agent
+  const stream = new WritableStream<ChunkType>({
+    write(chunk) {
+      chunks.push(chunk);
+      chunkCallback?.(chunks, false, undefined);
+    },
+    close() {
+      chunkCallback?.(chunks, true, undefined);
+      !promiseResolved && streamResolver.resolve(chunks);
+    },
+    abort(error) {
+      chunkCallback?.(chunks, true, error);
+      !promiseResolved && streamResolver.reject({chunks, error});
+    },
+  });
+
+  return {
+    promise: streamResolver.promise,
+    stream
+  }
+}
+
 async function sendRequest(adb: Adb, request: Request): Promise<Response> {
   let wrappedRequest: AgentParameters & Request = {
     agent_parameters: {
@@ -178,10 +219,10 @@ async function sendRequest(adb: Adb, request: Request): Promise<Response> {
     ...request
   }
   let command_buffer = encodeUtf8(JSON.stringify(wrappedRequest) + "\n");
-
   let agentProcess = await adb.subprocess.noneProtocol.spawn(AgentPath);
-
+  let response = null as (Response | null); // Typescript is weird...
   const stdin = agentProcess.stdin.getWriter();
+
   try {
     stdin.write(new Consumable(command_buffer));
   } finally {
@@ -191,37 +232,39 @@ async function sendRequest(adb: Adb, request: Request): Promise<Response> {
   let exited = false;
   agentProcess.exited.then(() => exited = true);
   adb.disconnected.then(() => exited = true);
-
-  const reader = agentProcess.output
-    // TODO: Not totally sure if this will handle non-ASCII correctly.
-    // Doesn't seem to consider that a chunk might not be valid UTF-8 on its own
-    .pipeThrough(new TextDecoderStream())
-    .getReader();
   
   console.group("Agent Request");
-  let buffer = "";
-  let response: Response | null = null;
-  while(!exited) {
-    const result = await reader.read();
-    const receivedStr = result.value;
-    if(receivedStr === undefined) {
-      continue;
+  console.log(request);
+
+  console.group("Messages");
+
+  // Create a WritableStream that will log messages from the agent stdout.
+  // The stream will run the callback function when it receives a chunk of data.
+  const {stream: outputCaptureStream, promise: outputCapturePromise} = createLoggingWritableStream((chunks: string[], closed, error) => {
+    // Combine all the chunks into a single string, then split it by newline.
+    // Splice also clears the chunks array.
+    const messages: string[] = chunks.splice(0, chunks.length).join("").split("\n");
+
+    // If not closed, the last message is incomplete and should be put back into the chunks array
+    if (!closed) {
+      const lastMessage = messages.pop()!;
+      chunks.unshift(lastMessage);
     }
 
-    // TODO: This is fairly inefficient in terms of memory usage
-    // (although we aren't receiving a huge amount of data so this might be OK)
-    buffer += receivedStr;
-    const messages = buffer.split("\n");
-    buffer = messages[messages.length - 1];
-
-    for(let i = 0; i < messages.length - 1; i++) {
-      // Parse each newline separated message as a Response
+    // Parse each message
+    for (const message of messages.filter(m => m.trim())) {
       let msg_obj: Response;
+
+      // Try to parse the message as JSON
       try {
-        msg_obj = JSON.parse(messages[i]) as Response;
+        msg_obj = JSON.parse(message) as Response;
       } catch(e) {
-        throw new Error("Agent message " + messages[i] + " was not valid JSON");
+        // If the message is not valid JSON, log it and throw an error
+        console.log(message);
+        throw new Error("Agent message " + message + " was not valid JSON");
       }
+
+      // If the message is a log message, emit it to the global log store
       if(msg_obj.type === "LogMsg") {
         const log_obj = msg_obj as LogMsg;
         Log.emitEvent(log_obj);
@@ -230,15 +273,30 @@ async function sendRequest(adb: Adb, request: Request): Promise<Response> {
         if(msg_obj.level === 'Error') {
           response = msg_obj;
         }
-      } else  {
-        // The final message is the only one that isn't of type `log`.
-        // This contains the actual response data
-        response = msg_obj;
-      }
-    }
-  }
-  console.groupEnd();
 
+        continue;
+      }
+
+      // The final message is the only one that isn't of type `log`.
+      // This contains the actual response data
+      console.log(msg_obj);
+      response = msg_obj;
+    }
+  });
+  outputCapturePromise.finally(console.groupEnd);
+
+  // Pipe the agent stdout and stderr to the logging streams
+  agentProcess.output.pipeThrough(new TextDecoderStream()).pipeTo(outputCaptureStream);
+
+  // Wait for everything to finish
+  let [exitCode, outputChunks] = await Promise.all([
+    agentProcess.exited,
+    outputCapturePromise
+  ]);
+
+  console.log(`Exited: ${exitCode}`);
+  console.groupEnd();
+  
   // "None" protocol is necessary as we pass input strings longer than one line in terminal sometimes
   // So using the shell protocol can cause messages to fail: particularly, when patching the game,
   // we need to send the whole manifest over.
@@ -247,13 +305,12 @@ async function sendRequest(adb: Adb, request: Request): Promise<Response> {
 
   // Don't worry too much! The agent should always return 0, even if it encounters an error, since errors are sent via a JSON message.
 
-  if(response === null) {
-    throw new Error("Received error response from agent");
-  } else if(response.type === 'LogMsg') {
-    const log = response as LogMsg;
-    throw new Error("`" + log.message + "`");
-  } else  {
-    return response;
+  await agentProcess.exited;
+
+  if(response !== null && (response as LogMsg).type === 'LogMsg') {
+    throw new Error("Agent responded with an error", { cause: response });
+  } else {
+    return response as Response;
   }
 }
 
