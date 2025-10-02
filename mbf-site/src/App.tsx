@@ -13,87 +13,29 @@ import 'react-toastify/dist/ReactToastify.css';
 import { CornerMenu } from './components/CornerMenu';
 import { installLoggers, setCoreModOverrideUrl } from './Agent';
 import { Log } from './Logging';
-import { OperationModals } from './components/OperationModals';
+import { useOperationModals } from './components/OperationModals';
 import { OpenLogsButton } from './components/OpenLogsButton';
 import { isViewingOnIos, isViewingOnMobile, isViewingOnWindows, usingOculusBrowser } from './platformDetection';
 import { SourceUrl } from '.';
-import { useDeviceStore } from './DeviceStore';
+import { useDeviceConnector } from './hooks/DeviceConnector';
 
-type NoDeviceCause = "NoDeviceSelected" | "DeviceInUse";
-
-const NON_LEGACY_ANDROID_VERSION: number = 11;
-
-async function connect(
-  setAuthing: () => void): Promise<Adb | NoDeviceCause> {
-  const device_manager = new AdbDaemonWebUsbDeviceManager(navigator.usb);
-  const quest = await device_manager.requestDevice();
-  if(quest === undefined) {
-    return "NoDeviceSelected";
-  }
-
-  let connection: AdbDaemonWebUsbConnection;
-  try {
-    if(import.meta.env.DEV) {
-      Log.debug("Developer build detected, attempting to disconnect ADB server before connecting to quest");
-      await tryDisconnectAdb();
-    }
-
-    connection = await quest.connect();
-    installLoggers();
-  } catch(err) {
-    if(String(err).includes("The device is already in used")) {
-      Log.warn("Full interface error: " + err);
-      // Some other ADB daemon is hogging the connection, so we can't get to the Quest.
-      return "DeviceInUse";
-    } else  {
-      throw err;
-    }
-  }
-  const keyStore: AdbWebCredentialStore = new AdbWebCredentialStore("ModsBeforeFriday");
-
-  setAuthing();
-  const transport: AdbDaemonTransport = await AdbDaemonTransport.authenticate({
-    serial: quest.serial,
-    connection,
-    credentialStore: keyStore
-  });
-
-  return new Adb(transport);
-}
-
-// Attempts to invoke mbf-adb-killer to disconnect the ADB server, avoiding the developer working on MBF having to manually do this.
-async function tryDisconnectAdb() {
-  try {
-    await fetch("http://localhost:25898");
-  } catch {
-    Log.warn("ADB killer is not running. ADB will have to be killed manually");
-  }
-}
-
-export async function getAndroidVersion(device: Adb) {
-  return Number((await device.subprocess.noneProtocol.spawnWaitText("getprop ro.build.version.release")));
-}
 
 function ChooseDevice() {
-  const [authing, setAuthing] = useState(false);
-  const [connectError, setConnectError] = useState(null as string | null);
-  const [deviceInUse, setDeviceInUse] = useState(false);
-  const {
-    devicePreV51, setDevicePreV51,
-    device: chosenDevice, setDevice: setChosenDevice,
-    androidVersion, setAndroidVersion
-  } = useDeviceStore();
-
+  const { devicePreV51, deviceInUse, authing, chosenDevice, connecting, connectError, connectDevice, disconnectDevice, DeviceConnectorContextProvider } = useDeviceConnector(null);
+  const [modderError, setModderError] = useState<string | null>(null);
+  
   if(chosenDevice !== null) {
-    return <>
-      <DeviceModder device={chosenDevice} devicePreV51={devicePreV51} quit={(err) => {
-        if(err != null) {
-          setConnectError(String(err));
-        }
-        chosenDevice.close().catch(err => Log.warn("Failed to close device " + err));
-        setChosenDevice(null);
-      }} />
-    </>
+    return (
+      <DeviceConnectorContextProvider>
+        <DeviceModder quit={(err) => {
+          if (err != null) {
+            setModderError(String(err));
+          }
+          disconnectDevice();
+          }
+        } />
+      </DeviceConnectorContextProvider>
+    )
   } else if(authing) {
     return <div className='container mainContainer fadeIn'>
       <h2>Allow connection in headset</h2>
@@ -110,6 +52,7 @@ function ChooseDevice() {
     </div>
   } else  {
     return <>
+      <DeviceConnectorContextProvider>
         <div className="container mainContainer">
           <Title />
           <p>To get started, plug your Quest in with a USB-C cable and click the button below.</p>
@@ -119,60 +62,24 @@ function ChooseDevice() {
 
           <div className="chooseDeviceContainer">
             <span><OpenLogsButton /></span>
-            <button onClick={async () => {
-              let device: Adb | null;
-
-              try {
-                const result = await connect(() => setAuthing(true));
-                if(result === "NoDeviceSelected") {
-                  device = null;
-                } else if(result === "DeviceInUse") {
-                  setDeviceInUse(true);
-                  return;
-                } else  {
-                  device = result;
-
-                  const androidVersion = await getAndroidVersion(device);
-                  setAndroidVersion(androidVersion);
-
-                  Log.debug("Device android version: " + androidVersion);
-
-                  const deviceName = device.banner.model;
-                  if (deviceName === "Quest") {
-                    Log.debug("Device is a Quest 1, switching to pre-v51 mode");
-                    setDevicePreV51(androidVersion < NON_LEGACY_ANDROID_VERSION);                  
-                  }
-
-                  setAuthing(false);
-                  setChosenDevice(device);
-
-                  await device.transport.disconnected;
-                  setChosenDevice(null);
-                }
-
-              } catch(error) {
-                Log.error("Failed to connect: " + error);
-                setConnectError(String(error));
-                setChosenDevice(null);
-                return;
-              }
-            }}>Connect to Quest</button>
+            <button onClick={() => !connecting && connectDevice()}>Connect to Quest</button>
           </div>
 
-          <ErrorModal isVisible={connectError != null}
+          {connectError && <ErrorModal isVisible={true}
             title="Failed to connect to device"
             description={connectError}
-            onClose={() => setConnectError(null)}>
+            onClose={() => disconnectDevice()}>
               <AskLaurie />
-          </ErrorModal>
+          </ErrorModal>}
 
-          <ErrorModal isVisible={deviceInUse}
-            onClose={() => setDeviceInUse(false)}
+          {deviceInUse && <ErrorModal isVisible={true}
+            onClose={() => disconnectDevice()}
             title="Device in use">
               <DeviceInUse />
-          </ErrorModal>
+          </ErrorModal>}
         </div>
-      </>
+      </DeviceConnectorContextProvider>
+    </>
   }
 }
 
@@ -268,16 +175,20 @@ function AppContents() {
 }
 
 function App() {
+  const { OperationModalContextProvider, OperationModals } = useOperationModals();
+  
   return <div className='main'>
-    <AppContents />
-    <CornerMenu />
-    <OperationModals />
-    <ToastContainer
-      position="bottom-right"
-      theme="dark"
-      autoClose={5000}
-      transition={Bounce}
-      hideProgressBar={true} />
+    <OperationModalContextProvider>
+      <AppContents />
+      <CornerMenu />
+      <OperationModals />
+      <ToastContainer
+        position="bottom-right"
+        theme="dark"
+        autoClose={5000}
+        transition={Bounce}
+        hideProgressBar={true} />
+    </OperationModalContextProvider>
   </div>
 }
 
