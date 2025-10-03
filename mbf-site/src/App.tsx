@@ -13,11 +13,11 @@ import 'react-toastify/dist/ReactToastify.css';
 import { CornerMenu } from './components/CornerMenu';
 import { installLoggers, setCoreModOverrideUrl } from './Agent';
 import { Log } from './Logging';
-import { useOperationModals } from './components/OperationModals';
 import { OpenLogsButton } from './components/OpenLogsButton';
 import { isViewingOnIos, isViewingOnMobile, isViewingOnWindows, usingOculusBrowser } from './platformDetection';
 import { SourceUrl } from '.';
 import { useDeviceConnector } from './hooks/DeviceConnector';
+import { OperationModals } from './components/OperationModals';
 
 
 function ChooseDevice() {
@@ -174,21 +174,17 @@ function AppContents() {
   }
 }
 
-function App() {
-  const { OperationModalContextProvider, OperationModals } = useOperationModals();
-  
+function App() {  
   return <div className='main'>
-    <OperationModalContextProvider>
-      <AppContents />
-      <CornerMenu />
-      <OperationModals />
-      <ToastContainer
-        position="bottom-right"
-        theme="dark"
-        autoClose={5000}
-        transition={Bounce}
-        hideProgressBar={true} />
-    </OperationModalContextProvider>
+    <AppContents />
+    <CornerMenu />
+    <OperationModals />
+    <ToastContainer
+      position="bottom-right"
+      theme="dark"
+      autoClose={5000}
+      transition={Bounce}
+      hideProgressBar={true} />
   </div>
 }
 
