@@ -16,7 +16,7 @@ import { Log } from "../Logging";
 import { ModRepoMod } from "../ModsRepo";
 import SyncIcon from "../icons/sync.svg"
 import { useDeviceConnectorContext } from '../hooks/DeviceConnector';
-import { useOperationModalsContext } from './OperationModals';
+import { OperationModals } from "./OperationModals";
 
 
 interface ModManagerProps {
@@ -99,7 +99,6 @@ interface ModMenuProps {
 }
 
 function InstalledModsMenu(props: ModMenuProps) {
-    const modals = useOperationModalsContext();
     const { mods,
         setMods,
         gameVersion
@@ -113,7 +112,7 @@ function InstalledModsMenu(props: ModMenuProps) {
             if (!chosenDevice) return;
             setChanges({});
             Log.debug("Installing mods, statuses requested: " + JSON.stringify(changes));
-            await modals.wrapOperation("Syncing mods", "Failed to sync mods", async () => {
+            await OperationModals.wrapOperation("Syncing mods", "Failed to sync mods", async () => {
                 const modSyncResult = await setModStatuses(chosenDevice, changes);
                 setMods(modSyncResult.installed_mods);
 
@@ -136,7 +135,7 @@ function InstalledModsMenu(props: ModMenuProps) {
 				onRemoved={async () => {
                     if (!chosenDevice) return;
 
-                    await modals.wrapOperation("Removing mod", "Failed to remove mod", async () => {
+                    await OperationModals.wrapOperation("Removing mod", "Failed to remove mod", async () => {
 						setMods(await removeMod(chosenDevice, mod.id));
                         const newChanges = { ...changes };
                         
@@ -215,7 +214,6 @@ function AddModsMenu(props: ModMenuProps) {
         gameVersion
     } = props;
     const { chosenDevice } = useDeviceConnectorContext();
-    const modals = useOperationModalsContext();
 
     // Automatically installs a mod when it is imported, or warns the user if it isn't designed for the current game version.
     // Gives appropriate toasts/reports errors in each case.
@@ -307,7 +305,7 @@ function AddModsMenu(props: ModMenuProps) {
 
         let disconnected = false;
         chosenDevice.disconnected.then(() => disconnected = true);
-        const setWorking = modals.useSetWorking("Importing");
+        const setWorking = OperationModals.useSetWorking("Importing");
 
         setWorking(true);
         while(importQueue.length > 0 && !disconnected) {
@@ -316,17 +314,17 @@ function AddModsMenu(props: ModMenuProps) {
 
             if(newImport.type == "File") {
                 const file = (newImport as QueuedFileImport).file;
-                modals.setStatusText(`Processing file ${file.name}`);
+                OperationModals.statusText = `Processing file ${file.name}`;
                 await handleFileImport(file);
             }   else if(newImport.type == "Url") {
                 const url = (newImport as QueuedUrlImport).url;
-                modals.setStatusText(`Processing url ${url}`);
+                OperationModals.statusText = `Processing url ${url}`;
 
                 await handleUrlImport(url);
             }   else if(newImport.type == "ModRepo") {
                 const mod = (newImport as QueuedModRepoImport).mod;
 
-                modals.setStatusText(`Installing ${mod.name} v${mod.version}`);
+                OperationModals.statusText = `Installing ${mod.name} v${mod.version}`;
 
                 await handleUrlImport(mod.download);
             }

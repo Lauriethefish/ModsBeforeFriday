@@ -15,7 +15,7 @@ import { OpenLogsButton } from './components/OpenLogsButton';
 import { lte as semverLte } from 'semver';
 import { gameId } from './game_info';
 import { useDeviceConnectorContext } from './hooks/DeviceConnector';
-import { useOperationModalsContext } from './components/OperationModals';
+import { OperationModals } from './components/OperationModals';
 
 interface DeviceModderProps {
     // Quits back to the main menu, optionally giving an error that caused the quit.
@@ -213,7 +213,6 @@ interface InstallStatusProps {
 }
 
 function InstallStatus(props: InstallStatusProps) {
-    const modals = useOperationModalsContext();
     const { modStatus, onFixed } = props;
 
     const modloaderStatus = modStatus.modloader_install_status;
@@ -239,7 +238,7 @@ function InstallStatus(props: InstallStatusProps) {
             <button onClick={async () => {
                 if (!chosenDevice) return;
 
-                modals.wrapOperation("Fixing issues", "Failed to fix install", async () =>
+                OperationModals.wrapOperation("Fixing issues", "Failed to fix install", async () =>
                     onFixed(await quickFix(chosenDevice, modStatus, false)));
             }}>Fix issues</button>
         </div>

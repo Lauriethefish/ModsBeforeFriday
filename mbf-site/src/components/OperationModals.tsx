@@ -9,15 +9,10 @@
 import { ScaleLoader } from "react-spinners";
 import { LogWindow, LogWindowControls } from "./LogWindow";
 import { ErrorModal } from "./Modal";
-import React, {
-  createContext,
-  PropsWithChildren,
-  useCallback,
-  useContext,
-  useEffect,
-  useState,
-} from "react";
+import React from "react";
+import { proxy, useSnapshot } from "valtio";
 import { Log } from "../Logging";
+import { definePropertiesFromSource } from "../definePropertiesFromSource";
 
 /**
  * An error that occured within a particular operation.
@@ -26,6 +21,13 @@ export interface OperationError {
   title: string;
   error: string;
 }
+
+const modalState = proxy<OperationModalsData>({
+  currentOperation: null,
+  currentError: null,
+  statusText: null,
+  logsManuallyOpen: false,
+});
 
 interface OperationModalsData {
   /** Name of the current ongoing operation */
@@ -37,213 +39,76 @@ interface OperationModalsData {
 
   /** Whether or not the logs have been manually opened by the user. */
   logsManuallyOpen: boolean;
-  setCurrentOperation: React.Dispatch<React.SetStateAction<string | null>>;
-  setCurrentError: React.Dispatch<React.SetStateAction<OperationError | null>>;
-  setStatusText: React.Dispatch<React.SetStateAction<string | null>>;
-  setLogsManuallyOpen: React.Dispatch<React.SetStateAction<boolean>>;
+}
 
+interface OperationModalsActions {
   /** Creates a function that can be used to set whether or not a particular operation is currently in progress. */
-  useSetWorking: (operationName: string) => (working: boolean) => void;
+  useSetWorking: typeof useSetWorking;
 
   /** Creates a function that can be used to set an error when a particular operation failed. */
-  useSetError: (errorTitle: string) => (error: unknown | null) => void;
+  useSetError: typeof useSetError;
 
   /** Used to wrap a particular operation while displaying the logging window and any errors if appropriate. */
-  wrapOperation: (
-    operationName: string,
-    errorModalTitle: string,
-    operation: () => Promise<void>
-  ) => Promise<void>;
+  wrapOperation: typeof wrapOperation;
 }
 
-interface OperationModalsComponents {
-  OperationModalContextProvider: React.FC<React.PropsWithChildren>;
-  OperationModals: React.FC;
-}
-
-const OperationModalsContext =
-  createContext<Readonly<OperationModalsData> | null>(null);
-
-  /**
-   * Provides the components and context necessary to track ongoing operations.
-   * 
-   * Do not destructure the returned object, as it will be updated as necessary.
-   * @returns 
-   */
-export function useOperationModals(): OperationModalsComponents {
-  const _OperationModalContextProvider = useCallback<
-    React.FC<React.PropsWithChildren>
-  >(function OperationModalContextProvider({ children }) {
-    const context = useContext(OperationModalsContext);
-    if (context !== null) {
-      throw new Error("OperationModalsContextProvider cannot be nested.");
+/**
+ * Creates a function that can be used to set whether or not a particular operation is currently in progress.
+ */
+function useSetWorking(
+  operationName: string
+): (working: boolean) => void {
+  return function setWorking(working) {
+    if (working) {
+      modalState.currentOperation = operationName;
+    } else {
+      modalState.statusText = null;
+      modalState.currentOperation = null;
     }
-
-    return (
-      <OperationModalsContext.Provider
-        value={{
-          currentOperation: null,
-          currentError: null,
-          statusText: null,
-          logsManuallyOpen: false,
-          setCurrentOperation: () => undefined,
-          setCurrentError: () => undefined,
-          setStatusText: () => undefined,
-          setLogsManuallyOpen: () => undefined,
-          useSetWorking: () => () => {},
-          useSetError: () => () => {},
-          wrapOperation: async () => Promise.resolve(),
-        }}
-      >
-        {children}
-      </OperationModalsContext.Provider>
-    );
-  }, []);
-
-  return {
-    OperationModalContextProvider: _OperationModalContextProvider,
-    OperationModals,
   };
 }
 
-export const useOperationModalsContext = () => {
-  const context = useContext(OperationModalsContext);
+/**
+ * Creates a function that can be used to set an error when a particular operation failed.
+ */
+function useSetError(
+  errorTitle: string
+): (error: unknown | null) => void {
+  return function setError(error) {
+    if (error === null) {
+      modalState.currentError = null;
+    } else {
+      Log.error(`${errorTitle}: ${String(error)}`);
+      modalState.currentError = {
+        title: errorTitle,
+        error: String(error),
+      };
+    }
+  };
+}
 
-  if (context === null) {
-    throw new Error(
-      "useOperationModalsContext must be used within an OperationModalContextProvider."
-    );
+async function wrapOperation(
+  operationName: string,
+  errorModalTitle: string,
+  operation: () => Promise<void>
+) {
+  const setWorking = useSetWorking(operationName);
+  const setError = useSetError(errorModalTitle);
+
+  setWorking(true);
+  try {
+    await operation();
+  } catch (error) {
+    Log.error(errorModalTitle + ": " + error);
+    setError(error);
+  } finally {
+    setWorking(false);
   }
-
-  return context;
-};
+}
 
 // Component that displays the log window when an operation is in progress, and displays errors when the operation failed.
-function OperationModals() {
-  const [currentOperation, setCurrentOperation] = useState<string | null>(null);
-  const [currentError, setCurrentError] = useState<OperationError | null>(null);
-  const [statusText, setStatusText] = useState<string | null>(null);
-  const [logsManuallyOpen, setLogsManuallyOpen] = useState(false);
-  const context = useContext(OperationModalsContext)! as OperationModalsData & {
-    modalRenderer: boolean;
-  };
-
-  if (context === null) {
-    throw new Error(
-      "OperationModals must be used within an OperationModalContextProvider."
-    );
-  }
-
-  /**
-   * Creates a function that can be used to set whether or not a particular operation is currently in progress.
-   */
-  const _useSetWorking = useCallback(
-    function useSetWorking(operationName: string): (working: boolean) => void {
-      return function setWorking(working) {
-        if (working) {
-          setCurrentOperation(operationName);
-        } else {
-          setStatusText(null);
-          setCurrentOperation(null);
-        }
-      };
-    },
-    [setCurrentOperation, setStatusText]
-  );
-
-  /**
-   * Creates a function that can be used to set an error when a particular operation failed.
-   */
-  const _useSetError = useCallback(
-    function useSetError(errorTitle: string): (error: unknown | null) => void {
-      return function setError(error) {
-        if (error === null) {
-          setCurrentError(null);
-        } else {
-          Log.error(`${errorTitle}: ${String(error)}`);
-          setCurrentError({
-            title: errorTitle,
-            error: String(error),
-          });
-        }
-      };
-    },
-    [setCurrentError]
-  );
-
-  const _wrapOperation = useCallback(
-    async function wrapOperation(
-      operationName: string,
-      errorModalTitle: string,
-      operation: () => Promise<void>
-    ) {
-      const setWorking = _useSetWorking(operationName);
-      const setError = _useSetError(errorModalTitle);
-
-      setWorking(true);
-      try {
-        await operation();
-      } catch (error) {
-        Log.error(errorModalTitle + ": " + error);
-        setError(error);
-      } finally {
-        setWorking(false);
-      }
-    },
-    [_useSetWorking, _useSetError]
-  );
-
-  useEffect(() => {
-    context.currentOperation = currentOperation;
-  }, [context, currentOperation]);
-
-  useEffect(() => {
-    context.currentError = currentError;
-  }, [context, currentError]);
-
-  useEffect(() => {
-    context.statusText = statusText;
-  }, [context, statusText]);
-
-  useEffect(() => {
-    context.logsManuallyOpen = logsManuallyOpen;
-  }, [context, logsManuallyOpen]);
-
-  useEffect(() => {
-    context.setCurrentOperation = setCurrentOperation;
-  }, [context, setCurrentOperation]);
-
-  useEffect(() => {
-    context.setCurrentError = setCurrentError;
-  }, [context, setCurrentError]);
-
-  useEffect(() => {
-    context.setStatusText = setStatusText;
-  }, [context, setStatusText]);
-
-  useEffect(() => {
-    context.setLogsManuallyOpen = setLogsManuallyOpen;
-  }, [context, setLogsManuallyOpen]);
-
-  useEffect(() => {
-    context.useSetWorking = _useSetWorking;
-  }, [context, _useSetWorking]);
-
-  useEffect(() => {
-    context.useSetError = _useSetError;
-  }, [context, _useSetError]);
-
-  useEffect(() => {
-    context.wrapOperation = _wrapOperation;
-  }, [context, _wrapOperation]);
-
-  useEffect(() => {
-    context.modalRenderer = true;
-
-    return () => {
-      context.modalRenderer = false;
-    };
-  }, [context]);
+export function OperationModals() {
+  const { currentOperation, currentError, statusText, logsManuallyOpen } = useSnapshot(modalState);
 
   const canClose = logsManuallyOpen && currentError === null;
   const needSyncModal =
@@ -255,17 +120,34 @@ function OperationModals() {
         isVisible={needSyncModal}
         title={currentOperation ?? "Log output"}
         subtext={statusText}
-        onClose={canClose ? () => setLogsManuallyOpen(false) : undefined}
+        onClose={
+          canClose
+            ? () => (modalState.logsManuallyOpen = false)
+            : undefined
+        }
       />
       <ErrorModal
         isVisible={currentError !== null}
         title={currentError?.title ?? ""}
         description={currentError?.error}
-        onClose={() => setCurrentError(null)}
+        onClose={() => (modalState.currentError = null)}
       ></ErrorModal>
     </>
   );
 }
+
+export namespace OperationModals  {
+  export let currentOperation: string | null;
+  export let currentError: OperationError | null;
+  export let statusText: string | null;
+  export let logsManuallyOpen: boolean;
+  export let useSetWorking: OperationModalsActions["useSetWorking"];
+  export let useSetError: OperationModalsActions["useSetError"];
+  export let wrapOperation: OperationModalsActions["wrapOperation"];
+}
+
+definePropertiesFromSource(OperationModals, modalState);
+definePropertiesFromSource(OperationModals, {useSetWorking, useSetError, wrapOperation}, undefined, true);
 
 function SyncingModal({
   isVisible,

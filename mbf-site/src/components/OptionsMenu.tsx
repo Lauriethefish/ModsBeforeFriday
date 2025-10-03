@@ -13,7 +13,8 @@ import { Modal } from './Modal';
 import { SplashScreenSelector } from './SplashScreenSelector';
 import { gameId } from '../game_info';
 import { useDeviceConnectorContext } from '../hooks/DeviceConnector';
-import { useOperationModalsContext } from './OperationModals';
+import { OperationModals } from './OperationModals';
+
 
 interface OptionsMenuProps {
     setModStatus: (status: ModStatus) => void,
@@ -51,7 +52,6 @@ function ModTools({ quit, modStatus, setModStatus }: {
     modStatus: ModStatus,
     setModStatus: (status: ModStatus) => void}) {
     const { chosenDevice } = useDeviceConnectorContext();
-    const modals = useOperationModalsContext();
 
     return (
       <div id="modTools">
@@ -61,7 +61,7 @@ function ModTools({ quit, modStatus, setModStatus }: {
           onClick={async () => {
             if (!chosenDevice) return;
 
-            const setError = modals.useSetError("Failed to kill Beat Saber process");
+            const setError = OperationModals.useSetError("Failed to kill Beat Saber process");
             try {
                 await chosenDevice.subprocess.noneProtocol.spawnWait(`am force-stop ${gameId}`);
                 toast.success("Successfully killed Beat Saber");
@@ -76,7 +76,7 @@ function ModTools({ quit, modStatus, setModStatus }: {
           onClick={async () => {
             if (!chosenDevice) return;
 
-            const setError = modals.useSetError("Failed to kill Beat Saber process");
+            const setError = OperationModals.useSetError("Failed to kill Beat Saber process");
             try {
               await chosenDevice.subprocess.noneProtocol.spawnWait(`sh -c 'am force-stop ${gameId}; monkey -p com.beatgames.beatsaber -c android.intent.category.LAUNCHER 1'`);
               toast.success("Successfully restarted Beat Saber");
@@ -91,7 +91,7 @@ function ModTools({ quit, modStatus, setModStatus }: {
           onClick={async () => {
             if (!chosenDevice) return;
 
-            await modals.wrapOperation(
+            await OperationModals.wrapOperation(
               "Reinstalling only core mods",
               "Failed to reinstall only core mods",
               async () => {
@@ -107,7 +107,7 @@ function ModTools({ quit, modStatus, setModStatus }: {
           onClick={async () => {
             if (!chosenDevice) return;
 
-            const setError = modals.useSetError("Failed to uninstall Beat Saber");
+            const setError = OperationModals.useSetError("Failed to uninstall Beat Saber");
             try {
               await uninstallBeatSaber(chosenDevice);
               quit();
@@ -121,7 +121,7 @@ function ModTools({ quit, modStatus, setModStatus }: {
           description="Fixes an issue with player data permissions."
           onClick={async () => {
             if (!chosenDevice) return;
-            const setError = modals.useSetError("Failed to fix player data");
+            const setError = OperationModals.useSetError("Failed to fix player data");
             try {
               if (await fixPlayerData(chosenDevice)) {
                 toast.success("Successfully fixed player data issues");
@@ -143,7 +143,6 @@ function RepatchMenu({ modStatus, quit }: {
 }
 ) {
     const { chosenDevice, devicePreV51 } = useDeviceConnectorContext();
-    const { wrapOperation } = useOperationModalsContext();
 
     let manifest = useRef(new AndroidManifest(modStatus.app_info!.manifest_xml));
     useEffect(() => {
@@ -159,7 +158,7 @@ function RepatchMenu({ modStatus, quit }: {
         <button onClick={async () => {
             if (!chosenDevice) return;
 
-            await wrapOperation("Repatching Beat Saber", "Failed to repatch", async () => {
+            await OperationModals.wrapOperation("Repatching Beat Saber", "Failed to repatch", async () => {
                 // TODO: Right now we do not set the mod status back to the DeviceModder state for it.
                 // This is fine at the moment since repatching does not update this state in any important way,
                 // but would be a problem if repatching did update it!

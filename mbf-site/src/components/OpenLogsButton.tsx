@@ -1,14 +1,13 @@
 import '../css/OpenLogs.css';
 import LogsIcon from '../icons/logs.svg';
 import { LabelledIconButton } from './LabelledIconButton';
-import { useOperationModalsContext } from './OperationModals';
+import { OperationModals } from './OperationModals';
 
 export function OpenLogsButton() {
-    const modals = useOperationModalsContext();
 
     return <div className="openLogs">
         <LabelledIconButton iconSrc={LogsIcon} iconAlt="Piece of paper with lines of text"
             label="Logs"
-            onClick={() => modals.setLogsManuallyOpen(true)}/>
+            onClick={() => OperationModals.logsManuallyOpen = true}/>
     </div>
 }
