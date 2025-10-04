@@ -25,7 +25,6 @@
     "react-spinners": "^0.14.1",
     "react-toastify": "^10.0.5",
     "semver": "^7.6.0",
-    "valtio": "^2.1.8",
     "vite": "^5.2.8",
     "vite-plugin-mkcert": "^1.17.5",
     "vite-tsconfig-paths": "^4.3.2",
