@@ -1,10 +1,12 @@
-import { getLangStr, setLangStr } from "../localization/shared";
+import { Eng } from "../localization/en";
+import { setLang } from "../localization/shared";
+import { ZhCn } from "../localization/zh_cn";
 
 export function LanguagePicker() {
     return <>
         <div className="langBtnContainer">
-            <a href="javascript:void(0)" className="langBtn" onClick={() => setLangStr("en")}>En</a>
-            <a href="javascript:void(0)" className="langBtn" onClick={() => setLangStr("zh_cn")}>中文</a>
+            <a href="javascript:void(0)" className="langBtn" onClick={() => setLang(Eng)}>En</a>
+            <a href="javascript:void(0)" className="langBtn" onClick={() => setLang(ZhCn)}>中文</a>
         </div>
     </>
 }

@@ -18,7 +18,7 @@ import { OpenLogsButton } from './components/OpenLogsButton';
 import { isViewingOnIos, isViewingOnMobile, isViewingOnWindows, usingOculusBrowser } from './platformDetection';
 import { SourceUrl } from '.';
 import { useDeviceStore } from './DeviceStore';
-import { getLang, initializeLocalization } from './localization/shared';
+import { getLang, initLanguage } from './localization/shared';
 
 type NoDeviceCause = "NoDeviceSelected" | "DeviceInUse";
 
@@ -269,7 +269,7 @@ function AppContents() {
 }
 
 function App() {
-  initializeLocalization()
+  initLanguage()
   return <div className='main'>
     <AppContents />
     <CornerMenu />
