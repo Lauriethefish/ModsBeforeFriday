@@ -1,6 +1,6 @@
 import { Eng } from "./en";
 
-export const ZhCn = {
+export const SimplifiedChinese = {
     __proto__: Eng, // use english text for missing items
 
     sourceCode: <>源代码</>,
