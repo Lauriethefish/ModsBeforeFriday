@@ -5,6 +5,7 @@ import SparklesIcon from '../icons/sparkles.svg';
 import { CreditsModal } from './CreditsModal';
 import { SettingsModal } from './SettingsModal';
 import { LanguagePicker } from './LanguagePicker';
+import { getLang } from '../localization/shared';
 
 export function CornerMenu() {
     const [creditsOpen, setCreditsOpen] = useState(false);
@@ -13,11 +14,11 @@ export function CornerMenu() {
     return <>
         <div className="cornerMenu container">
             <div className="cornerMenuRow" onClick={() => setSettingsOpen(true)}>
-                <p>Settings</p>
+                <p>{getLang().settings}</p>
                 <img src={PreferencesIcon} alt="Preferences icon" />
             </div>
             <div className="cornerMenuRow" onClick={() => setCreditsOpen(true)}>
-                <p>Credits</p>
+                <p>{getLang().credits}</p>
                 <img src={SparklesIcon} alt="Preferences icon" />
             </div>
         </div>

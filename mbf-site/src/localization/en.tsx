@@ -212,5 +212,11 @@ export const Eng = {
     modloaderNeedUpdate:<>Modloader has an available update</>,
     coremodsMissing:<>Not all the core mods are installed</>,
     coreModsNeedUpdate:<>Core mod updates need to be installed.</>,
-    fixIssue:<>Fix issues</>
+    fixIssue:<>Fix issues</>,
+
+
+    settings:<>Settings</>,
+    credits:<>Credits</>,
+
+    showAnimatedBackground:<>Show animated background</>
 }
