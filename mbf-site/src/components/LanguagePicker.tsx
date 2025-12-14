@@ -6,7 +6,7 @@ export function LanguagePicker() {
     return <>
         <div className="langBtnContainer">
             <a href="javascript:void(0)" className="langBtn" onClick={() => setLang(Eng)}>En</a>
-            <a href="javascript:void(0)" className="langBtn" onClick={() => setLang(ZhCn)}>中文</a>
+            <a href="javascript:void(0)" className="langBtn" onClick={() => setLang(ZhCn)}>中文(制作中)</a>
         </div>
     </>
 }
