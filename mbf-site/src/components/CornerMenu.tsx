@@ -21,9 +21,8 @@ export function CornerMenu() {
                 <img src={SparklesIcon} alt="Preferences icon" />
             </div>
         </div>
-
+        <LanguagePicker />
         <CreditsModal isVisible={creditsOpen} onClose={() => setCreditsOpen(false)} />
         <SettingsModal isVisible={settingsOpen} onClose={() => setSettingsOpen(false)} />
-        <LanguagePicker />
     </>
 }
