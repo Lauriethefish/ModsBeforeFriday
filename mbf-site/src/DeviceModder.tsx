@@ -299,7 +299,7 @@ function PatchingMenu(props: PatchingMenuProps) {
                 // TODO: Perhaps revert to "not downgrading" if this error comes up (but only if the latest version is moddable)
                 // This is low priority as this error message should only show up very rarely - there is already a previous check for internet access.
                 Log.error("Failed to fetch older manifest: " + error);
-                props.quit("Failed to fetch AndroidManifest.xml for the selected downgrade version. Did your quest lose its internet connection suddenly?");
+                props.quit(getLang().failedToFetchManifestHint);
             });
         }
     }, [downgradingTo]);
@@ -423,7 +423,7 @@ function DowngradeMessage({ toVersion,
     devicePreV51: boolean,
     canChooseAnotherVersion: boolean }) {
     return <>
-        <h1>{devicePreV51 ? getLang().update : getLang().downgrade} {getLang().andSetupMods}</h1>
+        <h1>{devicePreV51 ? getLang().updateAndSetupMods : getLang().downgradeAndSetupMods}</h1>
         {wasUserSelected ? (<><p>{getLang().olderThanLatestModdableHint} <ClickableLink onClick={requestedResetToDefault}>{getLang().reverseDecision}</ClickableLink></p></>)
         : devicePreV51 ? (<>
             <p>{getLang().quest1ModHint(trimGameVersion(toVersion))}</p>

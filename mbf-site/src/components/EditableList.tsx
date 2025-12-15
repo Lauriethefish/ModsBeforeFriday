@@ -5,7 +5,7 @@ import '../css/EditableList.css';
 // A component that allows adding/removing items from an array.
 // The items in the array must be distinct.
 export function EditableList({ list, addItem, removeItem, title }: 
-    { list: string[], addItem: (item: string) => void, removeItem: (item: string) => void, title: string}) {
+    { list: string[], addItem: (item: string) => void, removeItem: (item: string) => void, title: string | JSX.Element}) {
     
 
     const [isAdding, setAdding] = useState(false);

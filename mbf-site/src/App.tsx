@@ -97,25 +97,13 @@ function ChooseDevice() {
     </>
   } else if(authing) {
     return <div className='container mainContainer fadeIn'>
-      <h2>Allow connection in headset</h2>
-      <p>Put on your headset and click <b>"Always allow from this computer"</b></p>
-      <p>(You should only have to do this once.)</p>
-      <h4>Prompt doesn't show up?</h4>
-      <ol>
-        <li>Refresh the page.</li>
-        <li>Put your headset <b>on your head</b>.</li>
-        <li>Attempt to connect to your quest again.</li>
-      </ol>
-      <p>(Sometimes the quest only shows the prompt if the headset is on your head.)</p>
-      <p>If these steps do not work, <b>reboot your quest and try once more.</b></p>
+      {getLang().allowConnectionInHeadSet}
     </div>
   } else  {
     return <>
         <div className="container mainContainer">
           <Title />
-          <p>To get started, plug your Quest in with a USB-C cable and click the button below.</p>
-          <p>Want see what mods are available? You can find a full list <a href="https://mods.bsquest.xyz" target="_blank" rel="noopener noreferrer">here!</a></p>
-         
+          {getLang().toGetStart}
           <NoCompatibleDevices />
 
           <div className="chooseDeviceContainer">
@@ -157,19 +145,19 @@ function ChooseDevice() {
                 setChosenDevice(null);
                 return;
               }
-            }}>Connect to Quest</button>
+            }}>{getLang().connectToQuest}</button>
           </div>
 
           <ErrorModal isVisible={connectError != null}
-            title="Failed to connect to device"
+            title={getLang().failedToConnectDevice}
             description={connectError}
             onClose={() => setConnectError(null)}>
-              <AskLaurie />
+              {getLang().askLaurie}
           </ErrorModal>
 
           <ErrorModal isVisible={deviceInUse}
             onClose={() => setDeviceInUse(false)}
-            title="Device in use">
+            title={getLang().deviceInUse}>
               <DeviceInUse />
           </ErrorModal>
         </div>
@@ -178,24 +166,17 @@ function ChooseDevice() {
 }
 
 
-// I might regret this
-function AskLaurie() {
-  return <p>If you can't fix the issue, PLEASE hit up <code>Lauriethefish</code> on Discord for further support. We're working on fixing connection/driver issues
-  right now and can only do so with <i>your help!</i></p>
-}
 
 function DeviceInUse() {
  return <>
-  <p>Some other app is trying to access your Quest, e.g. SideQuest.</p>
+  <p>{getLang().otherAppIsAccessQuest}</p>
   {isViewingOnWindows() ? 
     <>
-      <p>To fix this, close SideQuest if you have it open, press <span className="codeBox">Win + R</span> and type the following text, and finally press enter.</p>
-      <span className="codeBox">taskkill /IM adb.exe /F</span>  
-      <p>Alternatively, restart your computer.</p>
+      {getLang().killAdb}
 
-      <AskLaurie />
+      {getLang().askLaurie}
     </>
-    : <p>To fix this, restart your {isViewingOnMobile() ? "phone" : "computer"}.</p>}
+    : <p>{getLang().fixWithRestartDevice(isViewingOnMobile())}</p>}
  </>
 }
 
@@ -220,8 +201,7 @@ function ChooseCoreModUrl({ setSpecifiedCoreMods } : { setSpecifiedCoreMods: () 
   const inputFieldRef = useRef<HTMLInputElement | null>(null);
 
   return <div className='container mainContainer'>
-    <h1>Manually override core mod JSON</h1>
-    <p>Please specify a complete URL to the raw contents of your core mod JSON</p>
+    {getLang().chooseCoreModUrl}
     <input type="text" ref={inputFieldRef}/>
     <br/><br/>
     <button onClick={() => {
@@ -236,7 +216,7 @@ function ChooseCoreModUrl({ setSpecifiedCoreMods } : { setSpecifiedCoreMods: () 
         setSpecifiedCoreMods();
       }
     }}>
-      Confirm URL
+      {getLang().confirmUrl}
     </button>
   </div>
 }
@@ -287,85 +267,53 @@ function App() {
 
 function OculusBrowserMessage() {
   return <div className="container mainContainer">
-    <h1>Quest Browser Detected</h1>
-    <p>MBF has detected that you're trying to use the built-in Quest browser.</p>
-    <p>Unfortunately, <b>you cannot use MBF on the device you are attempting to mod.</b></p>
+    {getLang().questBrowserMessage}
     <DevicesSupportingModding />
 
-    <p>(MBF can be used on a Quest if you install a chromium browser, however this can only be used to mod <b>another Quest headset</b>, connected via USB.)</p>
+    <p>{getLang().onlyWorkWithAnotherQuest}</p>
   </div>
 }
 
 function UnsupportedMessage() {
   return <div className='container mainContainer'>
     {isViewingOnIos() ? <>
-      <h1>iOS is not supported</h1>
-      <p>MBF has detected that you're trying to use it from an iOS device. Unfortunately, Apple does not allow WebUSB, which MBF needs to be able to interact with the Quest.</p>
+      {getLang().iosNotSupported}
       <DevicesSupportingModding />
 
-      <p>.... and one of the following supported browsers:</p>
+      <p>{getLang().supportedBrowserHintInIOS}</p>
     </> : <>
-      <h1>Browser Unsupported</h1>
-      <p>It looks like your browser doesn't support WebUSB, which this app needs to be able to access your Quest's files.</p>
+    {getLang().browserNotSupported}
     </>}
 
-    <h2>Supported Browsers</h2>
+    <h2>{getLang().supportedBrowserTitle}</h2>
     <SupportedBrowsers />
   </div>
 }
 
 function DevicesSupportingModding() {
   return <>
-    <p>To mod your game, you will need one of: </p>
-    <ul>
-      <li>A PC or Mac (preferred)</li>
-      <li>An Android phone (still totally works)</li>
-    </ul>
+    {getLang().deviceSupportingModding}
   </>
 }
 
 function SupportedBrowsers() {
   if(isViewingOnMobile()) {
     return <>
-      <ul>
-        <li>Google Chrome for Android 122 or newer</li>
-        <li>Edge for Android 123 or newer</li>
-      </ul>
-      <h3 className='fireFox'>Firefox for Android is NOT supported</h3>
+      {getLang().supportedBrowserMobile}
     </>
   } else  {
     return <>
-      <ul>
-        <li>Google Chrome 61 or newer</li>
-        <li>Opera 48 or newer</li>
-        <li>Microsoft Edge 79 or newer</li>
-      </ul>
-      <h3 className='fireFox'>Firefox and Safari are NOT supported.</h3>
-      <p>(There is no feasible way to add support for Firefox as Mozilla have chosen not to support WebUSB for security reasons.)</p>
+      {getLang().supportedBrowserNotMobile}
     </>
   }
 }
 
 function NoCompatibleDevices() {
   return <>
-    <h3>No compatible devices?</h3>
-
-    <p>
-      To use MBF, you must enable developer mode so that your Quest is accessible via USB.
-      <br />Follow the <a href="https://developer.oculus.com/documentation/native/android/mobile-device-setup/?locale=en_GB" target="_blank" rel="noopener noreferrer">official guide</a> -
-      you'll need to create a new organisation and enable USB debugging.
-    </p>
+    {getLang().noCompatableDevice}
 
     {isViewingOnMobile() && <>
-      <h4>Using Android?</h4>
-      <p>It's possible that the connection between your device and the Quest has been set up the wrong way around. To fix this:</p>
-      <ul>
-        <li>Swipe down from the top of the screen.</li>
-        <li>Click the dialog relating to the USB connection. This might be called "charging via USB".</li>
-        <li>Change "USB controlled by" to "Connected device". If "Connected device" is already selected, change it to "This device" and change it back.</li>
-      </ul>
-      <h4>Still not working?</h4>
-      <p>Try unplugging your cable and plugging the end that's currently in your phone into your Quest.</p>
+      {getLang().noCompatableDeviceMobile}
     </>}
   </>
 }

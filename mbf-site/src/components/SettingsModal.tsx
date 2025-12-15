@@ -8,7 +8,7 @@ export function SettingsModal({ isVisible, onClose }: { isVisible: boolean, onCl
     const [bgEnabled, setBgEnabled] = useState(getBgUserPreference());
 
     return <Modal isVisible={isVisible}>
-        <h2>Settings</h2>
+        <h2>{getLang().settings}</h2>
         <div className="horizontalCenter">
             <p>{getLang().showAnimatedBackground}</p>        
             <Slider on={bgEnabled} valueChanged={enabled => {

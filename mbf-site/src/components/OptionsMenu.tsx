@@ -14,6 +14,7 @@ import { Modal } from './Modal';
 import { SplashScreenSelector } from './SplashScreenSelector';
 import { useDeviceStore } from '../DeviceStore';
 import { gameId } from '../game_info';
+import { getLang } from '../localization/shared';
 
 interface OptionsMenuProps {
     setModStatus: (status: ModStatus) => void,
@@ -24,19 +25,19 @@ interface OptionsMenuProps {
     
 export function OptionsMenu({ quit, modStatus, setModStatus, visible }: OptionsMenuProps) {
     return <div className={`container mainContainer ${visible ? '' : 'hidden'}`} id="toolsContainer">
-        <Collapsible title="Mod tools" defaultOpen>
+        <Collapsible title={getLang().optionMenuModTools} defaultOpen>
             <ModTools modStatus={modStatus} setModStatus={setModStatus} quit={() => quit(null)} />
         </Collapsible>
-        <Collapsible title="ADB log" defaultOpen>
+        <Collapsible title={getLang().optionMenuAdbLog} defaultOpen>
             <AdbLogger />
         </Collapsible>
-        <Collapsible title="Change Permissions/Repatch">
+        <Collapsible title={getLang().optionMenuChangePerm}>
             <RepatchMenu quit={quit} modStatus={modStatus}/>
         </Collapsible>
     </div>
 }
 
-function ModToolButton({ onClick, text, description }: { onClick: () => void, text: string, description: string }) {
+function ModToolButton({ onClick, text, description }: { onClick: () => void, text: string|JSX.Element, description: string|JSX.Element }) {
     return <div>
       <div>
         <button onClick={onClick}>{text}</button>
@@ -55,58 +56,58 @@ function ModTools({ quit, modStatus, setModStatus }: {
     return (
       <div id="modTools">
         <ModToolButton
-          text="Kill Beat Saber"
-          description="Immediately closes the game."
+          text={getLang().optKillBeatSaber}
+          description={getLang().optKillBeatSaberDesc}
           onClick={async () => {
             if (!device) return;
 
-            const setError = useSetError("Failed to kill Beat Saber process");
+            const setError = useSetError(getLang().failedToKillBeatsaber);
             try {
                 await device.subprocess.noneProtocol.spawnWait(`am force-stop ${gameId}`);
-                toast.success("Successfully killed Beat Saber");
+                toast.success(getLang().beatsaberKilled);
             }   catch(e) {
                 setError(e);
             }
           }}
         />
         <ModToolButton
-          text="Restart Beat Saber"
-          description="Immediately closes and restarts the game."
+          text={getLang().optRestartBeatSaber}
+          description={getLang().optRestartBeatSaberDesc}
           onClick={async () => {
             if (!device) return;
 
-            const setError = useSetError("Failed to kill Beat Saber process");
+            const setError = useSetError(getLang().failedToKillBeatsaber);
             try {
               await device.subprocess.noneProtocol.spawnWait(`sh -c 'am force-stop ${gameId}; monkey -p com.beatgames.beatsaber -c android.intent.category.LAUNCHER 1'`);
-              toast.success("Successfully restarted Beat Saber");
+              toast.success(getLang().beatsaberRestarted);
             } catch (e) {
               setError(e);
             }
           }}
         />
         <ModToolButton
-          text="Reinstall only core mods"
-          description="Deletes all installed mods, then installs only the core mods."
+          text={getLang().optReinstallCore}
+          description={getLang().optReinstallCoreDesc}
           onClick={async () => {
             if (!device) return;
 
             await wrapOperation(
-              "Reinstalling only core mods",
-              "Failed to reinstall only core mods",
+              getLang().reinstallOnlyCoreMods,
+              getLang().failedToReinstallOnlyCoreMods,
               async () => {
                 setModStatus(await quickFix(device, modStatus, true));
-                toast.success("All non-core mods removed!");
+                toast.success(getLang().allNonCoreRemoved);
               }
             );
           }}
         />
         <ModToolButton
-          text="Uninstall Beat Saber"
-          description="Uninstalls the game: this will remove all mods and quit MBF."
+          text={getLang().optUninstallBeatsaber}
+          description={getLang().optUninstallBeatsaberDesc}
           onClick={async () => {
             if (!device) return;
 
-            const setError = useSetError("Failed to uninstall Beat Saber");
+            const setError = useSetError(getLang().failedToUninstall);
             try {
               await uninstallBeatSaber(device);
               quit();
@@ -116,16 +117,16 @@ function ModTools({ quit, modStatus, setModStatus }: {
           }}
         />
         <ModToolButton
-          text="Fix Player Data"
-          description="Fixes an issue with player data permissions."
+          text={getLang().optFixPlayerData}
+          description={getLang().optFixPlayerDataDesc}
           onClick={async () => {
             if (!device) return;
-            const setError = useSetError("Failed to fix player data");
+            const setError = useSetError(getLang().failedToFixPlayerData);
             try {
               if (await fixPlayerData(device)) {
-                toast.success("Successfully fixed player data issues");
+                toast.success(getLang().optFixPlayerDataSuccess);
               } else {
-                toast.error("No player data file found to fix");
+                toast.error(getLang().optFixPlayerDataNoData);
               }
             } catch (e) {
               setError(e);
@@ -153,8 +154,7 @@ function RepatchMenu({ modStatus, quit }: {
     const [splashScreen, setSplashScreen] = useState(null as File | null);
 
     return <>
-        <p>Certain mods require particular Android permissions to be enabled in order to work. 
-            To change the permisions, you will need to re-patch your game, which can be done automatically with the button below.</p>
+        {getLang().changePermHintInOptionsMenu}
         <PermissionsMenu manifest={manifest.current} />
         <br/>
         <button onClick={async () => {
@@ -167,7 +167,7 @@ function RepatchMenu({ modStatus, quit }: {
                 await patchApp(device, modStatus, null, manifest.current.toString(), true, false, false, splashScreen);
                 toast.success("Successfully repatched");
             })
-        }}>Repatch game</button>
+        }}>{getLang().repatchGame}</button>
 
         <SplashScreenSelector selected={splashScreen}
             onSelected={nowSelected => setSplashScreen(nowSelected)} />
@@ -240,16 +240,14 @@ function AdbLogger() {
     }, [logging]);
 
     return <>
-        <p>This feature allows you to get a log of what's going on inside your Quest, useful for modders to fix bugs with their mods.</p>
-        <p>Click the button below, <span className="warning">and keep your headset plugged in.</span> Open the game and do whatever it is that was causing you issues, then click the button again.</p>
-
+        {getLang().optionsMenuAdbLogHint}
         <p className="warning"></p>
         {!logging ? 
-            <button onClick={async () => setLogging(true)}>Start Logging</button> : 
-            <button onClick={() => setLogging(false)}>Stop Logging</button>}
+            <button onClick={async () => setLogging(true)}>{getLang().startLogging}</button> : 
+            <button onClick={() => setLogging(false)}>{getLang().stopLogging}</button>}
             <br/>
 
-        {waitingForLog && <p>Please wait while the log file generates . . .</p>}
-        {logFile !== null && <a href={URL.createObjectURL(logFile)} download={"logcat.log"}><button>Download Log</button></a>}
+        {waitingForLog && <p>{getLang().waitingForLog}</p>}
+        {logFile !== null && <a href={URL.createObjectURL(logFile)} download={"logcat.log"}><button>{getLang().downloadLog}</button></a>}
     </>
 }
