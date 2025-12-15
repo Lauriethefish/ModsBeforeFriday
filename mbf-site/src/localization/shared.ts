@@ -1,20 +1,25 @@
 import { useState } from "react";
 import { Eng } from "./en"
 
-let _lang:typeof Eng = Eng
-let _setLang:any
+interface EngImplementType {
+    __proto__: EngImplementType | typeof Eng
+}
+export type EngLikeObject = EngImplementType | typeof Eng
+
+let _lang: EngLikeObject = Eng
+let _setLang: (lang: any) => void
 
 export function initLanguage() {
     [_lang, _setLang] = useState(Eng)
 }
 
 export function getLang(): typeof Eng {
-    return _lang
+    return _lang as typeof Eng
 }
 
 export function setLang(
-    lang: any // lang is type of Eng, or act as Eng. This is duck-typed, and provided by other languages
+    lang: EngLikeObject
 ) {
-    if(_setLang)
+    if (_setLang)
         _setLang(lang)
 }
