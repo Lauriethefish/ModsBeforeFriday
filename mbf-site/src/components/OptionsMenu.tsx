@@ -160,12 +160,12 @@ function RepatchMenu({ modStatus, quit }: {
         <button onClick={async () => {
             if (!device) return;
 
-            await wrapOperation("Repatching Beat Saber", "Failed to repatch", async () => {
+            await wrapOperation(getLang().repatchingBeatSaber, getLang().failedToRepatch, async () => {
                 // TODO: Right now we do not set the mod status back to the DeviceModder state for it.
                 // This is fine at the moment since repatching does not update this state in any important way,
                 // but would be a problem if repatching did update it!
                 await patchApp(device, modStatus, null, manifest.current.toString(), true, false, false, splashScreen);
-                toast.success("Successfully repatched");
+                toast.success(getLang().successfullyRepatched);
             })
         }}>{getLang().repatchGame}</button>
 

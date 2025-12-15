@@ -340,7 +340,7 @@ export const Eng = {
     contributorXoToM:<>, a good friend of mine, created the animated background that you know and love. (although your CPU might hate it!)</>,
     contributorAltyFox:<>, a member of the BSMG support team, has provided invaluable feedback regarding usability, and has helped me to pinpoint and fix bugs.</>,
 
-    contributorLocalization:<>{/* nothing here, place holder for localization translators*/}</>,
+    contributorLocalization:<>{/* english version has nothing here, this is a credit text for localization translators*/}</>,
 
     creditsOkBtnText:<>OK</>,
 
@@ -444,5 +444,9 @@ export const Eng = {
     selectSplashScreen:<>Select splash screen</>,
     usingSplash:(name:string)=><>(Using <code className="codeBox">{name}</code> as splash)</>,
 
-    logOutput:<>Log output</>
+    logOutput:<>Log output</>,
+
+    repatchingBeatSaber: "Repatching Beat Saber",
+    failedToRepatch: "Failed to repatch",
+    successfullyRepatched: "Successfully repatched",
 }
