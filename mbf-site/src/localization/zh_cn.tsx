@@ -3,7 +3,7 @@ import { Eng } from "./en";
 export const SimplifiedChinese = {
     __proto__: Eng, // use english text for missing items
 
-    sourceCode: <>源代码</>,
+    sourceCode: <>源码</>,
     titleText: <>想在Quest上为节奏光剑安装自制谱面，这是最简单的工具!</>,
 
     toGetStart:
@@ -152,7 +152,7 @@ export const SimplifiedChinese = {
 
     contributorLocalization:<>{/* nothing here, place holder for localization translators*/}</>,
 
-    creditsOkBtnText:<>OK</>,
+    creditsOkBtnText:<>确定</>,
 
     checkInstall: <>正在检查节奏光剑的安装情况</>,
     mightTakeFewTimes: <>这可能会花费几秒钟，第一次会更久。</>,
@@ -275,4 +275,164 @@ export const SimplifiedChinese = {
     usingSplash:(name:string)=><>（正在使用<code className="codeBox">{name}</code>作为开屏画面）</>,
 
     logOutput:<>日志输出</>,
+
+
+    fixWithRestartDevice:(isViewingOnMobile:boolean)=>
+        <>
+        若要修复此问题，重启你的{isViewingOnMobile ? "手机" : "电脑"}.
+        </>
+    ,
+
+    questBrowserMessage:<>
+        <h1>已检测到Quest浏览器</h1>
+        <p>MBF发现你正在使用Quest设备内置的浏览器访问此工具。</p>
+        <p>非常不幸，<b>你无法在想要注入模组的设备本身上使用MBF。</b></p>
+    </>,
+
+    onlyWorkWithAnotherQuest:<>（如果你安装了一个Chromium浏览器，那么MBF可以在Quest上使用，但这只能用来给通过USB连接的<b>另外一台Quest设备</b>注入模组。）</>,
+
+    deviceSupportingModding:<>
+        <p>如果你想要给游戏注入模组，那么你需要这些设备之一： </p>
+        <ul>
+          <li>（最好是这个）一台电脑或者Mac</li>
+          <li>（这个也能用）一台安卓手机</li>
+        </ul>
+    </>,
+
+    iosNotSupported:<>
+        <h1>不支持iOS设备</h1>
+        <p>MBF检测到你正在使用iOS设备。非常不幸，苹果不允许使用WebUSB，而MBF需要用这个功能与Quest设备进行交互。</p>
+    </>,
+
+    supportedBrowserHintInIOS:<>
+        …… 以及下面这些浏览器：
+    </>,
+
+    browserNotSupported:<>
+        <h1>浏览器不支持</h1>
+        <p>看起来你正在用的浏览器不支持WebUSB，但是这个应用需要用此功能来访问你的Quest设备。</p>
+    </>,
+    supportedBrowserTitle:<>支持的浏览器</>,
+
+    supportedBrowserMobile:<>
+        <ul>
+            <li>安卓版本的Google Chrome 122或更新版本</li>
+            <li>安卓版本的Edge浏览器123或更新版本</li>
+        </ul>
+        <h3 className='fireFox'>不支持安卓版本的FireFox</h3>
+    </>,
+    supportedBrowserNotMobile:<>
+        <ul>
+            <li>Google Chrome 61或更新版本</li>
+            <li>Opera 48或更新版本</li>
+            <li>Microsoft Edge 79或更新版本</li>
+        </ul>
+        <h3 className='fireFox'>不支持FireFox或Safari浏览器。</h3>
+        <p>（无法支持FireFox浏览器，因为Mozilla出于安全考虑不支持WebUSB特性）</p>
+    </>,
+
+    noCompatableDeviceMobile:<>
+        <h4>正在使用安卓设备？</h4>
+        <p>很可能你没有正确设置你的设备与Quest之间的连接方式。若要修复：</p>
+        <ul>
+            <li>在安卓设备顶部下滑打开通知栏。</li>
+            <li>点按和USB连接有关的选项。可能叫做“正在通过 USB 为此设备充电”。</li>
+            <li>将“USB受控于”选项修改至“已连接的设备”。如果“已连接的设备”已经被选中，就先改成“本机”，然后再改回来。</li>
+        </ul>
+        <h4>还是不行?</h4>
+        <p>尝试把你的c-to-c数据线两端调换一下，让手机这头插到Quest上面。</p>
+    </>,
+
+    chooseCoreModUrl:<>
+        <h1>手动覆写核心模组JSON文件</h1>
+        <p>请输入一个完成的URL，内容包含你自己的核心模组JSON文件</p>
+    </>,
+
+    confirmUrl:<>确认URL</>,
+
+    versionSupportedInstallEssentialMods: <>
+        <p>为了让游戏能够使用自制歌曲，ModsBeforeFriday接下来会给游戏打补丁，并安装一些重要的模组。
+            结束之后，你就可以<b>在游戏里面</b>管理你的自制歌曲。</p>
+    </>,
+    
+    olderThanLatestModdableHint: <>你选择了一个比最新可用模组版本更旧的游戏版本。<b>应该只在有明确原因时，才这样做！</b></>,
+
+    reverseDecision: <>（撤回决定）</>,
+
+    quest1ModHint: (version:string)=>
+        <>MBF检测到你正在使用Quest 1。为了使用最新模组，MBF会将你的游戏升级至最新可用模组的版本（{version}）。
+                虽然Meta官方只为Quest 1支持到节奏光剑 v1.36.2，但是MBF可以通过补丁安装至{version}，所以依旧可以用！
+            </>
+    ,
+
+    unsupportedVersion: <>此版本不支持</>,
+    readThisMessage: <>在提问前，请阅读这个信息！</>,
+    notSupportedModsText: (version:string, isLegacy:boolean)=>
+        <>你安装了节奏光剑 v{version}但这个版本不支持{isLegacy ? "使用MBF来注入模组" : "注入模组"}！</>
+    ,
+
+    legacyUpdateRecommand:<>
+        <p>你用的这个版本或许可以通过其它模组工具来注入模组。但是，<b>强烈建议</b>你把它卸载掉，然后安装最新的可用模组的版本。</p>
+        <p className="warning"><em>BSMG（节奏光剑模组社区）已经不在支持</em>为1.28.0或更低的游戏版本注入模组——这是一个老旧的游戏版本，所有人都不应该用它了。务必务必<em>务必</em>升级至最新的游戏版本。</p>
+    </>,
+
+    normallyUpdateRecommand:<>
+        <p>一般来说，MBF会尝试将你的游戏降级到一个支持模组的游戏版本上，但前提是你要安装最新版本的游戏。</p>
+        <p>请按下面的按钮来卸载游戏，然后重新从Meta商店安装最新版本的游戏。</p>
+    </>,
+
+    awaitingPatchGeneration: <>正在等待生成补丁</>,
+
+    mustReadMessageFull:<>你必须<b>全文阅读</b>以下内容。</>,
+
+    noDiffMessageBody: (version:string)=>
+        <>
+            <p>你安装了节奏光剑，版本号是 v{version}暂时不支持模组。</p>
+            <p>MBF被设计为可以降级游戏至一个支持模组的版本， <b>但是现在还没有生成必要的补丁文件，</b>因为节奏光剑官方游戏刚刚更新。</p>
+            <p>生成补丁这件工作需要手动操作，<b>MBF的作者在空闲时很快就会进行</b>，这会持续大概半小时到一天左右的时间。</p>
+            <p><b>请耐心等待。</b>你可以刷新这个页面，然后重新连接Quest设备，来看看补丁是不是已经生成好了。</p>
+        </>
+    ,
+
+    incompatableModLoader: (modLoader:string)=>
+        <>
+            <h1>模组加载器不兼容</h1>
+            <p>你的游戏已经带有了{modLoader === 'QuestLoader' ? "QuestLoader" : "某个未知的"}模组加载器，MBF不支持这个加载器。</p>
+            <p>你必须卸载游戏，然后重新安装最新的原版游戏，这样就可以使用Scotland2模组加载器。</p>
+            <p>不必担心！你的自制歌曲不会丢失。</p>
+        </>
+    ,
+
+    incompatableVersionPatched: (version:string)=><>
+            <h1>已补丁的版本不支持模组</h1>
+
+            <p>你的游戏已经安装了一个模组加载器，但这个版本（{version}）没有支持的模组!</p>
+            <p>如果要修复，卸载节奏光剑并重新安装最新版本。然后MBF会自动降级游戏至最新可安装模组的版本。</p>
+        </>
+    ,
+
+    obbNotPresent:<>
+        <h1>没有找到OBB</h1>
+        <p>MBF检测到OOB文件（包含了节奏光剑启动所需的游戏资源）没有被正确安装。</p>
+        <p>这说明你的游戏是损坏的。你需要点击下面的按钮卸载游戏，然后在Meta商店重新安装最新版本。</p>
+    </>,
+
+    coreModDisabled:<>核心模组已禁用。</>,
+
+    problemFound:<>在安装过程中发现了问题：</>,
+    problemCanFix:<>可以点击下面的按钮来轻松修复。</>,
+    modloaderNotFound:<>没有找到模组加载器</>,
+    modloaderNeedUpdate:<>模组加载器有更新</>,
+    coremodsMissing:<>有些核心模组没有安装</>,
+    coreModsNeedUpdate:<>需要安装核心模组的更新。</>,
+    fixIssue:<>修复问题</>,
+
+    changeManifestXmlHint:<>
+        <h2>修改清单XML</h2>
+        <p>仅用于开发，这个菜单能让你手动编辑APK的AndroidManifest.xml文件。</p>
+        <p>务必小心，错误的编辑会导致APK安装异常。</p>
+    </>,
+    
+    // permMenuPermissions:<>Permissions</>,       // 不翻译
+    // permMenuFeatures:<>Features</>,             // 不翻译
 }
