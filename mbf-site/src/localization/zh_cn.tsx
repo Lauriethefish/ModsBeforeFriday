@@ -16,7 +16,7 @@ export const SimplifiedChinese = {
     notInstalled: <>
         <h1>没有安装节奏光剑</h1>
         <p>请在商店中安装节奏光剑，然后刷新此网页。</p>
-        <h3>你感觉自己已经安装了吗？</h3>
+        <h3>认为自己已经安装了吗？</h3>
         <p>偶尔会有这种情况，在头显里看起来已经安装了游戏，但实际上并没有（是Meta的软件Bug）。</p>
         <p>可以这样修复：在Quest上进入<b>资源库</b>，然后点击节奏光剑旁边的三个点，选择<b>卸载。最后在商店里重新安装节奏光剑，并刷新此网页重试。</b>。</p>
     </>,
@@ -150,7 +150,7 @@ export const SimplifiedChinese = {
     contributorXoToM:<>，是我朋友，制作了这个令人喜爱的动画背景。（虽说你的CPU可能会讨厌这个东西！）</>,
     contributorAltyFox:<>，是BSMG支持团队中的一个人，为可用性方面提供了宝贵的反馈，帮我定位并修复了Bug。</>,
 
-    contributorLocalization:<>{/* nothing here, place holder for localization translators*/}</>,
+    contributorLocalization:<><li><p>最初版本的中文本地化工作由<a href="https://github.com/frto027">Frto027</a>制作。如希望改进，请直接向MBF源码提交贡献。</p></li></>,
 
     creditsOkBtnText:<>确定</>,
 
@@ -435,4 +435,9 @@ export const SimplifiedChinese = {
     
     // permMenuPermissions:<>Permissions</>,       // 不翻译
     // permMenuFeatures:<>Features</>,             // 不翻译
+
+    repatchingBeatSaber: "正在重新补丁节奏光剑",
+    failedToRepatch: "重新补丁失败",
+    successfullyRepatched: "重新补丁成功",
+
 }
