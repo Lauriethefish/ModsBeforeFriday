@@ -5,6 +5,7 @@ import TrashCan from '../icons/trash.svg';
 import Code from '../icons/code.svg';
 import { YesNoModal } from './Modal';
 import { useState } from 'react';
+import { getLang } from '../localization/shared';
 
 interface ModCardProps {
     mod: Mod,
@@ -17,7 +18,7 @@ interface ModCardProps {
 function CoreModBadge() {
     return <div className="coreBadge">
         <img src={Code} alt="Code symbol"/>
-        <p>CORE</p>
+        <p>{getLang().coreBadgeText}</p>
     </div>
 }
 

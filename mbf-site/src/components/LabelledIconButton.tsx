@@ -4,7 +4,7 @@ import { isViewingOnMobile } from '../platformDetection';
 // A button that displays an icon and an associated label.
 // It has the same background tint as a .discreetButton
 export function LabelledIconButton({ label, iconSrc, iconAlt, onClick, noIconOnMobile }: {
-    label: string,
+    label: string | JSX.Element,
     iconSrc: string,
     iconAlt: string,
     noIconOnMobile?: boolean,

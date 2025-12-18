@@ -6,12 +6,14 @@ import { EditableList } from "./EditableList";
 import { AndroidManifest } from "../AndroidManifest";
 import { Modal } from "./Modal";
 import { toast } from "react-toastify";
+import { getLang } from "../localization/shared";
 
 
 // A particular toggle in the "permissions" menu.
 // This option being enabled will constitute having one or more features or permissions enabled.
 interface ManifestOptionInfo {
-    name: string, // Human readable
+    nameKey: string,
+    nameElement: ()=>JSX.Element, // Human readable
     features: string[]
     permissions: string[],
     // A dictionary of metadata element name attributes to value attributes
@@ -22,22 +24,26 @@ interface ManifestOptionInfo {
 
 const displayedOptions: ManifestOptionInfo[] = [
     {
-        name: "Microphone Access",
+        nameKey: "Microphone Access",
+        nameElement:()=>getLang().permMicrophone,
         permissions: ["android.permission.RECORD_AUDIO"],
         features: [],
     },
     {
-        name: "Passthrough to headset cameras",
+        nameKey: "Passthrough to headset cameras",
+        nameElement:()=>getLang().permPassthrough,
         permissions: [],
         features: ["com.oculus.feature.PASSTHROUGH"],
     },
     {
-        name: "Body tracking",
+        nameKey: "Body tracking",
+        nameElement:()=>getLang().permBody,
         permissions: ["com.oculus.permission.BODY_TRACKING"],
         features: ["com.oculus.software.body_tracking"]
     },
     {
-        name: "Hand tracking",
+        nameKey: "Hand tracking",
+        nameElement:()=>getLang().permHand,
         permissions: ["com.oculus.permission.HAND_TRACKING"],
         features: ["oculus.software.handtracking"],
         app_metadata: {
@@ -46,12 +52,14 @@ const displayedOptions: ManifestOptionInfo[] = [
         }
     },
     {
-        name: "Bluetooth",
+        nameKey: "Bluetooth",
+        nameElement:()=>getLang().permBluetooth,
         permissions: ["android.permission.BLUETOOTH", "android.permission.BLUETOOTH_CONNECT"],
         features: []
     },
     {
-        name: "MRC workaround",
+        nameKey: "MRC workaround",
+        nameElement:()=>getLang().permMRC,
         permissions: [],
         features: [],
         native_libraries: ["libOVRMrcLib.oculus.so"]
@@ -93,8 +101,8 @@ export function PermissionsMenu({ manifest }: { manifest: AndroidManifest }) {
     }
 
     return <>
-        <button className="discreetButton" onClick={() => setAdvanced(!advanced)}>{advanced ? "Simple options" : "Advanced Options"}</button>
-        {advanced && <button className="discreetButton rightMargin" onClick={() => setEditXml(true)}>Edit XML</button>}
+        <button className="discreetButton" onClick={() => setAdvanced(!advanced)}>{advanced ? getLang().SimpleOptions : getLang().AdvancedOptions }</button>
+        {advanced && <button className="discreetButton rightMargin" onClick={() => setEditXml(true)}>{getLang().EditXML}</button>}
         {!advanced && <ToggleMenu manifest={manifest} state={manifestState} updateState={updateState} />}
         {advanced && <TextFieldMenu manifest={manifest} state={manifestState} updateState={updateState} />}
         <Modal isVisible={editXml}>
@@ -110,7 +118,7 @@ export function PermissionsMenu({ manifest }: { manifest: AndroidManifest }) {
                     return false;
                 }
             }}/>
-            <button onClick={() => setEditXml(false)}>Back</button>
+            <button onClick={() => setEditXml(false)}>{getLang().backBtnText}</button>
         </Modal>
     </>
 }
@@ -126,7 +134,7 @@ function ToggleMenu({ state, manifest, updateState }: ManifestStateProps) {
                     .every(entry => state.metadata[entry[0]] == entry[1])) &&
                 (permInfo.native_libraries === undefined || permInfo.native_libraries.every(lib => state.nativeLibraries.includes(lib)))
 
-            return <span id="namedSlider" key={permInfo.name}>
+            return <span id="namedSlider" key={permInfo.nameKey}>
                 <Slider on={enabled}
                     valueChanged={nowEnabled => {
                         if(nowEnabled) {
@@ -149,7 +157,7 @@ function ToggleMenu({ state, manifest, updateState }: ManifestStateProps) {
                         updateState();
                     }} />
 
-                <p>{permInfo.name}</p>
+                <p>{permInfo.nameElement()}</p>
             </span>
         })}
     </>
@@ -158,7 +166,7 @@ function ToggleMenu({ state, manifest, updateState }: ManifestStateProps) {
 
 function TextFieldMenu({ state, manifest, updateState }: ManifestStateProps) {
     return <>
-        <EditableList title="Permissions" list={state.permissions} addItem={item => {
+        <EditableList title={getLang().permMenuPermissions} list={state.permissions} addItem={item => {
             manifest.addPermission(item);
             updateState();
         }} removeItem={item => {
@@ -166,7 +174,7 @@ function TextFieldMenu({ state, manifest, updateState }: ManifestStateProps) {
             updateState();
         }} />
         <br/>
-        <EditableList title="Features" list={state.features} addItem={item => {
+        <EditableList title={getLang().permMenuFeatures} list={state.features} addItem={item => {
             manifest.addFeature(item);
             updateState();
         }} removeItem={item => {
@@ -184,12 +192,10 @@ function XmlEditor({ manifestXml, setManifestXml }: {
     const inputFile = useRef<HTMLInputElement | null>(null);
 
     return <>
-        <h2>Change manifest XML</h2>
-        <p>For development purposes, this menu will allow you to manually edit the entirety of the AndroidManifest.xml file within the APK</p>
-        <p>Be careful, as erroneous edits will prevent the APK from installing properly.</p>
+        {getLang().changeManifestXmlHint}
         <a href={URL.createObjectURL(xmlBlob)}
             download="AndroidManifest.xml">
-            <button className="rightMargin">Download Current XML</button>
+            <button className="rightMargin">{getLang().downloadCurrentXML}</button>
         </a>
 
         <button className="rightMargin" onClick={() => inputFile.current?.click()}>
@@ -206,7 +212,7 @@ function XmlEditor({ manifestXml, setManifestXml }: {
                     }
                     ev.target.value = "";
                 }}
-            />Upload XML
+            />{getLang().uploadXML}
         </button>
     </>
     

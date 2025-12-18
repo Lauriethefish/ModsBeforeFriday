@@ -1,6 +1,6 @@
 .cornerMenu {
     position: fixed;
-    bottom: 0;
+    bottom: 24px;
     left: 0;
 
     padding: 0px;
@@ -39,4 +39,31 @@
 
 .cornerMenuRow > p {
     margin: 0;
+}
+
+.langBtnContainer{
+    position: fixed;
+    bottom: 4px;
+    left: 10px;
+    background-color: rgba(94, 94, 94, 0.432);
+    border-radius: 1000px;
+}
+.langBtn{
+    display: inline-block;
+    background-color: rgba(255, 255, 255, 0);
+    font-family: sans-serif; 
+    padding: 0px 8px;
+    border-radius: 100px;
+    margin-left: -6px;
+}
+.langBtnContainer > :first-child {
+    margin-left: 0 !important;
+}
+
+.langBtn:hover {
+    background-color: rgba(255, 255, 255, 0);
+}
+
+.selectedLangBtn {
+    background-color: #3558d4 !important;
 }

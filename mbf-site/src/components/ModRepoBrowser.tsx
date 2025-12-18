@@ -7,6 +7,7 @@ import { Log } from "../Logging";
 import '../css/ModRepoBrowser.css';
 import DownloadIcon from '../icons/download-icon.svg';
 import UpdateIcon from '../icons/update-icon.svg';
+import { getLang } from "../localization/shared";
 
 interface ModRepoBrowserProps {
     gameVersion: string,
@@ -85,10 +86,7 @@ export function ModRepoBrowser(props: ModRepoBrowserProps) {
                     onDownload(flagged.map(mod => mod.mod));
                     setFlagged([]);
                 }}>
-                    {hasFlaggedModsToUpdate && hasFlaggedNewMods && "Install/Update "}
-                    {hasFlaggedModsToUpdate && !hasFlaggedNewMods && "Update "}
-                    {!hasFlaggedModsToUpdate && hasFlaggedNewMods && "Install "}
-                    {flagged.length} {flagged.length > 1 ? "mods" : "mod"}
+                    {getLang().installModHint(hasFlaggedModsToUpdate, hasFlaggedNewMods, flagged.length)}
                     <img src={hasFlaggedNewMods ? DownloadIcon : UpdateIcon} alt="A download icon" />
                 </button>}
 
