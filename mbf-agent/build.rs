@@ -1,8 +1,8 @@
 use std::{fs::OpenOptions, path::Path};
 
 const LIBMAIN_URL: &str =
-    "https://github.com/sc2ad/LibMainLoader/releases/download/v0.1.0-alpha/libmain.so";
-const SL2_URL: &str = "https://github.com/sc2ad/Scotland2/releases/latest/download/libsl2.so";
+    "https://github.com/sc2ad/LibMainLoader/releases/download/v0.2.0/libmain.so";
+const SL2_URL: &str = "https://github.com/sc2ad/scotland2/releases/download/v0.1.7/libsl2.so";
 const OVR_URL: &str = "https://github.com/kodenamekrak/JusticeForQuest/raw/refs/heads/master/third_party/libovrplatformloader.so";
 
 fn download_if_not_exist(url: &str, to: &str) {
