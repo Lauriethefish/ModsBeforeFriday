@@ -304,7 +304,7 @@ function PatchingMenu(props: PatchingMenuProps) {
     .filter(version => version != initialDowngradingTo);
     
     const [manifest, setManifest] = useState(null as null | AndroidManifest); 
-    manifest?.applyPatchingManifestMod(devicePreV51);
+    manifest?.applyPatchingManifestMod();
     
     useEffect(() => {
         if (!device) return;
