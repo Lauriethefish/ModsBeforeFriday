@@ -72,6 +72,8 @@ pub struct LocalFileHeader {
 
 impl EndOfCentDir {
     pub const HEADER: u32 = 0x06054b50;
+    pub const MIN_SIZE: i64 = 22;
+    pub const COMMENT_LENGTH_FIELD_OFFSET: i64 = 20;
 
     pub fn read(data: &mut impl Read) -> Result<Self> {
         if data.read_u32::<LE>()? != Self::HEADER {

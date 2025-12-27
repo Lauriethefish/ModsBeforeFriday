@@ -111,7 +111,7 @@ export class AndroidManifest {
     // - Enable MANAGE_EXTERNAL_STORAGE permission.
     // - Make app debuggable
     // - Enable hardware acceleration. (useful for any mods that make use of the WebView API)
-    public applyPatchingManifestMod(devicePreV51: boolean = false) {
+    public applyPatchingManifestMod() {
         const application = this.document.getElementsByTagName("application")[0];
         application.setAttributeNS(ANDROID_NS_URI, `${this.androidNsPrefix}:debuggable`, "true");
         application.setAttributeNS(ANDROID_NS_URI, `${this.androidNsPrefix}:hardwareAccelerated`, "true");
@@ -119,13 +119,10 @@ export class AndroidManifest {
         this.addPermission("android.permission.MANAGE_EXTERNAL_STORAGE");
         this.setMetadata("com.oculus.supportedDevices", "quest|quest2");
         
-        // Quest 1 specific
-        if (devicePreV51) {
-            application.setAttributeNS(ANDROID_NS_URI, `${this.androidNsPrefix}:requestLegacyExternalStorage`, "true");
-
-            this.addPermission("android.permission.WRITE_EXTERNAL_STORAGE");
-            this.addPermission("android.permission.READ_EXTERNAL_STORAGE");    
-        }
+        // Pre Android 11 permissions to read/write external storage (we keep these for compatibility with older devices, do not remove)
+        application.setAttributeNS(ANDROID_NS_URI, `${this.androidNsPrefix}:requestLegacyExternalStorage`, "true");
+        this.addPermission("android.permission.WRITE_EXTERNAL_STORAGE");
+        this.addPermission("android.permission.READ_EXTERNAL_STORAGE");    
     }
 
     // Adds a <uses-permission> element for the specified permission underneath the manifest tag.
