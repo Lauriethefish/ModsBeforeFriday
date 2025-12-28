@@ -8,12 +8,13 @@ import '../css/OptionsMenu.css'
 import { Collapsible } from './Collapsible';
 import { ModStatus } from '../Messages';
 import { AndroidManifest } from '../AndroidManifest';
-import { useSetError, wrapOperation } from '../SyncStore';
 import { Log } from '../Logging';
 import { Modal } from './Modal';
 import { SplashScreenSelector } from './SplashScreenSelector';
-import { useDeviceStore } from '../DeviceStore';
 import { gameId } from '../game_info';
+import { useDeviceConnectorContext } from '../hooks/DeviceConnector';
+import { OperationModals } from './OperationModals';
+
 
 interface OptionsMenuProps {
     setModStatus: (status: ModStatus) => void,
@@ -50,7 +51,7 @@ function ModTools({ quit, modStatus, setModStatus }: {
     quit: () => void,
     modStatus: ModStatus,
     setModStatus: (status: ModStatus) => void}) {
-    const { device } = useDeviceStore((store) => ({ device: store.device }));
+    const { chosenDevice } = useDeviceConnectorContext();
 
     return (
       <div id="modTools">
@@ -58,11 +59,11 @@ function ModTools({ quit, modStatus, setModStatus }: {
           text="Kill Beat Saber"
           description="Immediately closes the game."
           onClick={async () => {
-            if (!device) return;
+            if (!chosenDevice) return;
 
-            const setError = useSetError("Failed to kill Beat Saber process");
+            const setError = OperationModals.useSetError("Failed to kill Beat Saber process");
             try {
-                await device.subprocess.noneProtocol.spawnWait(`am force-stop ${gameId}`);
+                await chosenDevice.subprocess.noneProtocol.spawnWait(`am force-stop ${gameId}`);
                 toast.success("Successfully killed Beat Saber");
             }   catch(e) {
                 setError(e);
@@ -73,11 +74,11 @@ function ModTools({ quit, modStatus, setModStatus }: {
           text="Restart Beat Saber"
           description="Immediately closes and restarts the game."
           onClick={async () => {
-            if (!device) return;
+            if (!chosenDevice) return;
 
-            const setError = useSetError("Failed to kill Beat Saber process");
+            const setError = OperationModals.useSetError("Failed to kill Beat Saber process");
             try {
-              await device.subprocess.noneProtocol.spawnWait(`sh -c 'am force-stop ${gameId}; monkey -p com.beatgames.beatsaber -c android.intent.category.LAUNCHER 1'`);
+              await chosenDevice.subprocess.noneProtocol.spawnWait(`sh -c 'am force-stop ${gameId}; monkey -p com.beatgames.beatsaber -c android.intent.category.LAUNCHER 1'`);
               toast.success("Successfully restarted Beat Saber");
             } catch (e) {
               setError(e);
@@ -88,13 +89,13 @@ function ModTools({ quit, modStatus, setModStatus }: {
           text="Reinstall only core mods"
           description="Deletes all installed mods, then installs only the core mods."
           onClick={async () => {
-            if (!device) return;
+            if (!chosenDevice) return;
 
-            await wrapOperation(
+            await OperationModals.wrapOperation(
               "Reinstalling only core mods",
               "Failed to reinstall only core mods",
               async () => {
-                setModStatus(await quickFix(device, modStatus, true));
+                setModStatus(await quickFix(chosenDevice, modStatus, true));
                 toast.success("All non-core mods removed!");
               }
             );
@@ -104,11 +105,11 @@ function ModTools({ quit, modStatus, setModStatus }: {
           text="Uninstall Beat Saber"
           description="Uninstalls the game: this will remove all mods and quit MBF."
           onClick={async () => {
-            if (!device) return;
+            if (!chosenDevice) return;
 
-            const setError = useSetError("Failed to uninstall Beat Saber");
+            const setError = OperationModals.useSetError("Failed to uninstall Beat Saber");
             try {
-              await uninstallBeatSaber(device);
+              await uninstallBeatSaber(chosenDevice);
               quit();
             } catch (e) {
               setError(e);
@@ -119,10 +120,10 @@ function ModTools({ quit, modStatus, setModStatus }: {
           text="Fix Player Data"
           description="Fixes an issue with player data permissions."
           onClick={async () => {
-            if (!device) return;
-            const setError = useSetError("Failed to fix player data");
+            if (!chosenDevice) return;
+            const setError = OperationModals.useSetError("Failed to fix player data");
             try {
-              if (await fixPlayerData(device)) {
+              if (await fixPlayerData(chosenDevice)) {
                 toast.success("Successfully fixed player data issues");
               } else {
                 toast.error("No player data file found to fix");
@@ -141,10 +142,7 @@ function RepatchMenu({ modStatus, quit }: {
     quit: (err: unknown) => void
 }
 ) {
-    const { device, devicePreV51 } = useDeviceStore((store) => ({ 
-        device: store.device,
-        devicePreV51: store.devicePreV51
-    }));
+    const { chosenDevice, devicePreV51 } = useDeviceConnectorContext();
 
     let manifest = useRef(new AndroidManifest(modStatus.app_info!.manifest_xml));
     useEffect(() => {
@@ -158,13 +156,13 @@ function RepatchMenu({ modStatus, quit }: {
         <PermissionsMenu manifest={manifest.current} />
         <br/>
         <button onClick={async () => {
-            if (!device) return;
+            if (!chosenDevice) return;
 
-            await wrapOperation("Repatching Beat Saber", "Failed to repatch", async () => {
+            await OperationModals.wrapOperation("Repatching Beat Saber", "Failed to repatch", async () => {
                 // TODO: Right now we do not set the mod status back to the DeviceModder state for it.
                 // This is fine at the moment since repatching does not update this state in any important way,
                 // but would be a problem if repatching did update it!
-                await patchApp(device, modStatus, null, manifest.current.toString(), true, false, false, splashScreen);
+                await patchApp(chosenDevice, modStatus, null, manifest.current.toString(), true, false, false, splashScreen);
                 toast.success("Successfully repatched");
             })
         }}>Repatch game</button>
@@ -214,10 +212,10 @@ function AdbLogger() {
     const [logging, setLogging] = useState(false);
     const [logFile, setLogFile] = useState(null as Blob | null);
     const [waitingForLog, setWaitingForLog] = useState(false);
-    const { device } = useDeviceStore((store)=> ({device: store.device}));
+    const { chosenDevice } = useDeviceConnectorContext();
 
     useEffect(() => {
-        if(!logging || !device) {
+        if(!logging || !chosenDevice) {
             return () => {};
         }
 
@@ -225,7 +223,7 @@ function AdbLogger() {
         setWaitingForLog(false);
         setLogFile(null);
         let cancelled = false;
-        logcatToBlob(device, () => cancelled)
+        logcatToBlob(chosenDevice, () => cancelled)
             .then(log => {
                 setLogFile(log);
                 setWaitingForLog(false);
