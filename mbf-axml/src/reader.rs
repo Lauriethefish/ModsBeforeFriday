@@ -177,6 +177,9 @@ impl<'r, R: Read + Seek> AxmlReader<'r, R> {
                 AttributeValue::String(self.get_pooled_string(raw_value)?.to_string())
             }
             Some(AttributeTypeId::Reference) => AttributeValue::Reference(raw_value),
+            Some(AttributeTypeId::Float) => {
+                AttributeValue::Float(f32::from_bits(raw_value))
+            }
             None => return Err(anyhow!("Attribute type ID {type_id} was not recognised")),
         };
 
