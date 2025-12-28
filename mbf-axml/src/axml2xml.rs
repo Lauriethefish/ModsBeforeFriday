@@ -283,6 +283,7 @@ fn stringify_attr_value(value: AxmlAttrValue) -> String {
         AxmlAttrValue::Integer(i) => i.to_string(),
         AxmlAttrValue::String(s) => s,
         AxmlAttrValue::Reference(reference) => format!("[REF {reference}]"),
+        AxmlAttrValue::Float(f) => f.to_string(),
     }
 }
 
@@ -295,6 +296,8 @@ fn attr_value_from_string(string: String) -> Result<AxmlAttrValue> {
         AxmlAttrValue::Boolean(false)
     } else if let Ok(i) = string.parse::<i32>() {
         AxmlAttrValue::Integer(i)
+    } else if let Ok(f) = string.parse::<f32>() {
+        AxmlAttrValue::Float(f)
     } else if string.starts_with("[REF ") {
         AxmlAttrValue::Reference(
             string[5..string.len() - 1]
