@@ -16,6 +16,7 @@ import { OpenLogsButton } from './components/OpenLogsButton';
 import { lte as semverLte } from 'semver';
 import { useDeviceStore } from './DeviceStore';
 import { gameId } from './game_info';
+import { getLang } from './localization/shared';
 
 interface DeviceModderProps {
     device: Adb,
@@ -82,26 +83,19 @@ export function DeviceModder(props: DeviceModderProps) {
     // Fun "ocean" of IF statements, hopefully covering every possible state of an installation!
     if (modStatus === null) {
         return <div className='container mainContainer fadeIn'>
-            <h2>Checking Beat Saber installation</h2>
+            <h2>{getLang().checkInstall}</h2>
             <span className="floatRight"><LogWindowControls/></span>
-            <p>This might take a minute or so the first few times.</p>
+            <p>{getLang().mightTakeFewTimes}</p>
             <LogWindow />
         </div>
     } else if (modStatus.app_info === null) {
         return <div className='container mainContainer'>
-            <h1>Beat Saber is not installed</h1>
-            <p>Please install Beat Saber from the store and then refresh the page.</p>
-            <h3>Think you have Beat Saber installed?</h3>
-            <p>Sometimes, it looks like Beat Saber is installed in your headset, when it actually isn't (a bug in the Meta software).</p>
-            <p>This can be fixed by going to the main <b>Applications</b> menu inside your Quest, clicking the 3 dots next to Beat Saber, and clicking <b>Uninstall</b>. Finally, reinstall Beat Saber from the Meta store and refresh this page to try again.</p>
+            { getLang().notInstalled }
         </div>
     } else if (modStatus.core_mods === null) {
         return <div className='container mainContainer'>
             <OpenLogsButton />
-            <h1>No internet</h1>
-            <p>It seems as though <b>your Quest</b> has no internet connection.</p>
-            <p>To mod Beat Saber, MBF needs to download files such as a mod loader and several essential mods.
-                <br />This occurs on your Quest's connection. Please make sure that WiFi is enabled, then refresh the page.</p>
+            { getLang().noInternet }
         </div>
     }  else if (!(modStatus.core_mods.supported_versions.includes(modStatus.app_info.version)) && !isDeveloperUrl) {
         // Check if we can downgrade to a supported version
@@ -153,15 +147,13 @@ function NoObb({ quit }: { quit: () => void }) {
     const { device } = useDeviceStore((state) => ({ device: state.device }));
 
      return <div className="container mainContainer">
-        <h1>OBB not present</h1>
-        <p>MBF has detected that the OBB file, which contains asset files required for Beat Saber to load, is not present in the installation.</p>
-        <p>This means your installation is corrupt. You will need to uninstall Beat Saber with the button below, and reinstall the latest version from the Meta store.</p>
+        {getLang().obbNotPresent}
         <button onClick={async () => {
             if (!device) return;
 
             await uninstallBeatSaber(device);
             quit();
-        }}>Uninstall Beat Saber</button>
+        }}>{getLang().uninstallBeatSaber}</button>
      </div>
 }
 
@@ -174,16 +166,16 @@ function ValidModLoaderMenu({ modStatus, setModStatus, quit }: {
     return <>
         <div className='container mainContainer'>
             <OpenLogsButton />
-            <h1>App is modded</h1>
+            <h1>{getLang().appIsModded}</h1>
             <UpdateInfo modStatus={modStatus} quit={quit}/>
 
             {isDeveloperUrl ? <>
-                <p className="warning">Core mod functionality is disabled.</p>
+                <p className="warning">{getLang().coreModDisabled}</p>
             </> : <>
                 <InstallStatus
                         modStatus={modStatus}
                         onFixed={status => setModStatus(status)}/>
-                <h4>Not sure what to do next?</h4>
+                <h4>{getLang().notSureNext}</h4>
                 <NextSteps />
             </>}
         </div>
@@ -222,27 +214,27 @@ function InstallStatus(props: InstallStatusProps) {
     const { device } = useDeviceStore((state) => ({ device: state.device }));
     
     if (modloaderStatus === "Ready" && coreModStatus === "Ready") {
-        return <p>Everything should be ready to go! &#9989;</p>
+        return <p>{getLang().everythingReady} &#9989;</p>
     } else {
         return <div>
-            <h3 className="warning">Problems found with your install:</h3>
-            <p>These can be easily fixed by clicking the button below.</p>
+            <h3 className="warning">{getLang().problemFound}</h3>
+            <p>{getLang().problemCanFix}</p>
             <ul>
                 {modloaderStatus === "Missing" &&
-                    <li>Modloader not found &#10060;</li>}
+                    <li>{getLang().modloaderNotFound} &#10060;</li>}
                 {modloaderStatus === "NeedUpdate" &&
-                    <li>Modloader has an available update</li>}
+                    <li>{getLang().modloaderNeedUpdate}</li>}
                 {coreModStatus === "Missing" &&
-                    <li>Not all the core mods are installed &#10060;</li>}
+                    <li>{getLang().coremodsMissing} &#10060;</li>}
                 {coreModStatus === "NeedUpdate" && 
-                    <li>Core mod updates need to be installed.</li>}
+                    <li>{getLang().coreModsNeedUpdate}</li>}
             </ul>
             <button onClick={async () => {
                 if (!device) return;
 
                 wrapOperation("Fixing issues", "Failed to fix install", async () =>
                     onFixed(await quickFix(device, modStatus, false)));
-            }}>Fix issues</button>
+            }}>{getLang().fixIssue}</button>
         </div>
     }
 }
@@ -255,30 +247,19 @@ function UpdateInfo({ modStatus, quit }: { modStatus: ModStatus, quit: () => voi
     const [updateWindowOpen, setUpdateWindowOpen] = useState(false);
     
     return <>
-        <p>Your Beat Saber install is modded, and its version is compatible with mods.</p>
-        {newerUpdateExists && <p>&#10071; &#65039;&#10071; &#65039; However, an updated moddable version is available! <ClickableLink onClick={() => setUpdateWindowOpen(true)}>Click here to update</ClickableLink></p>}
+        <p>{ getLang().modCompatable }</p>
+        {newerUpdateExists && <p>&#10071; &#65039;&#10071; &#65039; { getLang().modUpdateAvaliable }<ClickableLink onClick={() => setUpdateWindowOpen(true)}>{getLang().clickHereToUpdate}</ClickableLink></p>}
 
         <Modal isVisible={updateWindowOpen}>
-            <h2>Update Beat Saber</h2>
-            <p>To update to the latest moddable version, simply:</p>
-            <ol>
-                <li>Uninstall Beat Saber with the button below.</li>
-                <li>Reinstall Beat Saber in your headset.</li>
-                <li>Open back up MBF to mod the version you just installed.</li>
-            </ol>
+            {getLang().updateBeatSaberHint}
             <button onClick={async () => {
                 if (!device) return;
                 await uninstallBeatSaber(device);
                 quit();
-            }}>Uninstall Beat Saber</button>
-            <button onClick={() => setUpdateWindowOpen(false)} className="discreetButton">Cancel</button>
+            }}>{getLang().uninstallBeatSaber}</button>
+            <button onClick={() => setUpdateWindowOpen(false)} className="discreetButton">{getLang().cancel}</button>
             <br/><br/>
-            <h3>What about my maps/mods/scores/qosmetics?</h3>
-            <ul>
-                <li><em>Maps and scores will remain safe</em> as they are held in a separate folder to the game files, so will not be deleted when you uninstall.</li>
-                <li>Qosmetics will not be deleted, however you can only use them if the qosmetics mods are available for the new version. You can always move back to your current version later if you miss them.</li>
-                <li><em>All currently installed mods will be removed.</em> (the new core mods for the updated version will be installed automatically) You can reinstall them once you have updated (if they are available for the newer version)</li>
-            </ul>
+            {getLang().uninstallAboutMapThings}
         </Modal>
     </>
 }
@@ -318,15 +299,14 @@ function PatchingMenu(props: PatchingMenuProps) {
                 // TODO: Perhaps revert to "not downgrading" if this error comes up (but only if the latest version is moddable)
                 // This is low priority as this error message should only show up very rarely - there is already a previous check for internet access.
                 Log.error("Failed to fetch older manifest: " + error);
-                props.quit("Failed to fetch AndroidManifest.xml for the selected downgrade version. Did your quest lose its internet connection suddenly?");
+                props.quit(getLang().failedToFetchManifestHint);
             });
         }
     }, [downgradingTo]);
 
     if(manifest === null) {
         return <div className='container mainContainer'>
-            <h2>Loading downgraded APK manifest</h2>
-            <p>This should only take a few seconds.</p>
+            {getLang().loadingDowngradedApk}
         </div>
     } else if(!isPatching) {
         return <div className='container mainContainer'>
@@ -358,11 +338,9 @@ function PatchingMenu(props: PatchingMenuProps) {
                     }
                     setVersionSelectOpen(false);
                 }} />
-            
-            <h2 className='warning'>READ CAREFULLY</h2>
-            <p>Mods and custom songs are not supported by Beat Games. You may experience bugs and crashes that you wouldn't in a vanilla game.</p>
+            {getLang().modWarning}
             <div>
-                <button className="discreetButton" id="permissionsButton" onClick={() => setSelectingPerms(true)}>Permissions</button>
+                <button className="discreetButton" id="permissionsButton" onClick={() => setSelectingPerms(true)}>{getLang().permissions}</button>
                 <button disabled={!device} className="largeCenteredButton" onClick={async () => {
                     if (!device) return;
 
@@ -373,7 +351,7 @@ function PatchingMenu(props: PatchingMenuProps) {
                         setPatchingError(String(e));
                         setIsPatching(false);
                     }
-                }}>Mod the app</button>
+                }}>{getLang().modTheApp}</button>
             </div>
 
             <ErrorModal
@@ -383,20 +361,17 @@ function PatchingMenu(props: PatchingMenuProps) {
                 onClose={() => setPatchingError(null)} />
 
             <Modal isVisible={selectingPerms}>
-                <h2>Change Permissions</h2>
-                <p>Certain mods require particular Android permissions to be set on the Beat Saber app in order to work correctly.</p>
-                <p>(You can change these permissions later, so don't worry about enabling them all now unless you know which ones you need.)</p>
+                {getLang().changePermissionHint}
                 <PermissionsMenu manifest={manifest} />
-                <button className="largeCenteredButton" onClick={() => setSelectingPerms(false)}>Confirm permissions</button>
+                <button className="largeCenteredButton" onClick={() => setSelectingPerms(false)}>{getLang().confirmPermission}</button>
             </Modal>
 
         </div>
     } else {
         return <div className='container mainContainer'>
-            <h1>App is being patched</h1>
-            <p>This should only take a few minutes, but could take much, much longer if your internet connection is slow.</p>
+            {getLang().appPatchedHint}
             <span className="floatRight"><LogWindowControls/></span>
-            <p className='warning'>You must not disconnect your device during this process.</p>
+            <p className='warning'>{getLang().dontDisconnectDeviceHint}</p>
             <LogWindow />
         </div>
     }
@@ -412,17 +387,13 @@ function PatchingAdvancedOptions({ downgradeVersions, onConfirm, isVisible }:
     const [selected, setSelected] = useState(null as string | null);
 
     return <Modal isVisible={isVisible}>
-        <h2>Choose a different game version</h2>
-        <p>Using this menu, you can make MBF downgrade to a version other than the latest moddable version.</p>
-        <p>This is not recommended, and you should only do it if there are specific mods you wish to use that aren't available on the latest version.</p>
-        <p><b>Please note that MBF is not capable of modding Beat Saber 1.28 or lower.</b></p>
-        <p>Click a version then confirm the downgrade:</p>
+        {getLang().chooseDifferentGameVersionHint}
         <SelectableList options={downgradeVersions} choiceSelected={choice => setSelected(choice)} />
         <br/>
         <button onClick={() => {
             setSelected(null);
             onConfirm(selected);
-        }}>{selected === null ? <>Use latest moddable</> : <>Confirm downgrade</>}</button>
+        }}>{selected === null ? <>{getLang().useLatestModdable}</> : <>{getLang().confirmDowngrade}</>}</button>
     </Modal>
 }
 
@@ -432,13 +403,11 @@ function ClickableLink({ onClick, children }: { onClick: () => void, children: R
 
 function VersionSupportedMessage({ version, requestedVersionChange, canChooseAnotherVersion }: { version: string, requestedVersionChange: () => void, canChooseAnotherVersion: boolean }) {
     return <>
-        <h1>Install Custom Songs</h1>
+        <h1>{getLang().versionSupportedMessageTitle}</h1>
         {isDeveloperUrl ?
-            <p className="warning">Mod development mode engaged: bypassing version check.
-            This will not help you unless you are a mod developer!</p> : <>
-            <p>Your app has version {trimGameVersion(version)}, which is supported by mods! {canChooseAnotherVersion && <ClickableLink onClick={requestedVersionChange}>(choose another version)</ClickableLink>}</p>
-            <p>To get your game ready for custom songs, ModsBeforeFriday will next patch your Beat Saber app and install some essential mods.
-            Once this is done, you will be able to manage your custom songs <b>inside the game.</b></p>
+            <p className="warning">{getLang().modDevelopmentWarn}</p> : <>
+            <p>{getLang().versionSupportedHint(trimGameVersion(version))} {canChooseAnotherVersion && <ClickableLink onClick={requestedVersionChange}>{getLang().chooseAnotherVersion}</ClickableLink>}</p>
+            {getLang().versionSupportedInstallEssentialMods}
         </>}
     </>
 }
@@ -454,15 +423,13 @@ function DowngradeMessage({ toVersion,
     devicePreV51: boolean,
     canChooseAnotherVersion: boolean }) {
     return <>
-        <h1>{devicePreV51 ? "Update" : "Downgrade"} and set up mods</h1>
-        {wasUserSelected ? (<><p>You have decided to change to a version older than the latest moddable version. <b>Only do this if you know why you want to!</b> <ClickableLink onClick={requestedResetToDefault}>(reverse decision)</ClickableLink></p></>)
+        <h1>{devicePreV51 ? getLang().updateAndSetupMods : getLang().downgradeAndSetupMods}</h1>
+        {wasUserSelected ? (<><p>{getLang().olderThanLatestModdableHint} <ClickableLink onClick={requestedResetToDefault}>{getLang().reverseDecision}</ClickableLink></p></>)
         : devicePreV51 ? (<>
-            <p>MBF has detected that you're running on a Quest 1. To get the latest mods, MBF will automatically update Beat Saber to the latest moddable version ({trimGameVersion(toVersion)}).
-                Even though Meta only officially supports Quest 1 up to Beat Saber v1.36.2, MBF can patch version  {trimGameVersion(toVersion)} so it still works!
-            </p>
+            <p>{getLang().quest1ModHint(trimGameVersion(toVersion))}</p>
         </>) : <>
-                <p>MBF has detected that your version of Beat Saber doesn't support mods!</p>
-                <p>Fortunately for you, your version can be downgraded automatically to the latest moddable version: {trimGameVersion(toVersion)} {canChooseAnotherVersion && <ClickableLink onClick={requestedVersionChange}>(choose another version)</ClickableLink>}</p>
+                <p>{getLang().doesntSupportMods}</p>
+                <p>{getLang().canDowngrateToVersion(trimGameVersion(toVersion))} {canChooseAnotherVersion && <ClickableLink onClick={requestedVersionChange}>{getLang().chooseAnotherVersion}</ClickableLink>}</p>
             </>}
         </>
 }
@@ -477,21 +444,17 @@ function NotSupported({ version, quit }: { version: string, quit: () => void }) 
     const isLegacy = isVersionLegacy(version);
 
     return <div className='container mainContainer'>
-        <h1>Unsupported Version</h1>
-        <p className='warning'>Read this message in full before asking for help if needed!</p>
+        <h1>{getLang().unsupportedVersion}</h1>
+        <p className='warning'>{getLang().readThisMessage}</p>
 
         {/* Some legacy versions can be modded but MBF does not support anything on the old Unity version*/}
-        <p>You have Beat Saber v{trimGameVersion(version)} installed, but this version has no support for {isLegacy ? "modding with MBF" : "mods"}!</p>
+        <p>{getLang().notSupportedModsText(trimGameVersion(version), isLegacy)}</p>
         {isLegacy && <>
-            <p>While your version might work with other modding tools, it is <b>very strongly recommended</b> that you uninstall Beat Saber and update
-        to the latest moddable version.</p>
-
-            <p className="warning">Modding with versions 1.28.0 or below is <em>no longer supported by BSMG</em> - it's an ancient version and nobody should be using it anymore. Please, please, <em>PLEASE</em> update to the latest version of the game.</p>
+            {getLang().legacyUpdateRecommand}
         </>}
 
         {!isLegacy && <>
-            <p>Normally, MBF would attempt to downgrade (un-update) your Beat Saber version to a version with mod support, but this is only possible if you have the latest version of Beat Saber installed.</p>
-            <p>Please uninstall Beat Saber using the button below, then reinstall the latest version of Beat Saber using the Meta store.</p>
+            {getLang().normallyUpdateRecommand}
         </>}
 
         <button onClick={async () => {
@@ -499,7 +462,7 @@ function NotSupported({ version, quit }: { version: string, quit: () => void }) 
 
             await uninstallBeatSaber(device);
             quit();
-        }}>Uninstall Beat Saber</button>
+        }}>{getLang().uninstallBeatSaber}</button>
     </div>
 }
 
@@ -512,13 +475,10 @@ function isVersionLegacy(version: string): boolean {
 
 function NoDiffAvailable({ version }: { version: string }) {
     return <div className="container mainContainer">
-        <h1>Awaiting patch generation</h1>
-        <p className='warning'>You must READ this message IN FULL.</p>
+        <h1>{getLang().awaitingPatchGeneration}</h1>
+        <p className='warning'>{getLang().mustReadMessageFull}</p>
 
-        <p>You have Beat Saber v{trimGameVersion(version)}, which has no support for mods.</p>
-        <p>MBF is designed to downgrade (un-update) your Beat Saber version to a version with mod support <b>but the necessary patches have not yet been generated,</b> as a Beat Saber update has only just been released.</p>
-        <p>Patch generation needs manual input and <b>will happen as soon as the author of MBF is available</b>, which will take from 30 minutes to 24 hours.</p>
-        <p><b>PLEASE WAIT in the meanwhile.</b> You can refresh this page and reconnect to your Quest to check if the patch has been generated.</p>
+        {getLang().noDiffMessageBody(trimGameVersion(version))}
     </div>
 }
 
@@ -527,17 +487,14 @@ function IncompatibleLoader(props: IncompatibleLoaderProps) {
     const { device } = useDeviceStore((state) => ({ device: state.device }));
 
     return <div className='container mainContainer'>
-        <h1>Incompatible Modloader</h1>
-        <p>Your app is patched with {loader === 'QuestLoader' ? "the QuestLoader" : "an unknown"} modloader, which isn't supported by MBF.</p>
-        <p>You will need to uninstall your app and reinstall the latest vanilla version so that the app can be re-patched with Scotland2.</p>
-        <p>Do not be alarmed! Your custom songs will not be lost.</p>
+        {getLang().incompatableModLoader(loader)}
 
         <button onClick={async () => {
             if (!device) return;
 
             await uninstallBeatSaber(device);
             quit();
-        }}>Uninstall Beat Saber</button>
+        }}>{getLang().uninstallBeatSaber}</button>
     </div>
 }
 
@@ -547,24 +504,16 @@ function IncompatibleAlreadyModded({ quit, installedVersion }: {
     const { device } = useDeviceStore((state) => ({ device: state.device }));
 
     return <div className='container mainContainer'>
-        <h1>Incompatible Version Patched</h1>
-
-        <p>Your Beat Saber app has a modloader installed, but the game version ({trimGameVersion(installedVersion)}) has no support for mods!</p>
-        <p>To fix this, uninstall Beat Saber and reinstall the latest version. MBF can then downgrade this automatically to the latest moddable version.</p>
-
+        {getLang().incompatableVersionPatched(trimGameVersion(installedVersion))}
         <button onClick={async () => {
             if (!device) return;
             
             await uninstallBeatSaber(device);
             quit();
-        }}>Uninstall Beat Saber</button>
+        }}>{getLang().uninstallBeatSaber}</button>
     </div>
 }
 
 function NextSteps() {
-    return <ul>
-        <li>Load up the game and look left. A menu should be visible that shows your mods.</li>
-        <li>Click the <b>"SongDownloader"</b> mod and browse for custom songs in-game.</li>
-        <li>Download additional mods below!</li>
-    </ul>
+    return <>{getLang().nextSteps}</>
 }
