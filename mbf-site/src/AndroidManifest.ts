@@ -68,14 +68,14 @@ export class AndroidManifest {
 
                 if(metadataName !== null && metadataValue !== null) {
                     if(metadataName in this.metadata) {
-                        Log.warn("Duplicate metadata key found: " + metadataName + " ..removing");
+                        Log.warn("Duplicate metadata key found: " + metadataName + " ..removing", this.metadata);
                         // Safe as we've used Array.from, so we're not modifying the array while iterating it.
                         this.applicationEl.removeChild(appChild);
                     }   else    {
                         this.metadata[metadataName] = metadataValue;
                     }
                 }   else    {
-                    Log.warn("Invalid metadata node: missing name or value: " + appChild);
+                    Log.warn("Invalid metadata node: missing name or value: " + appChild, appChild);
                 }
             }
         })
