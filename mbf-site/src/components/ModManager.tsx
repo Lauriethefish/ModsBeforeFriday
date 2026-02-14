@@ -17,6 +17,7 @@ import { useSetWorking, useSyncStore, wrapOperation } from "../SyncStore";
 import { ModRepoMod } from "../ModsRepo";
 import { useDeviceStore } from "../DeviceStore";
 import SyncIcon from "../icons/sync.svg"
+import { getLang } from "../localization/shared";
 
 
 interface ModManagerProps {
@@ -78,7 +79,7 @@ function Title(props: TitleProps) {
     return <div className='container noPadding horizontalCenter sticky'>
         <div className={`tab-header ${menu === SelectedMenu.current ? "selected":""}`}
             onClick={() => setMenu(SelectedMenu.current)}>
-            <h1>Your Mods</h1>
+            <h1>{getLang().yourMods}</h1>
         </div>
         <span className={`tab-header settingsCog ${menu === SelectedMenu.options ? "selected":""}`}
             onClick={() => setMenu(SelectedMenu.options)}>
@@ -86,7 +87,7 @@ function Title(props: TitleProps) {
         </span>
         <div className={`tab-header ${menu === SelectedMenu.add ? "selected":""}`}
             onClick={() => setMenu(SelectedMenu.add)}>
-            <h1>Add Mods</h1>
+            <h1>{getLang().addMods}</h1>
         </div>
     </div>
 }
@@ -165,7 +166,7 @@ function InstalledModsMenu(props: ModMenuProps) {
 function UploadButton({ onUploaded }: { onUploaded: (files: File[]) => void}) {
     const inputFile = useRef<HTMLInputElement | null>(null);
     return <button id="uploadButton" onClick={() => inputFile.current?.click()} title="Upload any .QMOD file, any song as a .ZIP, any Qosmetics files or any other file accepted by a particular mod.">
-        Upload Files
+        {getLang().uploadFiles}
         <img src={UploadIcon}/>
         <input type="file"
             id="file"
