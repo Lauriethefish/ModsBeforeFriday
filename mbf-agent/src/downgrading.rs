@@ -4,7 +4,7 @@
 //! This module also allows more "direct" diffs to be created for faster downgrading, say several versions at once.
 //! A breadth-first-search is used to determine the shortest route (smallest number of diffs) in the database to downgrade one version to another.
 
-use std::{collections::{HashMap, VecDeque}, fs::OpenOptions, io::{BufReader, BufWriter, Read}, path::{Path, PathBuf}};
+use std::{collections::{HashMap, VecDeque}, fs::OpenOptions, io::{BufReader, BufWriter, Read, Write}, path::{Path, PathBuf}};
 
 use log::info;
 use mbf_res_man::{models::{Diff, VersionDiffs}, res_cache::ResCache};
@@ -12,6 +12,53 @@ use anyhow::{Result, Context, anyhow};
 use mbf_res_man::external_res;
 use mbf_zip::ZIP_CRC;
 use std::ffi::OsStr;
+
+struct ProgressWriter<W: Write> {
+    inner: W,
+    total: u64,      // expected output size
+    written: u64,    // bytes written so far
+    next_report: u64 // next byte threshold to log
+}
+
+impl<W: Write> ProgressWriter<W> {
+    fn new(inner: W, total: u64) -> Self {
+        Self { 
+            inner, 
+            total, 
+            written: 0, 
+            next_report: 100 * 1024 * 1024 // 100 MB
+        }
+    }
+}
+
+impl<W: Write> Write for ProgressWriter<W> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let n = self.inner.write(buf)?;
+        self.written += n as u64;
+
+        // Only log when we've crossed the next 100 MB boundary
+        if self.written >= self.next_report {
+            let pct = if self.total > 0 {
+                (self.written as f64 / self.total as f64) * 100.0
+            } else {
+                0.0
+            };
+            info!("Patch progress: {:.1}%", pct);
+            
+            // schedule next report
+            while self.written >= self.next_report {
+                self.next_report += 100 * 1024 * 1024;
+            }
+        }
+
+        Ok(n)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.flush()
+    }
+}
+
 
 use crate::downloads;
 
@@ -172,15 +219,21 @@ fn apply_diff(from_path: &Path, to_path: &Path, diff: &Diff, diffs_path: &Path) 
 
     // Carry out the downgrade
     info!("Applying patch (This step may take a few minutes)");
-    let mut output_handle = BufWriter::new(
-        OpenOptions::new()
-            .truncate(true)
-            .create(true)
-            .read(true)
-            .write(true)
-            .open(to_path)?,
-    );
-    patch.apply(&file_content, &mut output_handle)?;
+
+    // Open the output file
+    let out_file = OpenOptions::new()
+        .truncate(true)
+        .create(true)
+        .read(true)
+        .write(true)
+        .open(to_path)?;
+
+    // Wrap it in ProgressWriter with the expected output size
+    let expected_size = diff.output_size as u64; // adjust field name
+    let progress_writer = ProgressWriter::new(BufWriter::new(out_file), expected_size);
+
+    // Apply the patch
+    patch.apply(&file_content, progress_writer)?;
 
     // TODO: Verify checksum on the result of downgrading?
 
