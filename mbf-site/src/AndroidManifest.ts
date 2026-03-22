@@ -134,6 +134,21 @@ export class AndroidManifest {
 
         const permissionElement = this.document.createElement("uses-permission");
         permissionElement.setAttributeNS(ANDROID_NS_URI, `${this.androidNsPrefix}:name`, perm);
+        if(perm == "android.permission.BLUETOOTH_SCAN") {
+            /*
+                For BLUETOOTH_SCAN permission, add flag "neverForLocation" for it.
+                If we don't add this flag, the quest device will likely returns empty scan result,
+                    unless the game has ACCESS_FINE_LOCATION permission.
+                
+                TODO:
+                    If the game already has BLUETOOTH_SCAN permission without the flag "neverForLocation", 
+                    mbf will assume that the permission exists and thus turn on the Bluetooth toggle.
+                    In this case the BLUETOOTH_SCAN doesn't work correctly, unless ACCESS_FINE_LOCATION
+                    permission is grant.
+                    We don't need to handle this situation at the moment because mbf doesn't cause this normally.
+            */
+            permissionElement.setAttributeNS(ANDROID_NS_URI, `${this.androidNsPrefix}:usesPermissionFlags`, "65536")
+        }
         this.manifestEl.appendChild(permissionElement);
         this.permissions.push(perm);
     }
