@@ -42,7 +42,8 @@ a {
 }
 
 .mainContainer {
-    max-width: min(40rem, 95vw);
+    width: 95vw;
+    max-width: 40rem;
     overflow: hidden;
 }
 

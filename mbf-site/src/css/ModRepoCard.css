@@ -1,5 +1,6 @@
 .modRepoCard {
-    width: min(40rem, 95%);
+    width: 95%;
+    max-width: 40rem;
     padding: 2px;
     display: grid;
     flex-direction: row;
