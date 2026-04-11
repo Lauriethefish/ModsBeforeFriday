@@ -61,7 +61,7 @@ export default function useFileDropper(props: Props) {
                     }
                 }
             } catch (e) {
-                Log.error("Failure in ondrop: " + e);
+                Log.error("Failure in ondrop: " + e, e);
             }
         }
 

@@ -13,10 +13,11 @@ import { ImportResult, ImportedMod, ModStatus } from "../Messages";
 import { OptionsMenu } from "./OptionsMenu";
 import useFileDropper from "../hooks/useFileDropper";
 import { Log } from "../Logging";
-import { useSetWorking, useSyncStore, wrapOperation } from "../SyncStore";
 import { ModRepoMod } from "../ModsRepo";
-import { useDeviceStore } from "../DeviceStore";
+import { waitForDisconnect } from "../waitForDisconnect";
 import SyncIcon from "../icons/sync.svg"
+import { useDeviceConnectorContext } from "../hooks/DeviceConnector";
+import { useOperationModalsContext } from "./OperationModals";
 
 
 interface ModManagerProps {
@@ -99,21 +100,22 @@ interface ModMenuProps {
 }
 
 function InstalledModsMenu(props: ModMenuProps) {
+    const { wrapOperation } = useOperationModalsContext();
     const { mods,
         setMods,
         gameVersion
     } = props;
-    const { device } = useDeviceStore((state) => ({ device: state.device }));
+    const { chosenDevice } = useDeviceConnectorContext();
     const [changes, setChanges] = useState({} as { [id: string]: boolean });
 
 
     return <div className={`installedModsMenu fadeIn ${props.visible ? "" : "hidden"}`}>
         {Object.keys(changes).length > 0 && <button className={`syncChanges fadeIn ${props.visible ? "" : "hidden"}`} onClick={async () => {
-            if (!device) return;
+            if (!chosenDevice) return;
             setChanges({});
             Log.debug("Installing mods, statuses requested: " + JSON.stringify(changes));
             await wrapOperation("Syncing mods", "Failed to sync mods", async () => {
-                const modSyncResult = await setModStatuses(device, changes);
+                const modSyncResult = await setModStatuses(chosenDevice, changes);
                 setMods(modSyncResult.installed_mods);
 
                 if(modSyncResult.failures !== null) {
@@ -133,10 +135,10 @@ function InstalledModsMenu(props: ModMenuProps) {
                 pendingChange={changes[mod.id]}
 				key={mod.id}
 				onRemoved={async () => {
-                    if (!device) return;
+                    if (!chosenDevice) return;
 
                     await wrapOperation("Removing mod", "Failed to remove mod", async () => {
-						setMods(await removeMod(device, mod.id));
+						setMods(await removeMod(chosenDevice, mod.id));
                         const newChanges = { ...changes };
                         
                         delete newChanges[mod.id];
@@ -213,12 +215,13 @@ function AddModsMenu(props: ModMenuProps) {
         setMods,
         gameVersion
     } = props;
-    const { device } = useDeviceStore((state) => ({ device: state.device }));
+    const { chosenDevice } = useDeviceConnectorContext();
+    const { useSetWorking, setStatusText } = useOperationModalsContext();
 
     // Automatically installs a mod when it is imported, or warns the user if it isn't designed for the current game version.
     // Gives appropriate toasts/reports errors in each case.
     async function onModImported(result: ImportedMod) {
-        if (!device) return;
+        if (!chosenDevice) return;
 
         const { installed_mods, imported_id } = result;
         setMods(installed_mods);
@@ -231,7 +234,7 @@ function AddModsMenu(props: ModMenuProps) {
                 + trimGameVersion(gameVersion) + ".", { autoClose: false });
         }   else    {
             try {
-                const result = await setModStatuses(device, { [imported_id]: true });
+                const result = await setModStatuses(chosenDevice, { [imported_id]: true });
                 setMods(result.installed_mods);
 
                 // This is where typical mod install failures occur
@@ -265,10 +268,10 @@ function AddModsMenu(props: ModMenuProps) {
     }
 
     async function handleFileImport(file: File) {
-        if (!device) return;
+        if (!chosenDevice) return;
 
         try {
-            const importResult = await importFile(device, file);
+            const importResult = await importFile(chosenDevice, file);
             await onImportResult(importResult);
         }   catch(e)   {
             toast.error("Failed to import file: " + e);
@@ -276,13 +279,13 @@ function AddModsMenu(props: ModMenuProps) {
     }
 
     async function handleUrlImport(url: string) {
-        if (!device) return;
+        if (!chosenDevice) return;
         if (url.startsWith("file:///")) {
             toast.error("Cannot process dropped file from this source, drag from the file picker instead. (Drag from OperaGX file downloads popup does not work)");
             return;
         }
         try {
-            const importResult = await importUrl(device, url)
+            const importResult = await importUrl(chosenDevice, url)
             await onImportResult(importResult);
         }   catch(e)   {
             toast.error(`Failed to import file: ${e}`);
@@ -290,7 +293,7 @@ function AddModsMenu(props: ModMenuProps) {
     }
 
     async function enqueueImports(imports: QueuedImport[]) {
-        if (!device) return;
+        if (!chosenDevice) return;
 
         // Add the new imports to the queue
         importQueue.push(...imports);
@@ -304,9 +307,8 @@ function AddModsMenu(props: ModMenuProps) {
         isProcessingQueue = true;
 
         let disconnected = false;
-        device.disconnected.then(() => disconnected = true);
+        waitForDisconnect(chosenDevice).then(() => disconnected = true);
         const setWorking = useSetWorking("Importing");
-        const { setStatusText } = useSyncStore.getState(); 
 
         setWorking(true);
         while(importQueue.length > 0 && !disconnected) {

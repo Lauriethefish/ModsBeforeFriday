@@ -53,6 +53,9 @@ importers:
       '@yume-chan/adb-daemon-webusb':
         specifier: workspace:^
         version: link:../ya-webadb/libraries/adb-daemon-webusb
+      '@yume-chan/async':
+        specifier: ^4.1.3
+        version: 4.1.3
       '@yume-chan/stream-extra':
         specifier: workspace:^
         version: link:../ya-webadb/libraries/stream-extra
