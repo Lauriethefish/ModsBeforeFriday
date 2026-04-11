@@ -6,11 +6,10 @@ import {
   createContext,
   useContext,
 } from "react";
-import {
-  checkForBridge,
-  AdbServerWebSocketConnector,
-} from "../AdbServerWebSocketConnector";
 import { Log } from "../Logging";
+import { BridgeFactory, IBridge } from "../BridgeFactory";
+import { PromiseResolver } from "@yume-chan/async";
+import { delay } from "../utilities/delay";
 
 /**
  * Compares two arrays of device objects for equality.
@@ -70,10 +69,12 @@ function areObjectsEqual(
 
 export interface BridgeManagerData {
   checkedForBridge: boolean;
+  bridge: IBridge | null;
   bridgeClient: AdbServerClient | null;
   adbDevices: AdbServerClient.Device[];
   bridgeError: unknown | null;
   scanning: boolean;
+  clearDevices: () => void;
 }
 
 export interface BridgeManagerComponents {
@@ -99,6 +100,7 @@ export function useBridgeManager(): Readonly<
   BridgeManagerData & BridgeManagerComponents
 > {
   const [checkedForBridge, setCheckedForBridge] = useState(false);
+  const [bridge, setBridge] = useState<IBridge | null>(null);
   const [bridgeClient, setBridgeClient] = useState<AdbServerClient | null>(
     null
   );
@@ -111,12 +113,15 @@ export function useBridgeManager(): Readonly<
         setScanning(true);
 
         return () => setScanning(false);
-      }, []);
+      }, [bridgeClient]);
 
       return null;
     },
     [setScanning]
   );
+  const clearDevices = useCallback(function clearDevices() {
+    setAdbDevices([]);
+  }, [setAdbDevices]);
   const _BridgeManagerContextProvider = useCallback<
     React.FC<React.PropsWithChildren>
   >(
@@ -125,22 +130,30 @@ export function useBridgeManager(): Readonly<
         <BridgeManagerContext.Provider
           value={{
             checkedForBridge,
+            bridge,
             bridgeClient,
             adbDevices,
             bridgeError,
             scanning,
+            clearDevices,
           }}
         >
           {children}
         </BridgeManagerContext.Provider>
       );
     },
-    [checkedForBridge, bridgeClient, adbDevices, bridgeError, scanning]
+    [checkedForBridge, bridge, bridgeClient, adbDevices, bridgeError, scanning, clearDevices]
   );
 
   const deviceUpdate = useCallback(async () => {
     try {
-      const client = new AdbServerClient(new AdbServerWebSocketConnector());
+      const bridge = await BridgeFactory.getBridge();
+      const connector = await (bridge?.getConnector());
+      if (!connector) {
+        throw new Error("No bridge available");
+      }
+      
+      const client = new AdbServerClient(connector);
       const devices = (await client.getDevices()).filter(
         (device) => device.state == "device"
       );
@@ -152,9 +165,7 @@ export function useBridgeManager(): Readonly<
         setBridgeError(null);
       }
     } catch (err) {
-      setBridgeClient(null);
       setAdbDevices([]);
-      setCheckedForBridge(false);
       setBridgeError(err);
 
       Log.error("Failed to get devices: " + err, err);
@@ -171,15 +182,23 @@ export function useBridgeManager(): Readonly<
   // Check if the bridge is running
   useEffect(() => {
     if (checkedForBridge) return;
+    
+    const abortController = new AbortController();
 
-    checkForBridge().then((haveBridge) => {
-      if (haveBridge) {
-        const client = new AdbServerClient(new AdbServerWebSocketConnector());
-        setBridgeClient(client);
+    BridgeFactory.getBridge(abortController).then( async (bridge) => {
+      if (bridge) {
+        setBridge(bridge);
+        bridge.getConnector().then(client => {
+          if (client) {
+            setBridgeClient(new AdbServerClient(client));
+          } else {
+            setBridgeClient(null);
+          }
+        });
       }
-
-      setCheckedForBridge(true);
-    });
+    }).finally(() => setCheckedForBridge(true));
+    
+    return () => abortController.abort();
   }, [checkedForBridge]);
 
   // Update the available devices on an interval
@@ -194,12 +213,14 @@ export function useBridgeManager(): Readonly<
 
   return {
     checkedForBridge,
+    bridge,
     bridgeClient,
     adbDevices,
     bridgeError,
     scanning,
     DeviceScanner: _DeviceScanner,
     BridgeManagerContextProvider: _BridgeManagerContextProvider,
+    clearDevices
   };
 }
 

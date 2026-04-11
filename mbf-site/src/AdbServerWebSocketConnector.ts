@@ -1,6 +1,9 @@
 import type { AdbIncomingSocketHandler, AdbServerClient } from "@yume-chan/adb";
 import { MaybeConsumable, ReadableStream, ReadableWritablePair } from "@yume-chan/stream-extra";
 import { PromiseResolver } from "@yume-chan/async";
+import { IBridge } from "./BridgeFactory";
+import { createElement, ReactNode } from "react";
+import { PagePinger } from "./PagePinger";
 
 /** WebSocket bridge endpoints. */
 class BridgeData {
@@ -31,8 +34,6 @@ export const bridgeData = (() => {
   if (params.has("bridge")) {
     return new BridgeData(params.get("bridge")!);
   }
-
-  return new BridgeData("127.0.0.1:25037");
 })();
 
 /**
@@ -40,9 +41,9 @@ export const bridgeData = (() => {
  *
  * @returns A promise that resolves to true if the bridge is running, false otherwise.
  */
-export async function checkForBridge(address?: string): Promise<boolean> {
+async function checkForBridge(address: string, signal?: AbortSignal): Promise<boolean> {
   try {
-    const response = await fetch(address || bridgeData.pingAddress);
+    const response = await fetch(address, { signal });
     if (response.ok) {
       // Read the response body
       var text = await response.text();
@@ -161,7 +162,7 @@ class WebSocketConnection {
  * A `AdbServerClient.ServerConnector` implementation using a WebSocket connection.
  */
 export class AdbServerWebSocketConnector implements AdbServerClient.ServerConnector {
-  constructor() { }
+  constructor(private websocketAddress: string) { }
 
   /**
    * Connects to the ADB server bridge using a WebSocket connection.
@@ -169,7 +170,7 @@ export class AdbServerWebSocketConnector implements AdbServerClient.ServerConnec
    * @returns A promise that resolves to the ADB server connection.
    */
   async connect(): Promise<AdbServerClient.ServerConnection> {
-    const connection = new WebSocketConnection(bridgeData.websocketAddress);
+    const connection = new WebSocketConnection(this.websocketAddress);
     let timer: ReturnType<typeof setTimeout> | undefined = undefined;
 
     // Create a timeout promise that rejects after 5000ms.
@@ -229,4 +230,25 @@ export class AdbServerWebSocketConnector implements AdbServerClient.ServerConnec
   clearReverseTunnels(): void {
     throw new Error("Method not implemented.");
   }
+}
+
+export class WebSocketBridge implements IBridge {
+    #bridgeData: BridgeData;
+    
+    constructor(bridgeData: BridgeData) {
+        this.#bridgeData = bridgeData;
+    }
+    
+    BridgeSupplement = (function(this: WebSocketBridge): ReactNode {
+      const url = this.#bridgeData.pingAddress;
+      return createElement(PagePinger, { url, interval: 5000 });
+    }).bind(this);
+    
+    async isAvailable(abortController?: AbortController): Promise<boolean> {
+        return await checkForBridge(this.#bridgeData.pingAddress, abortController?.signal);
+    }
+    
+    async getConnector() {
+        return new AdbServerWebSocketConnector(this.#bridgeData.websocketAddress);
+    }
 }

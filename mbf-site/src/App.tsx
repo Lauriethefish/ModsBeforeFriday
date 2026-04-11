@@ -11,11 +11,10 @@ import { Log } from './Logging';
 import { useOperationModals } from './components/OperationModals';
 import { OpenLogsButton } from './components/OpenLogsButton';
 import { usingOculusBrowser } from './platformDetection';
-import { bridgeData, checkForBridge } from './AdbServerWebSocketConnector';
 import { useBridgeManager } from './hooks/BridgeManager';
 import { AllowAuth, AskLaurie, DeviceInUse, NoCompatibleDevices, OculusBrowserMessage, Title, UnsupportedMessage } from './AppMessages';
-import { PagePinger } from './PagePinger';
 import { useDeviceConnector } from './hooks/DeviceConnector';
+import { BridgeFactory } from './BridgeFactory';
 
 /**
  * Main component for device selection and connection flow.
@@ -36,28 +35,36 @@ import { useDeviceConnector } from './hooks/DeviceConnector';
  * - adbDevices: List of detected ADB devices via bridge.
  */
 function ChooseDevice() {
-  const { checkedForBridge, bridgeClient, adbDevices, bridgeError, scanning, DeviceScanner, BridgeManagerContextProvider } = useBridgeManager();
+  const { checkedForBridge, bridge, bridgeClient, adbDevices, bridgeError, scanning, DeviceScanner, BridgeManagerContextProvider, clearDevices } = useBridgeManager();
   const { devicePreV51, deviceInUse, authing, chosenDevice, connecting, connectError, connectDevice, disconnectDevice, DeviceConnectorContextProvider } = useDeviceConnector(bridgeClient);
   const [modderError, setModderError] = useState<string | null>(null);
 
   useEffect(() => {
     // If the user is using a bridge and there is only one device, connect to it automatically.
-    if (!connecting && chosenDevice == null && bridgeClient != null && adbDevices.length == 1) {
+    if (!connectError && !connecting && chosenDevice == null && bridgeClient != null && adbDevices.length == 1) {
       connectDevice(adbDevices[0])
     }
-  });
+  }, [connectError, connecting, chosenDevice, bridgeClient, adbDevices.length]);
+  
+  useEffect(() => {
+    if (bridgeClient && connectError) {
+      clearDevices();
+      disconnectDevice();
+    }
+  }, [connectError]);
 
   if (chosenDevice !== null) {
     return (
       <DeviceConnectorContextProvider>
-        {bridgeClient && <PagePinger url={bridgeData.pingAddress} interval={5000} />}
+        {bridge && <bridge.BridgeSupplement />}
         <DeviceModder quit={(err) => {
+          clearDevices();
+          disconnectDevice();
+          
           if (err != null) {
             setModderError(String(err));
           }
-          disconnectDevice();
-          }
-        } />
+        }} />
       </DeviceConnectorContextProvider>
     )
   } else if (authing) {
@@ -158,13 +165,22 @@ function ChooseCoreModUrl({ setSpecifiedCoreMods } : { setSpecifiedCoreMods: () 
  */
 function AppContents() {
   const [ hasSetCoreUrl, setSetCoreUrl ] = useState(false);
-  const [ hasBridge, setHasBridge ] = useState(false);
+  const [ hasBridge, setHasBridge ] = useState<boolean | null>(null);
   const overrideQueryParam: string | null = new URLSearchParams(window.location.search).get("setcores");
+  
   useEffect(() => {
-    checkForBridge().then((hasBridge) => {
-      setHasBridge(hasBridge);
-      console.log("Bridge running: " + hasBridge);
+    if (hasBridge) {
+      return;
+    }
+    
+    const abortController = new AbortController();
+    
+    BridgeFactory.getBridge(abortController).then((bridge) => {
+      setHasBridge(!!bridge);
+      console.log("Bridge available: " + !!bridge, bridge);
     });
+    
+    return () => abortController.abort();
   });
 
   let mustEnterUrl = false;
