@@ -7,9 +7,20 @@ use std::{
     path::PathBuf,
 };
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use log::{debug, warn};
 use serde::de::DeserializeOwned;
+
+fn describe_ureq_error(err: &ureq::Error) -> String {
+    match err {
+        ureq::Error::Status(status, resp) => {
+            format!("HTTP {status} response: {}", resp.status_text())
+        }
+        ureq::Error::Transport(transport_err) => {
+            format!("transport error: {transport_err} ({transport_err:?})")
+        }
+    }
+}
 
 /// We separate this out into an enum as if a file can't be fetched,
 /// then it is useful to know that the *fetching* was the problem and not the *parsing*
@@ -20,13 +31,20 @@ pub enum JsonPullError {
     ParseError(serde_json::Error),
 }
 
-impl std::error::Error for JsonPullError {}
+impl std::error::Error for JsonPullError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::FetchError(e) => Some(e.as_ref()),
+            Self::ParseError(e) => Some(e),
+        }
+    }
+}
 
 impl Display for JsonPullError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::ParseError(e) => write!(f, "Failed to parse JSON into required type: {e}"),
-            Self::FetchError(e) => write!(f, "Failed to download JSON: {e}"),
+            Self::ParseError(_) => write!(f, "Failed to parse JSON into required type"),
+            Self::FetchError(_) => write!(f, "Failed to download JSON"),
         }
     }
 }
@@ -110,6 +128,24 @@ impl<'agent> ResCache<'agent> {
         self.agent
     }
 
+    /// Removes the cached file and its ETag entry for `cached_file_name`, if present.
+    pub fn remove_cached(&self, cached_file_name: &str) -> Result<()> {
+        let cached_path = self.cache_root.join(cached_file_name);
+        if cached_path.exists() {
+            std::fs::remove_file(cached_path)?;
+        }
+
+        self.load_etag_cache()?;
+        let mut etag_cache_ref = self.etag_cache.borrow_mut();
+        let etag_cache = etag_cache_ref.as_mut().unwrap();
+        if etag_cache.remove(cached_file_name).is_some() {
+            drop(etag_cache_ref);
+            self.save_etag_cache()?;
+        }
+
+        Ok(())
+    }
+
     /// Gets a file from the provided URL and caches it at `cached_file_name` within the `cache_root`,
     /// if there is no cached copy already or the cached copy is out of date.
     ///
@@ -129,39 +165,64 @@ impl<'agent> ResCache<'agent> {
                 "If-Modified-Since",
                 &httpdate::fmt_http_date(cache_last_modified),
             );
-        }
 
-        let mut etag_cache_ref = self.etag_cache.borrow_mut();
-        let etag_cache = etag_cache_ref.as_mut().unwrap();
-
-        if let Some(cached_etag) = etag_cache.get(cached_file_name) {
-            request = request.set("If-None-Match", &cached_etag);
-        }
-
-        let resp = request.call().context("HTTP GET to get file to cache")?;
-        if resp.status() != 304 {
-            // If cached file out of date. (or no cache)
-            if let Some(etag) = resp.header("ETag") {
-                debug!("Got ETag {etag} for {cached_file_name}");
-                etag_cache.insert(cached_file_name.to_owned(), etag.to_owned());
-                drop(etag_cache_ref);
-                self.save_etag_cache()?;
+            let etag_cache_ref = self.etag_cache.borrow();
+            let etag_cache = etag_cache_ref.as_ref().unwrap();
+            if let Some(cached_etag) = etag_cache.get(cached_file_name) {
+                request = request.set("If-None-Match", cached_etag);
             }
+        }
 
-            debug!("No cache, downloading {url} to {cached_file_name}");
-            // Copy response body into cache
-            let mut cache_handle = std::fs::OpenOptions::new()
-                .create(true)
-                .write(true)
-                .truncate(true)
-                .open(&cached_path)
-                .context("Opening cache file for writing: is the directory writable?")?;
+        let resp = match request.call() {
+            Ok(resp) => resp,
+            Err(ureq::Error::Status(304, resp)) => resp,
+            Err(ureq::Error::Status(404, _)) => {
+                return Err(anyhow!("File not found at {url}"));
+            }
+            Err(ureq::Error::Status(status, _)) => {
+                return Err(anyhow!("Unexpected HTTP {status} response fetching {url}"));
+            }
+            Err(err) => {
+                return Err(anyhow!(describe_ureq_error(&err)).context(format!(
+                    "HTTP GET failed for {url} while caching to {}",
+                    cached_path.display()
+                )));
+            }
+        };
 
-            std::io::copy(&mut resp.into_reader(), &mut cache_handle)
-                .context("Copying response to cache")?;
-        } else {
-            // If using cache, ETag should be the same so no need to check it again.
-            debug!("Using cached file {cached_file_name} for {url}");
+        match resp.status() {
+            304 => {
+                // Cached copy is still valid
+                debug!("Using cached file {cached_file_name} for {url}");
+            }
+            404 => {
+                // No cached copy and file not found at URL
+                return Err(anyhow!("File not found at {url}"));
+            }
+            200 => {
+                if let Some(etag) = resp.header("ETag") {
+                    debug!("Got ETag {etag} for {cached_file_name}");
+                    let mut etag_cache_ref = self.etag_cache.borrow_mut();
+                    let etag_cache = etag_cache_ref.as_mut().unwrap();
+                    etag_cache.insert(cached_file_name.to_owned(), etag.to_owned());
+                    drop(etag_cache_ref);
+                    self.save_etag_cache()?;
+                }
+
+                debug!("Downloading {url} to {cached_file_name}");
+                let mut cache_handle = std::fs::OpenOptions::new()
+                    .create(true)
+                    .write(true)
+                    .truncate(true)
+                    .open(&cached_path)
+                    .context("Opening cache file for writing: is the directory writable?")?;
+
+                std::io::copy(&mut resp.into_reader(), &mut cache_handle)
+                    .context("Copying response to cache")?;
+            }
+            status => {
+                return Err(anyhow!("Unexpected HTTP {status} response fetching {url}"));
+            }
         }
 
         Ok(std::fs::File::open(cached_path)?)
@@ -191,12 +252,27 @@ impl<'agent> ResCache<'agent> {
     ) -> Result<T, JsonPullError> {
         let json_bytes = match self.get_bytes_cached(url, cached_file_name) {
             Ok(bytes) => bytes,
-            Err(fetch_err) => return Err(JsonPullError::FetchError(fetch_err)),
+            Err(fetch_err) => {
+                let root_cause = fetch_err
+                    .chain()
+                    .last()
+                    .map(ToString::to_string)
+                    .unwrap_or_else(|| fetch_err.to_string());
+
+                return Err(JsonPullError::FetchError(fetch_err.context(format!(
+                    "Fetching JSON from {url} into cache file {cached_file_name} failed: {root_cause}"
+                ))));
+            }
         };
 
         match serde_json::from_slice(&json_bytes) {
             Ok(result) => Ok(result),
-            Err(parse_err) => Err(JsonPullError::ParseError(parse_err)),
+            Err(parse_err) => {
+                if let Err(e) = self.remove_cached(cached_file_name) {
+                    warn!("Failed to remove corrupted cache file {cached_file_name}: {e}");
+                }
+                Err(JsonPullError::ParseError(parse_err))
+            }
         }
     }
 }
