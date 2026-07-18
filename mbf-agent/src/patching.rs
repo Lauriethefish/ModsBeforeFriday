@@ -159,7 +159,7 @@ fn patch_and_reinstall(
         }
     }
 
-    reinstall_modded_app(&temp_apk_path, device_pre_v51).context("Reinstalling modded APK")?;
+    reinstall_modded_app(&temp_apk_path).context("Reinstalling modded APK")?;
     std::fs::remove_file(temp_apk_path)?;
 
     info!("Restoring OBB files");
@@ -190,8 +190,7 @@ pub fn backup_player_data() -> Result<()> {
 }
 
 fn reinstall_modded_app(
-    temp_apk_path: &Path,
-    device_pre_v51: bool,
+    temp_apk_path: &Path
 ) -> Result<()> {
     info!("Reinstalling modded app");
     Command::new("pm")
@@ -199,18 +198,34 @@ fn reinstall_modded_app(
         .output()
         .context("Uninstalling vanilla APK")?;
 
-    Command::new("pm")
-        .args(["install", &temp_apk_path.to_string_lossy()])
-        .output()
-        .context("Installing modded APK")?;
+    let is_pico = get_android_device_manufacturer()
+        .map(|v| v.to_lowercase().contains("pico"))
+        .unwrap_or(false);
+
+    if is_pico {
+        Command::new("pm")
+            .args([
+                "install", 
+                "-i", "com.picovr.store", // needed to display game icon in the app launcher
+                &temp_apk_path.to_string_lossy()
+            ])
+            .output()
+            .context("Installing modded APK")?;
+    } else {
+        Command::new("pm")
+            .args(["install", &temp_apk_path.to_string_lossy()])
+            .output()
+            .context("Installing modded APK")?;
+    }
 
     info!("Granting external storage permission");
     Command::new("appops")
         .args(["set", "--uid", &PARAMETERS.apk_id, "MANAGE_EXTERNAL_STORAGE", "allow"])
         .output()?;
 
-    // Quest 1 specific permissions
-    if device_pre_v51 {
+    // Android 10 and below needs extra permissions granted for external storage access (Quest 1)
+    let sdk_version = get_android_sdk_version()?;
+    if sdk_version < 30 {
         info!("Granting WRITE_EXTERNAL_STORAGE and READ_EXTERNAL_STORAGE (Quest 1)");
         Command::new("pm")
             .args(["grant", &PARAMETERS.apk_id, "android.permission.WRITE_EXTERNAL_STORAGE"])
@@ -480,4 +495,23 @@ fn patch_manifest(zip: &mut ZipFile<File>, additional_properties: String) -> Res
     .context("Writing modified manifest")?;
 
     Ok(())
+}
+
+fn get_android_sdk_version() -> Result<i32> {
+    let output = Command::new("getprop")
+        .arg("ro.build.version.sdk")
+        .output().context("Getting Android SDK version")?;
+
+    let sdk_version_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let sdk_version: i32 = sdk_version_str.parse().context("Parsing Android SDK version number")?;
+    Ok(sdk_version)
+}
+
+fn get_android_device_manufacturer() -> Result<String> {
+    let output = Command::new("getprop")
+        .arg("ro.product.manufacturer")
+        .output().context("Getting Android device manufacturer")?;
+    
+    let manufacturer = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    Ok(manufacturer)
 }

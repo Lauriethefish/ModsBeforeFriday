@@ -56,6 +56,7 @@ pub enum AttributeValue {
     Boolean(bool),
     Integer(i32),
     Reference(u32), // Reference ID
+    Float(f32),
 }
 
 #[derive(Copy, Clone, PartialEq, Debug)]
@@ -111,6 +112,7 @@ enum AttributeTypeId {
     Hex,
     Reference,
     String,
+    Float,
 }
 
 impl AttributeTypeId {
@@ -121,6 +123,7 @@ impl AttributeTypeId {
             0x11 => Some(Self::Hex),
             0x01 => Some(Self::Reference),
             0x03 => Some(Self::String),
+            0x04 => Some(Self::Float),
             _ => None,
         }
     }
@@ -132,6 +135,7 @@ impl AttributeTypeId {
             Self::Hex => 0x11,
             Self::Reference => 0x01,
             Self::String => 0x03,
+            Self::Float => 0x04,
         };
 
         (basic_type << 24) | 0x000008

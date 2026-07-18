@@ -148,7 +148,7 @@ function RepatchMenu({ modStatus, quit }: {
 
     let manifest = useRef(new AndroidManifest(modStatus.app_info!.manifest_xml));
     useEffect(() => {
-        manifest.current.applyPatchingManifestMod(devicePreV51);
+        manifest.current.applyPatchingManifestMod();
     }, []);
     const [splashScreen, setSplashScreen] = useState(null as File | null);
 

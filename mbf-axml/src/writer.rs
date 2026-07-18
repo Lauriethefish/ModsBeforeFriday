@@ -284,7 +284,8 @@ impl<'w, W: Write> AxmlWriter<'w, W> {
             AttributeValue::String(str_value) => {
                 let str_idx = self.get_string_idx(str_value)?;
                 (str_idx as i32, str_idx as i32, AttributeTypeId::String)
-            }
+            },
+            AttributeValue::Float(f) => (f.to_bits() as i32, -1, AttributeTypeId::Float),
         };
 
         self.main_contents.write_i32::<LE>(raw_str)?;

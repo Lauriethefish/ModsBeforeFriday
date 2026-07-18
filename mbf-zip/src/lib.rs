@@ -18,6 +18,8 @@ pub mod signing;
 
 /// Minimum version needed to extract ZIP files made by this module
 pub const VERSION_NEEDED_TO_EXTRACT: u16 = 0x0002;
+// Max size of the comment
+pub const UINT16_MAX_VALUE: u16 = 0xffff;
 
 /// The CRC-32 algorithm used by the ZIP file format.
 pub const ZIP_CRC: Crc<u32> = Crc::<u32>::new(&Algorithm {
@@ -78,17 +80,39 @@ impl<T: Read + Seek> ZipFile<T> {
     pub fn open(mut file: T) -> Result<Self> {
         let mut buf_file = BufReader::new(&mut file);
 
-        buf_file.seek(SeekFrom::End(-22))?; // Assuming zero comment, this is the latest position for the EOCD header
-
-        // Read backwards until an EOCD header is found.
-        while buf_file.read_u32::<LE>()? != EndOfCentDir::HEADER {
-            if buf_file.stream_position()? == 4 {
-                return Err(anyhow!("No EOCD found in APK"));
+        let mut found_eocd_pos = None;
+        {
+            let archive_size = buf_file.seek(SeekFrom::End(0))?;
+            if archive_size < EndOfCentDir::MIN_SIZE as u64 {
+                return Err(anyhow!("File too small to be a valid ZIP archive"));
             }
 
-            buf_file.seek(SeekFrom::Current(-8))?;
+            let max_comment_len = std::cmp::min(
+                archive_size - EndOfCentDir::MIN_SIZE as u64,
+                UINT16_MAX_VALUE as u64,
+            );
+
+            let eocd_empty_comment_pos = archive_size - EndOfCentDir::MIN_SIZE as u64;
+            for expected_comment_len in 0..=max_comment_len {
+                let eocd_pos = eocd_empty_comment_pos - expected_comment_len;
+                buf_file.seek(SeekFrom::Start(eocd_pos))?;
+
+                if buf_file.read_u32::<LE>()? == EndOfCentDir::HEADER {
+                    buf_file.seek(SeekFrom::Start(
+                        eocd_pos + EndOfCentDir::COMMENT_LENGTH_FIELD_OFFSET as u64,
+                    ))?;
+
+                    let actual_comment_len = buf_file.read_u16::<LE>()? as u64;
+
+                    if actual_comment_len == expected_comment_len {
+                        found_eocd_pos = Some(eocd_pos);
+                        break;
+                    }
+                }
+            }
         }
-        buf_file.seek(SeekFrom::Current(-4))?; // Seek back before the LFH
+        let eocd_pos = found_eocd_pos.ok_or_else(|| anyhow!("No EOCD found in APK"))?;
+        buf_file.seek(SeekFrom::Start(eocd_pos))?;
 
         let eocd: EndOfCentDir = EndOfCentDir::read(&mut buf_file).context("Invalid EOCD")?;
         buf_file.seek(SeekFrom::Start(eocd.cent_dir_offset as u64))?;

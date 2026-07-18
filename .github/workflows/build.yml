@@ -45,8 +45,8 @@ jobs:
         if: steps.agent_cache.outputs.cache-hit != 'true'
         uses: actions/cache@v4
         with:
-          key: rust-target-${{ steps.agent_hash.outputs.hash }}
-          restore-keys: rust-target-
+          key: rust-target-newlibmain-${{ steps.agent_hash.outputs.hash }}
+          restore-keys: rust-target-newlibmain-
           path: |
             ./target
 
