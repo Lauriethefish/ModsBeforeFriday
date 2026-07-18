@@ -3,7 +3,6 @@ use std::io::Read;
 use anyhow::{anyhow, Context, Result};
 use log::info;
 use serde::Deserialize;
-use ureq::post;
 
 const META_GRAPH_BASE_URL: &str = "https://meta.graph.meta.com";
 const OCULUS_GRAPH_BASE_URL: &str = "https://graph.oculus.com";
@@ -19,7 +18,7 @@ fn extract_access_token(access_token_result: &serde_json::Value) -> Result<Strin
 pub fn meta_accounts_login(email_addr: &str, password: &str) -> Result<String> {
     let resp = crate::default_agent::get_agent()
         .post(&format!("{META_GRAPH_BASE_URL}/accounts_login"))
-        .send_form(&[
+        .send_form([
             (
                 "access_token",
                 "FRL|778542610035039|2e189079414d3a6e5642a789322b1940",
@@ -30,21 +29,22 @@ pub fn meta_accounts_login(email_addr: &str, password: &str) -> Result<String> {
         ])
         .context("Sending accounts login POST")?;
 
-    let access_token_result: serde_json::Value = serde_json::from_reader(resp.into_reader())?;
+    let access_token_result: serde_json::Value =
+        serde_json::from_reader(resp.into_body().into_reader())?;
     extract_access_token(&access_token_result)
 }
 
 fn get_horizon_access_token(access_token: &str) -> Result<String> {
     let resp = crate::default_agent::get_agent()
         .post(&format!("{META_GRAPH_BASE_URL}/graphql"))
-        .send_form(&[
+        .send_form([
             ("access_token", access_token),
             ("variables", "{\"app_id\":\"1582076955407037\"}"),
             ("doc_id", "5787825127910775"),
         ])
         .context("Sending get access token POST")?;
 
-    let json_doc: serde_json::Value = serde_json::from_reader(resp.into_reader())?;
+    let json_doc: serde_json::Value = serde_json::from_reader(resp.into_body().into_reader())?;
 
     // Extract the horizon access token from the document.
     let access_token_result = &json_doc["data"]["xfr_create_profile_token"]["profile_tokens"]
@@ -58,13 +58,14 @@ fn get_horizon_access_token(access_token: &str) -> Result<String> {
 fn authenticate_application(access_token: &str, app_id: u64) -> Result<String> {
     let resp = crate::default_agent::get_agent()
         .post(&format!("{OCULUS_GRAPH_BASE_URL}/authenticate_application"))
-        .send_form(&[
+        .send_form([
             ("access_token", access_token),
             ("app_id", &app_id.to_string()),
         ])
         .context("Sending authenticate_application POST")?;
 
-    let access_token_result: serde_json::Value = serde_json::from_reader(resp.into_reader())?;
+    let access_token_result: serde_json::Value =
+        serde_json::from_reader(resp.into_body().into_reader())?;
     extract_access_token(&access_token_result)
 }
 
@@ -126,13 +127,13 @@ pub struct Application {
 pub fn list_app_versions(access_token: &str, app_id: &str) -> Result<Vec<AndroidBinary>> {
     let resp = crate::default_agent::get_agent()
         .post(&format!("{OCULUS_GRAPH_BASE_URL}/graphql"))
-        .send_form(&[
+        .send_form([
             ("access_token", access_token),
             ("doc_id", "2885322071572384"),
             ("variables", &format!("{{\"applicationID\":\"{app_id}\"}}")),
         ])?;
 
-    let string = resp.into_string()?;
+    let string = resp.into_body().read_to_string()?;
 
     let req_result: ResponseData<Application> = serde_json::from_str(&string)?;
 
@@ -143,7 +144,7 @@ pub fn list_app_versions(access_token: &str, app_id: &str) -> Result<Vec<Android
 pub fn get_obb_binary(access_token: &str, android_binary_id: &str) -> Result<Option<ObbBinary>> {
     let resp = crate::default_agent::get_agent()
         .post(&format!("{OCULUS_GRAPH_BASE_URL}/graphql"))
-        .send_form(&[
+        .send_form([
             ("access_token", access_token),
             ("doc_id", "24072064135771905"),
             (
@@ -152,7 +153,7 @@ pub fn get_obb_binary(access_token: &str, android_binary_id: &str) -> Result<Opt
             ),
         ])?;
 
-    let string = resp.into_string()?;
+    let string = resp.into_body().read_to_string()?;
 
     let req_result: ResponseData<AndroidBinary> = serde_json::from_str(&string)?;
     Ok(req_result.data.node.obb_binary)
@@ -160,10 +161,11 @@ pub fn get_obb_binary(access_token: &str, android_binary_id: &str) -> Result<Opt
 
 // Starts a request to download the binary with the given binary ID.
 pub fn download_binary(access_token: &str, binary_id: &str) -> Result<Box<dyn Read>> {
-    Ok(crate::default_agent::get_agent()
+    let resp = crate::default_agent::get_agent()
         .get(OCULUS_BINARY_DOWNLOAD_URL)
         .query("access_token", access_token)
         .query("id", binary_id)
-        .call()?
-        .into_reader())
+        .call()?;
+
+    Ok(Box::new(resp.into_body().into_reader()))
 }
