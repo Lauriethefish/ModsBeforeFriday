@@ -14,6 +14,7 @@ fn download_if_not_exist(url: &str, to: &str) {
     let mut reader = ureq::get(url)
         .call()
         .expect("Failed to access URL")
+        .into_body()
         .into_reader();
     let mut writer = OpenOptions::new()
         .create_new(true)

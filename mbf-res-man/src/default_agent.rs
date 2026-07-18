@@ -11,12 +11,14 @@ static AGENT: OnceLock<ureq::Agent> = OnceLock::new();
 
 pub fn get_agent() -> &'static ureq::Agent {
     AGENT.get_or_init(|| {
-        ureq::AgentBuilder::new()
-            .timeout_read(Duration::from_secs(REQUEST_TIMEOUT_READ_SECS))
-            .timeout_write(Duration::from_secs(REQUEST_TIMEOUT_WRITE_SECS))
+        let config = ureq::Agent::config_builder()
+            .timeout_recv_body(Some(Duration::from_secs(REQUEST_TIMEOUT_READ_SECS)))
+            .timeout_send_body(Some(Duration::from_secs(REQUEST_TIMEOUT_WRITE_SECS)))
             .https_only(true)
-            .try_proxy_from_env(true)
-            .user_agent(format!("mbf-agent/{}", env!("CARGO_PKG_VERSION")).as_str())
-            .build()
+            .proxy(ureq::Proxy::try_from_env())
+            .user_agent(format!("mbf-agent/{}", env!("CARGO_PKG_VERSION")))
+            .build();
+
+        ureq::Agent::new_with_config(config)
     })
 }

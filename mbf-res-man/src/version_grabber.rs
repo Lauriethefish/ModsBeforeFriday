@@ -9,7 +9,7 @@ use crate::{
     APK_ID,
 };
 
-const BEATSABER_GRAPH_APP_ID: &str = "2448060205267927";
+pub(crate) const BEATSABER_GRAPH_APP_ID: &str = "2448060205267927";
 
 // Used to hold a Beat Saber version, which follows semver but has a build suffix that is not valid semver.
 // The `non_semver` here is the complete version string with build suffix.
