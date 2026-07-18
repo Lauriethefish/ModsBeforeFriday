@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-rsa = { version = "0.9", features = ["sha2"] }
+rsa = { version = "0.9", default-features = false, features = ["std", "u64_digit", "sha2"] }
 rasn = "0.28"
 rasn-pkix = "0.28"
 byteorder = "1.5"
