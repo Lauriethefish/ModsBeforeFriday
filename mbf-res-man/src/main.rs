@@ -608,8 +608,11 @@ fn main() -> Result<()> {
             older_binaries,
         } => {
             let access_token = get_or_load_access_token(cli.access_token)?;
-            let versions =
-                version_grabber::get_live_bs_versions(&access_token, Version::new(0, 0, 0))?;
+            let versions = version_grabber::get_live_versions(
+                &access_token,
+                Version::new(0, 0, 0),
+                version_grabber::BEATSABER_GRAPH_APP_ID,
+            )?;
 
             version_grabber::download_version(
                 &access_token,
@@ -622,10 +625,13 @@ fn main() -> Result<()> {
         }
         Commands::ListVersions => {
             let access_token = get_or_load_access_token(cli.access_token)?;
-            let mut versions: Vec<_> =
-                version_grabber::get_live_bs_versions(&access_token, Version::new(0, 0, 0))?
-                    .into_keys()
-                    .collect();
+            let mut versions: Vec<_> = version_grabber::get_live_versions(
+                &access_token,
+                Version::new(0, 0, 0),
+                version_grabber::BEATSABER_GRAPH_APP_ID,
+            )?
+            .into_keys()
+            .collect();
             versions.sort_by_cached_key(|ver| ver.semver.clone());
 
             for version in versions {
