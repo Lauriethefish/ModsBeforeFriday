@@ -113,8 +113,16 @@ function ChooseDevice() {
         <div className="container mainContainer">
           <Title />
           <p>To get started, plug your Quest in with a USB-C cable and click the button below.</p>
-          <p>Want see what mods are available? You can find a full list <a href="https://mods.bsquest.xyz" target="_blank" rel="noopener noreferrer">here!</a></p>
-         
+          <p>An unofficial version of MBF is available on Windows, MacOS, and Linux as a desktop app!
+            <br /> It's also available as a in-headset app! 
+            <br />This version can either be sideloaded from within the headset, or installed via Windows!
+          </p>
+          <p>Desktop App Links:
+            <br /><a href="https://github.com/DanTheMan827/mbf-bridge/releases/download/v0.1.1/mbf-bridge-windows-x86-release.zip" target="_blank" rel="noopener noreferrer">Win32</a> <a href="https://github.com/DanTheMan827/mbf-bridge/releases/download/v0.1.1/mbf-bridge-windows-x64-release.zip" target="_blank" rel="noopener noreferrer">Win64</a> <a href="https://github.com/DanTheMan827/mbf-bridge/releases/download/v0.1.1/mbf-bridge-macos-universal-release.zip" target="_blank" rel="noopener noreferrer">MacOS</a> <a href="https://github.com/DanTheMan827/mbf-bridge/releases/download/v0.1.1/mbf-bridge-linux-x64-release.zip" target="_blank" rel="noopener noreferrer">Linux</a> </p>
+            <p> Headset App and Installer Links:
+              <br /><a href="https://github.com/DanTheMan827/mbf-launcher/releases/download/0.1.0-beta.2/com.dantheman827.mbflauncher-Signed.apk" target="_blank" rel="noopener noreferrer">MBFLauncher Apk</a>
+              <br /> <a href="https://github.com/AltyFox/MBFLauncherAutoInstaller/releases/download/v1.1.11/MBF-Launcher-Installer.exe" target="_blank" rel="noopener noreferrer">MBFLauncher Windows Installer</a></p>
+            <p>Want see what mods are available? You can find a full list <a href="https://mods.bsquest.xyz" target="_blank" rel="noopener noreferrer">here!</a></p>
           <NoCompatibleDevices />
 
           <div className="chooseDeviceContainer">
@@ -287,7 +295,8 @@ function OculusBrowserMessage() {
   return <div className="container mainContainer">
     <h1>Quest Browser Detected</h1>
     <p>MBF has detected that you're trying to use the built-in Quest browser.</p>
-    <p>Unfortunately, <b>you cannot use MBF on the device you are attempting to mod.</b></p>
+    <p>Unfortunately, <b>you cannot use the MBF website on the device you are attempting to mod.</b></p>
+
     <DevicesSupportingModding />
 
     <p>(MBF can be used on a Quest if you install a chromium browser, however this can only be used to mod <b>another Quest headset</b>, connected via USB.)</p>
@@ -352,7 +361,7 @@ function NoCompatibleDevices() {
       To use MBF, you must enable developer mode so that your Quest is accessible via USB.
       <br />Follow the <a href="https://developer.oculus.com/documentation/native/android/mobile-device-setup/?locale=en_GB" target="_blank" rel="noopener noreferrer">official guide</a> -
       you'll need to create a new organisation and enable USB debugging.
-    </p>
+    </p> 
 
     {isViewingOnMobile() && <>
       <h4>Using Android?</h4>
