@@ -31,7 +31,7 @@ Android documents this declaration as making the named app visible to matching
 [package visibility documentation](https://developer.android.com/training/package-visibility/declaring)
 and [`<queries>` reference](https://developer.android.com/guide/topics/manifest/queries-element).
 
-## Validation and approval
+## Validation and automatic application
 
 `manifestRequirements` is optional. Existing QMODs through schema version 1.2.0 remain valid and
 behave exactly as before. A QMOD that uses `manifestRequirements` must specify `_QPVersion` 1.3.0,
@@ -45,9 +45,10 @@ validation.
 
 When a mod is enabled, the agent reads the installed binary Android manifest and verifies every
 request. If declarations are missing, it returns the requesting mod IDs and exact packages without
-copying those mods' files. The frontend shows that list and asks the user before repatching. The
-agent then verifies the installed manifest again on the retry. Required dependencies use the same
-checks, including dependencies downloaded during the operation.
+copying those mods' files. The frontend automatically performs a manifest-only repatch and retries
+the original enable operation. This preserves MBF's one-click install flow while keeping enforcement
+in the typed schema and Rust agent. The agent verifies the installed manifest again on the retry.
+Required dependencies use the same checks, including dependencies downloaded during the operation.
 
 Manifest-only repatches use Android's replace-existing install path and check the package manager's
 result. A rejected generated APK therefore leaves the existing app installed.

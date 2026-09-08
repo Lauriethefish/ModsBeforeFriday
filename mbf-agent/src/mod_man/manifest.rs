@@ -38,8 +38,8 @@ impl std::error::Error for MissingManifestRequirements {}
 /// Declarative Android manifest requirements for a QMOD.
 ///
 /// This intentionally exposes a small, typed surface rather than accepting raw XML. New
-/// requirement types should be added individually after defining their validation and approval
-/// policy.
+/// requirement types should be added individually after defining their validation, compatibility,
+/// and safety policy.
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ManifestRequirements {

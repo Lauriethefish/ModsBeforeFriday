@@ -26,7 +26,7 @@ pub(super) fn handle_set_mods_enabled(statuses: HashMap<String, bool>) -> Result
     let mut missing_requirements = Vec::new();
 
     // This preflight is deliberately performed before any requested status is changed. It covers
-    // every dependency that is already downloaded, allowing the UI to ask for one approval and
+    // every dependency that is already downloaded, allowing the UI to complete one automatic
     // repatch before mod files are copied.
     for (id, new_status) in &statuses {
         if !new_status {

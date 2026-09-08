@@ -9,7 +9,7 @@ import '../css/ModManager.css';
 import { importFile, importUrl, patchApp, removeMod, setModStatuses } from "../Agent";
 import { toast } from "react-toastify";
 import { ModRepoBrowser } from "./ModRepoBrowser";
-import { ImportResult, ImportedMod, MissingManifestRequirement, ModStatus, ModSyncResult } from "../Messages";
+import { ImportResult, ImportedMod, ModStatus, ModSyncResult } from "../Messages";
 import { OptionsMenu } from "./OptionsMenu";
 import useFileDropper from "../hooks/useFileDropper";
 import { Log } from "../Logging";
@@ -393,10 +393,11 @@ function AddModsMenu(props: ModMenuProps) {
 
 const MAX_MANIFEST_REPATCH_ATTEMPTS = 16;
 
-// Enables/disables mods, pausing to show and apply any typed manifest requirements returned by
-// the agent. A newly downloaded dependency can introduce another requirement, so the operation is
-// retried after each successful repatch. The bounded loop prevents a malformed dependency graph
-// from causing an endless cycle.
+// Enables/disables mods, automatically applying any typed manifest requirements returned by the
+// agent. The agent only accepts the deliberately narrow, validated package-visibility model; raw
+// XML and permissions never reach this path. A newly downloaded dependency can introduce another
+// requirement, so the operation is retried after each successful repatch. The bounded loop
+// prevents a malformed dependency graph from causing an endless cycle.
 async function setModStatusesWithManifestRequirements(
     device: Adb,
     devicePreV51: boolean,
@@ -419,10 +420,6 @@ async function setModStatusesWithManifestRequirements(
 
         if(currentStatus.app_info === null) {
             throw new Error("Cannot apply manifest requirements because Beat Saber is not installed.");
-        }
-
-        if(!confirmManifestRequirements(requirements)) {
-            throw new Error("The requested manifest changes were not approved; no requesting mod was enabled.");
         }
 
         const manifest = new AndroidManifest(currentStatus.app_info.manifest_xml);
@@ -456,18 +453,6 @@ async function setModStatusesWithManifestRequirements(
 
     throw new Error(
         `More than ${MAX_MANIFEST_REPATCH_ATTEMPTS} manifest repatches were requested while resolving dependencies.`
-    );
-}
-
-function confirmManifestRequirements(requirements: MissingManifestRequirement[]): boolean {
-    const descriptions = requirements.map(requirement =>
-        `- ${requirement.mod_id}: ${requirement.query_packages.join(", ")}`
-    );
-
-    return window.confirm(
-        "The following mods need Beat Saber's manifest to make specific installed apps visible:\n\n"
-        + descriptions.join("\n")
-        + "\n\nThis does not grant Android permissions. MBF will repatch the game before enabling these mods. Continue?"
     );
 }
 

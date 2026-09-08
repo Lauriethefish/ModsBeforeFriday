@@ -136,7 +136,7 @@ pub enum Response {
         // If any of the mods failed to install/uninstall, this will be Some with a string
         // containing a list of the errors generated.
         failures: Option<String>,
-        // Requirements that must be approved and applied before retrying this operation.
+        // Requirements that must be applied before retrying this operation.
         manifest_changes_required: Vec<MissingManifestRequirementModel>,
     },
     Patched {
