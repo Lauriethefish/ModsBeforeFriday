@@ -8,6 +8,11 @@ MBF has some query parameters which can be passed with the URL. These are useful
 - `?dev=true`: This will override the normal version check, and always prompt the user to patch the currently installed Beat Saber game. NOTE: If you are not a mod developer, this **will not help you.** All it does is allows the modloader to be installed, it does not magically make the new version support mods and using this will only prevent you from downgrading Beat Saber. This is not "get mods only".
 - `?setcores=prompt`: This will prompt the user to enter an alternative core mods URL to use to test that the core mod JSON is ready for release. This URL will then be stored in the query parameter for future page refreshes.
 
+## QMOD Manifest Requirements
+
+QMOD schema 1.3.0 can declare narrowly typed Android package-visibility requirements. See the
+[format, compatibility, and security documentation](docs/qmod-manifest-requirements.md).
+
 ## Project Structure
 
 - `./mbf-agent` contains the agent, which is an executable written in Rust that is executed by the frontend via ADB. This agent does pretty much all the work, including installing mods and patching the game.
