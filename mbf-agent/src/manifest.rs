@@ -127,4 +127,27 @@ mod tests {
 
         assert!(info.query_packages.is_empty());
     }
+
+    #[test]
+    fn reads_all_direct_queries_and_requires_the_android_name_namespace() {
+        let info = read_manifest(
+            r#"<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+                          xmlns:other="https://example.com/not-android"
+                          android:versionName="1.40.8">
+                <queries>
+                    <package other:name="com.ignored.wrongnamespace" />
+                    <package android:name="com.discord" />
+                </queries>
+                <queries>
+                    <package android:name="com.spotify.music" />
+                    <package android:name="com.discord" />
+                </queries>
+            </manifest>"#,
+        );
+
+        assert_eq!(
+            info.query_packages,
+            HashSet::from(["com.discord".to_string(), "com.spotify.music".to_string()])
+        );
+    }
 }

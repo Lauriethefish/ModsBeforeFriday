@@ -50,6 +50,12 @@ pub struct ManifestRequirements {
 impl ManifestRequirements {
     /// Validates limits that must remain enforced even if schema validation is bypassed or changed.
     pub fn validate(&self) -> Result<()> {
+        if self.query_packages.is_empty() {
+            return Err(anyhow!(
+                "A manifestRequirements object must request at least one query package"
+            ));
+        }
+
         if self.query_packages.len() > MAX_QUERY_PACKAGES {
             return Err(anyhow!(
                 "A QMOD may request at most {MAX_QUERY_PACKAGES} query packages"
@@ -286,6 +292,11 @@ mod tests {
 
     #[test]
     fn rejects_duplicate_or_excessive_query_packages() {
+        let empty = ManifestRequirements {
+            query_packages: Vec::new(),
+        };
+        assert!(empty.validate().is_err());
+
         let duplicate = ManifestRequirements {
             query_packages: vec!["com.discord".to_string(), "com.discord".to_string()],
         };
@@ -297,6 +308,17 @@ mod tests {
                 .collect(),
         };
         assert!(excessive.validate().is_err());
+    }
+
+    #[test]
+    fn accepts_the_maximum_number_of_query_packages() {
+        let requirements = ManifestRequirements {
+            query_packages: (0..MAX_QUERY_PACKAGES)
+                .map(|index| format!("com.example.package{index}"))
+                .collect(),
+        };
+
+        requirements.validate().unwrap();
     }
 
     #[test]

@@ -120,6 +120,50 @@ fn requirement_models(
     models
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn requirement_models_merge_duplicate_reports_for_one_mod() {
+        let models = requirement_models(vec![
+            MissingManifestRequirements {
+                mod_id: "example-mod".to_string(),
+                query_packages: vec!["com.discord".to_string()],
+            },
+            MissingManifestRequirements {
+                mod_id: "example-mod".to_string(),
+                query_packages: vec!["com.discord".to_string(), "com.spotify.music".to_string()],
+            },
+        ]);
+
+        assert_eq!(models.len(), 1);
+        assert_eq!(models[0].mod_id, "example-mod");
+        assert_eq!(
+            models[0].query_packages,
+            vec!["com.discord", "com.spotify.music"]
+        );
+    }
+
+    #[test]
+    fn requirement_models_keep_requesting_mods_separate() {
+        let models = requirement_models(vec![
+            MissingManifestRequirements {
+                mod_id: "first-mod".to_string(),
+                query_packages: vec!["com.discord".to_string()],
+            },
+            MissingManifestRequirements {
+                mod_id: "second-mod".to_string(),
+                query_packages: vec!["com.discord".to_string()],
+            },
+        ]);
+
+        assert_eq!(models.len(), 2);
+        assert_eq!(models[0].mod_id, "first-mod");
+        assert_eq!(models[1].mod_id, "second-mod");
+    }
+}
+
 /// Handles `RemoveMod` [Requests](crate::requests::Request).
 ///
 /// # Returns

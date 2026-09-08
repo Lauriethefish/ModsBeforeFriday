@@ -1,7 +1,7 @@
 # QMOD Android manifest requirements
 
-MBF supports a deliberately limited manifest-requirements extension for QMOD schema version
-1.3.0. It lets a mod declare specific Android packages that must be visible through
+This branch proposes a deliberately limited manifest-requirements extension for QMOD schema
+version 1.3.0. It lets a mod declare specific Android packages that must be visible through
 `PackageManager` on Android 11 and newer.
 
 ```json
@@ -38,10 +38,10 @@ behave exactly as before. A QMOD that uses `manifestRequirements` must specify `
 so older installers fail clearly instead of silently ignoring a requirement and enabling a broken
 mod.
 
-MBF accepts at most 32 unique package IDs per QMOD. Each ID is at most 255 ASCII characters, has at
-least two dot-separated components, starts every component with a letter, and otherwise contains
-only letters, digits, or underscores. The Rust agent repeats these checks after JSON Schema
-validation.
+MBF accepts between 1 and 32 unique package IDs per QMOD. Each ID is at most 255 ASCII characters,
+has at least two dot-separated components, starts every component with a letter, and otherwise
+contains only letters, digits, or underscores. The Rust agent repeats these checks after JSON
+Schema validation.
 
 When a mod is enabled, the agent reads the installed binary Android manifest and verifies every
 request. If declarations are missing, it returns the requesting mod IDs and exact packages without
@@ -78,6 +78,19 @@ removal feature would need persistent provenance and reference counting.
 ## Compatibility note
 
 Version 1.3.0 is a proposed QMOD schema addition. Before mods publish QMODs that depend on it, the
-canonical QMOD model/schema and other active installers should adopt the same typed field. Keeping
-the version gate is important: merely adding an optional property to version 1.2.0 would let older
-installers accept the archive, ignore the requirement, and report a misleading successful install.
+[canonical QuestPatcher.QMod model and schema](https://github.com/Lauriethefish/QuestPatcher.QMod)
+and other active installers should adopt the same typed field. QPM's current typed QMOD model also
+needs to preserve and generate the field; otherwise rebuilding a `mod.template.json` can omit it.
+Keeping the version gate is important: merely adding an optional property to version 1.2.0 would
+let older installers accept the archive, ignore the requirement, and report a misleading
+successful install.
+
+The recommended merge order is therefore:
+
+1. agree on the field and version in the canonical QuestPatcher.QMod repository;
+2. add the field to the canonical schema/library and QPM's typed model;
+3. merge installer support such as this MBF implementation; and
+4. only then publish mods that depend on the new version.
+
+Until the canonical proposal is accepted, this MBF branch is an implementation reference and
+should not be treated as a final QMOD 1.3.0 definition.

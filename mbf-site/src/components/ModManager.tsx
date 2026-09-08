@@ -261,8 +261,7 @@ function AddModsMenu(props: ModMenuProps) {
                 toast.success("Successfully downloaded and installed " + imported_mod.name + " v" + imported_mod.version)
 
             }   catch(err) {
-                // If this occurs, it's a panic i.e. bug in the agent
-                toast.error(`Failed to install ${imported_id} after importing due to an internal error: ${err}`, { autoClose: false} );
+                toast.error(`Failed to install ${imported_id} after importing: ${err}`, { autoClose: false} );
             }
         }
     }
@@ -423,17 +422,13 @@ async function setModStatusesWithManifestRequirements(
         }
 
         const manifest = new AndroidManifest(currentStatus.app_info.manifest_xml);
-        const packagesBefore = new Set(manifest.getQueryPackages());
         requirements
             .flatMap(requirement => requirement.query_packages)
             .forEach(packageName => manifest.addQueryPackage(packageName));
 
-        // If the device already contains every declaration, retry without needlessly rebuilding
-        // the APK. This also protects against a stale frontend status object.
-        if(manifest.getQueryPackages().every(packageName => packagesBefore.has(packageName))) {
-            continue;
-        }
-
+        // Always perform the requested repatch, even if the frontend's cached XML already contains
+        // every package. The agent made this decision from the installed binary manifest; skipping
+        // here would leave a stale frontend status unable to repair the actual APK.
         const repatchedStatus = await patchApp(
             device,
             currentStatus,

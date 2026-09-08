@@ -972,6 +972,7 @@ mod tests {
     #[test]
     fn schema_rejects_untyped_or_malformed_manifest_changes() {
         for requirements in [
+            serde_json::json!({ "queryPackages": [] }),
             serde_json::json!({ "permissions": ["android.permission.RECORD_AUDIO"] }),
             serde_json::json!({ "queryPackages": ["com.discord\" />"] }),
             serde_json::json!({ "queryPackages": ["com.discord", "com.discord"] }),

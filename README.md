@@ -10,7 +10,8 @@ MBF has some query parameters which can be passed with the URL. These are useful
 
 ## QMOD Manifest Requirements
 
-QMOD schema 1.3.0 can declare narrowly typed Android package-visibility requirements. See the
+This branch proposes a QMOD 1.3.0 extension for narrowly typed Android package-visibility
+requirements. See the
 [format, compatibility, and security documentation](docs/qmod-manifest-requirements.md).
 
 ## Project Structure
