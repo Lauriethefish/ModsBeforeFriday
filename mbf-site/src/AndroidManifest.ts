@@ -6,6 +6,7 @@ const ANDROID_NS_URI: string = "http://schemas.android.com/apk/res/android";
 export class AndroidManifest {
     private features: string[] = [];
     private permissions: string[] = [];
+    private queryPackages: string[] = [];
     private nativeLibraries: string[] = [];
     private metadata: { [name: string]: string } = {};
     private document!: XMLDocument;
@@ -42,6 +43,7 @@ export class AndroidManifest {
         this.applicationEl = this.document.getElementsByTagName("application")[0];
         this.permissions = [];
         this.features = [];
+        this.queryPackages = [];
         // Load the permissions and features already within the manifest.
         Array.from(this.document.getElementsByTagName("uses-permission")).forEach(permNode => {
             const permName = permNode.getAttribute(`${androidNsPrefix}:name`);
@@ -55,6 +57,16 @@ export class AndroidManifest {
                 this.features.push(featName);
             }
         })
+        Array.from(this.manifestEl.childNodes)
+            .filter(node => node.nodeType === Node.ELEMENT_NODE && node.nodeName === "queries")
+            .flatMap(node => Array.from(node.childNodes))
+            .filter(node => node.nodeType === Node.ELEMENT_NODE && node.nodeName === "package")
+            .forEach(packageNode => {
+                const packageName = (packageNode as Element).getAttributeNS(ANDROID_NS_URI, "name");
+                if(packageName !== null && !this.queryPackages.includes(packageName)) {
+                    this.queryPackages.push(packageName);
+                }
+            });
         Array.from(this.document.getElementsByTagName("uses-native-library")).forEach(libNode => {
             const libName = libNode.getAttribute(`${androidNsPrefix}:name`);
             if(libName !== null) {
@@ -94,6 +106,11 @@ export class AndroidManifest {
     // Gets an array of the current features within the APK.
     public getFeatures(): string[] {
         return this.features;
+    }
+
+    // Gets package IDs declared directly beneath the manifest's <queries> element.
+    public getQueryPackages(): string[] {
+        return this.queryPackages;
     }
 
     // Gets a map of metadata element names to metadata values within the application element of the manifest.
@@ -136,6 +153,32 @@ export class AndroidManifest {
         permissionElement.setAttributeNS(ANDROID_NS_URI, `${this.androidNsPrefix}:name`, perm);
         this.manifestEl.appendChild(permissionElement);
         this.permissions.push(perm);
+    }
+
+    // Adds a package visibility declaration. This does not grant the app a permission; it only
+    // allows PackageManager APIs to discover the named package on Android 11 and newer.
+    public addQueryPackage(packageName: string) {
+        if(this.queryPackages.includes(packageName)) {
+            return;
+        }
+
+        let queriesElement = Array.from(this.manifestEl.childNodes)
+            .find(node => node.nodeType === Node.ELEMENT_NODE && node.nodeName === "queries") as Element | undefined;
+        if(queriesElement === undefined) {
+            queriesElement = this.document.createElement("queries");
+            // Keeping <queries> before <application> matches Android's documented examples and
+            // avoids disturbing the application's existing children.
+            this.manifestEl.insertBefore(queriesElement, this.applicationEl);
+        }
+
+        const packageElement = this.document.createElement("package");
+        packageElement.setAttributeNS(
+            ANDROID_NS_URI,
+            `${this.androidNsPrefix}:name`,
+            packageName
+        );
+        queriesElement.appendChild(packageElement);
+        this.queryPackages.push(packageName);
     }
 
     // Adds a <uses-feature> element for the specified feature underneath the manifest tag.

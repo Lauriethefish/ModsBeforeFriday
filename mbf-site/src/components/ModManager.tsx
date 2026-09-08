@@ -6,10 +6,10 @@ import { ModCard } from "./ModCard";
 import UploadIcon from '../icons/upload.svg';
 import ToolsIcon from '../icons/tools-icon.svg';
 import '../css/ModManager.css';
-import { importFile, importUrl, removeMod, setModStatuses } from "../Agent";
+import { importFile, importUrl, patchApp, removeMod, setModStatuses } from "../Agent";
 import { toast } from "react-toastify";
 import { ModRepoBrowser } from "./ModRepoBrowser";
-import { ImportResult, ImportedMod, ModStatus } from "../Messages";
+import { ImportResult, ImportedMod, MissingManifestRequirement, ModStatus, ModSyncResult } from "../Messages";
 import { OptionsMenu } from "./OptionsMenu";
 import useFileDropper from "../hooks/useFileDropper";
 import { Log } from "../Logging";
@@ -17,6 +17,7 @@ import { useSetWorking, useSyncStore, wrapOperation } from "../SyncStore";
 import { ModRepoMod } from "../ModsRepo";
 import { useDeviceStore } from "../DeviceStore";
 import SyncIcon from "../icons/sync.svg"
+import { AndroidManifest } from "../AndroidManifest";
 
 
 interface ModManagerProps {
@@ -48,6 +49,8 @@ export function ModManager(props: ModManagerProps) {
             mods={mods}
             setMods={setMods}
             gameVersion={gameVersion}
+            modStatus={modStatus}
+            setModStatus={setModStatus}
             visible={menu === SelectedMenu.add}
         />
         
@@ -55,6 +58,8 @@ export function ModManager(props: ModManagerProps) {
             mods={mods}
             setMods={setMods}
             gameVersion={gameVersion}
+            modStatus={modStatus}
+            setModStatus={setModStatus}
             visible={menu === SelectedMenu.current}
         />
         
@@ -95,30 +100,39 @@ interface ModMenuProps {
     mods: Mod[],
     setMods: (mods: Mod[]) => void,
     gameVersion: string,
+    modStatus: ModStatus,
+    setModStatus: (status: ModStatus) => void,
     visible?: boolean
 }
 
 function InstalledModsMenu(props: ModMenuProps) {
     const { mods,
         setMods,
-        gameVersion
+        gameVersion,
+        modStatus,
+        setModStatus
     } = props;
-    const { device } = useDeviceStore((state) => ({ device: state.device }));
+    const { device, devicePreV51 } = useDeviceStore((state) => ({
+        device: state.device,
+        devicePreV51: state.devicePreV51
+    }));
     const [changes, setChanges] = useState({} as { [id: string]: boolean });
 
 
     return <div className={`installedModsMenu fadeIn ${props.visible ? "" : "hidden"}`}>
         {Object.keys(changes).length > 0 && <button className={`syncChanges fadeIn ${props.visible ? "" : "hidden"}`} onClick={async () => {
             if (!device) return;
-            setChanges({});
             Log.debug("Installing mods, statuses requested: " + JSON.stringify(changes));
             await wrapOperation("Syncing mods", "Failed to sync mods", async () => {
-                const modSyncResult = await setModStatuses(device, changes);
+                const modSyncResult = await setModStatusesWithManifestRequirements(
+                    device,
+                    devicePreV51,
+                    changes,
+                    modStatus,
+                    setModStatus
+                );
                 setMods(modSyncResult.installed_mods);
-
-                if(modSyncResult.failures !== null) {
-                    throw modSyncResult.failures;
-                }
+                setChanges({});
             });
 
         }}>
@@ -211,9 +225,14 @@ function AddModsMenu(props: ModMenuProps) {
     const {
         mods,
         setMods,
-        gameVersion
+        gameVersion,
+        modStatus,
+        setModStatus
     } = props;
-    const { device } = useDeviceStore((state) => ({ device: state.device }));
+    const { device, devicePreV51 } = useDeviceStore((state) => ({
+        device: state.device,
+        devicePreV51: state.devicePreV51
+    }));
 
     // Automatically installs a mod when it is imported, or warns the user if it isn't designed for the current game version.
     // Gives appropriate toasts/reports errors in each case.
@@ -231,15 +250,15 @@ function AddModsMenu(props: ModMenuProps) {
                 + trimGameVersion(gameVersion) + ".", { autoClose: false });
         }   else    {
             try {
-                const result = await setModStatuses(device, { [imported_id]: true });
+                const result = await setModStatusesWithManifestRequirements(
+                    device,
+                    devicePreV51,
+                    { [imported_id]: true },
+                    modStatus,
+                    setModStatus
+                );
                 setMods(result.installed_mods);
-
-                // This is where typical mod install failures occur
-                if (result.failures !== null) {
-                    toast.error(result.failures, { autoClose: false });
-                }   else    {
-                    toast.success("Successfully downloaded and installed " + imported_mod.name + " v" + imported_mod.version)
-                }
+                toast.success("Successfully downloaded and installed " + imported_mod.name + " v" + imported_mod.version)
 
             }   catch(err) {
                 // If this occurs, it's a panic i.e. bug in the agent
@@ -370,6 +389,86 @@ function AddModsMenu(props: ModMenuProps) {
             enqueueImports(modRepoImports);
         }} />
     </div>
+}
+
+const MAX_MANIFEST_REPATCH_ATTEMPTS = 16;
+
+// Enables/disables mods, pausing to show and apply any typed manifest requirements returned by
+// the agent. A newly downloaded dependency can introduce another requirement, so the operation is
+// retried after each successful repatch. The bounded loop prevents a malformed dependency graph
+// from causing an endless cycle.
+async function setModStatusesWithManifestRequirements(
+    device: Adb,
+    devicePreV51: boolean,
+    changes: { [id: string]: boolean },
+    initialStatus: ModStatus,
+    setModStatus: (status: ModStatus) => void
+): Promise<ModSyncResult> {
+    let currentStatus = initialStatus;
+
+    for(let attempt = 0; attempt < MAX_MANIFEST_REPATCH_ATTEMPTS; attempt++) {
+        const result = await setModStatuses(device, changes);
+        if(result.failures !== null) {
+            throw result.failures;
+        }
+
+        const requirements = result.manifest_changes_required ?? [];
+        if(requirements.length === 0) {
+            return result;
+        }
+
+        if(currentStatus.app_info === null) {
+            throw new Error("Cannot apply manifest requirements because Beat Saber is not installed.");
+        }
+
+        if(!confirmManifestRequirements(requirements)) {
+            throw new Error("The requested manifest changes were not approved; no requesting mod was enabled.");
+        }
+
+        const manifest = new AndroidManifest(currentStatus.app_info.manifest_xml);
+        const packagesBefore = new Set(manifest.getQueryPackages());
+        requirements
+            .flatMap(requirement => requirement.query_packages)
+            .forEach(packageName => manifest.addQueryPackage(packageName));
+
+        // If the device already contains every declaration, retry without needlessly rebuilding
+        // the APK. This also protects against a stale frontend status object.
+        if(manifest.getQueryPackages().every(packageName => packagesBefore.has(packageName))) {
+            continue;
+        }
+
+        const repatchedStatus = await patchApp(
+            device,
+            currentStatus,
+            null,
+            manifest.toString(),
+            true,
+            false,
+            devicePreV51,
+            null
+        );
+        // The existing repatch response does not reload the mod directory. Preserve the agent's
+        // preflight result until the final SetModsEnabled response supplies the authoritative list.
+        repatchedStatus.installed_mods = result.installed_mods;
+        currentStatus = repatchedStatus;
+        setModStatus(repatchedStatus);
+    }
+
+    throw new Error(
+        `More than ${MAX_MANIFEST_REPATCH_ATTEMPTS} manifest repatches were requested while resolving dependencies.`
+    );
+}
+
+function confirmManifestRequirements(requirements: MissingManifestRequirement[]): boolean {
+    const descriptions = requirements.map(requirement =>
+        `- ${requirement.mod_id}: ${requirement.query_packages.join(", ")}`
+    );
+
+    return window.confirm(
+        "The following mods need Beat Saber's manifest to make specific installed apps visible:\n\n"
+        + descriptions.join("\n")
+        + "\n\nThis does not grant Android permissions. MBF will repatch the game before enabling these mods. Continue?"
+    );
 }
 
 
