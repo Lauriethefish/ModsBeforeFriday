@@ -1,5 +1,7 @@
 //! Models used for communication *from the backend back to the frontend*
 
+use std::collections::HashSet;
+
 use serde::{Deserialize, Serialize};
 
 use crate::mod_man;
@@ -10,6 +12,8 @@ pub struct AppInfo {
     pub obb_present: bool,
     #[serde(skip_serializing)]
     pub path: String,
+    #[serde(skip_serializing)]
+    pub query_packages: HashSet<String>,
     pub version: String,
     pub manifest_xml: String,
 }
@@ -86,6 +90,13 @@ pub struct ModModel {
     pub is_core: bool,
 }
 
+/// A typed manifest requirement that prevented a mod from being enabled.
+#[derive(Serialize)]
+pub struct MissingManifestRequirementModel {
+    pub mod_id: String,
+    pub query_packages: Vec<String>,
+}
+
 impl From<&mod_man::Mod> for ModModel {
     fn from(value: &mod_man::Mod) -> Self {
         Self {
@@ -125,6 +136,8 @@ pub enum Response {
         // If any of the mods failed to install/uninstall, this will be Some with a string
         // containing a list of the errors generated.
         failures: Option<String>,
+        // Requirements that must be applied before retrying this operation.
+        manifest_changes_required: Vec<MissingManifestRequirementModel>,
     },
     Patched {
         installed_mods: Vec<ModModel>,

@@ -391,11 +391,11 @@ export async function patchApp(device: Adb,
           manifest_xml: manifestMod,
           obb_present: beforePatch.app_info!.obb_present
       },
-      core_mods: {
-          core_mod_install_status: "Ready",
-          supported_versions: beforePatch.core_mods!.supported_versions,
-          downgrade_versions: [],
-          is_awaiting_diff: false
+      core_mods: beforePatch.core_mods === null ? null : {
+        core_mod_install_status: "Ready",
+        supported_versions: beforePatch.core_mods.supported_versions,
+        downgrade_versions: [],
+        is_awaiting_diff: false
       },
       modloader_install_status: "Ready",
       installed_mods: response.installed_mods
