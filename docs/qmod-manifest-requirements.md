@@ -80,8 +80,7 @@ Schema validation.
 When a user-installed mod is enabled, the agent reads the installed binary Android manifest and verifies every
 request. If declarations are missing, it returns the requesting mod IDs and exact packages without
 copying those mods' files. The frontend automatically performs a manifest-only repatch and retries
-the original enable operation. There is no additional confirmation dialog, so the existing one-click
-patch/install flow is preserved. The agent verifies the installed manifest again on the retry.
+the original enable operation. The agent verifies the installed manifest again on the retry.
 Required dependencies use the same checks, including dependencies downloaded during the operation.
 
 Manifest-only repatches use Android's replace-existing install path and check the package manager's
