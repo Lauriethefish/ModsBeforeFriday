@@ -38,7 +38,7 @@ const QMOD_SCHEMA: &str = include_str!("qmod_schema.json");
 /// NB: The schema also checks that this property is an allowed value, however it is good
 /// if we can detect a version that's too new/old manually to give a more helpful error message
 /// than "schema validation failed."
-const MAX_SCHEMA_VERSION: Version = Version::new(1, 3, 0);
+const MAX_SCHEMA_VERSION: Version = Version::new(1, 2, 0);
 
 /// A structure to manage QMODs installed on Beat Saber.
 pub struct ModManager<'cache> {
@@ -162,7 +162,7 @@ impl<'cache> ModManager<'cache> {
             .ok_or_else(|| anyhow!("Could not inspect mod with ID {id} as it did not exist"))?;
         let mod_ref = mod_rc.borrow();
 
-        if let Some(requirements) = &mod_ref.manifest().manifest_requirements {
+        if let Some(requirements) = &mod_ref.manifest().mbf_manifest_requirements {
             let query_packages = requirements.missing_query_packages(declared_query_packages);
             if !query_packages.is_empty() {
                 missing.push(MissingManifestRequirements {
@@ -322,7 +322,7 @@ impl<'cache> ModManager<'cache> {
             return Ok(());
         }
 
-        if let Some(requirements) = &to_install.manifest().manifest_requirements {
+        if let Some(requirements) = &to_install.manifest().mbf_manifest_requirements {
             let query_packages = requirements.missing_query_packages(declared_query_packages);
             if !query_packages.is_empty() {
                 return Err(MissingManifestRequirements {
@@ -627,7 +627,7 @@ impl<'cache> ModManager<'cache> {
 
         let manifest: ModInfo = serde_json::from_value(manifest_value)
             .expect("Failed to parse as QMOD manifest, despite being valid according to schema. This is a bug");
-        if let Some(requirements) = &manifest.manifest_requirements {
+        if let Some(requirements) = &manifest.mbf_manifest_requirements {
             requirements
                 .validate()
                 .context("Validating manifest requirements")?;
@@ -950,23 +950,20 @@ mod tests {
     }
 
     #[test]
-    fn schema_accepts_typed_query_packages_in_version_1_3() {
-        let mut manifest = valid_manifest("1.3.0");
-        manifest["manifestRequirements"] = serde_json::json!({
-            "queryPackages": ["com.discord", "com.spotify.music"]
-        });
+    fn schema_accepts_mbf_query_packages_in_existing_qmod_versions() {
+        for version in ["0.1.2", "1.2.0"] {
+            let mut manifest = valid_manifest(version);
+            manifest["mbfManifestRequirements"] = serde_json::json!({
+                "queryPackages": ["com.discord", "com.spotify.music"]
+            });
 
-        assert!(schema().is_valid(&manifest));
+            assert!(schema().is_valid(&manifest));
+        }
     }
 
     #[test]
-    fn schema_requires_version_1_3_when_manifest_requirements_are_used() {
-        let mut manifest = valid_manifest("1.2.0");
-        manifest["manifestRequirements"] = serde_json::json!({
-            "queryPackages": ["com.discord"]
-        });
-
-        assert!(!schema().is_valid(&manifest));
+    fn schema_rejects_unstandardized_version_1_3() {
+        assert!(!schema().is_valid(&valid_manifest("1.3.0")));
     }
 
     #[test]
@@ -977,8 +974,8 @@ mod tests {
             serde_json::json!({ "queryPackages": ["com.discord\" />"] }),
             serde_json::json!({ "queryPackages": ["com.discord", "com.discord"] }),
         ] {
-            let mut manifest = valid_manifest("1.3.0");
-            manifest["manifestRequirements"] = requirements;
+            let mut manifest = valid_manifest("0.1.2");
+            manifest["mbfManifestRequirements"] = requirements;
             assert!(!schema().is_valid(&manifest));
         }
     }

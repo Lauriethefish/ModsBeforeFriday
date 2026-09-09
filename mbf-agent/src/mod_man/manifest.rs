@@ -35,7 +35,7 @@ impl Display for MissingManifestRequirements {
 
 impl std::error::Error for MissingManifestRequirements {}
 
-/// Declarative Android manifest requirements for a QMOD.
+/// Declarative Android manifest requirements for MBF's optional QMOD extension.
 ///
 /// This intentionally exposes a small, typed surface rather than accepting raw XML. New
 /// requirement types should be added individually after defining their validation, compatibility,
@@ -52,7 +52,7 @@ impl ManifestRequirements {
     pub fn validate(&self) -> Result<()> {
         if self.query_packages.is_empty() {
             return Err(anyhow!(
-                "A manifestRequirements object must request at least one query package"
+                "An mbfManifestRequirements object must request at least one query package"
             ));
         }
 
@@ -164,10 +164,10 @@ pub struct ModInfo {
     pub file_copies: Vec<FileCopy>,
     /// list of copy extensions registered for this specific mod
     pub copy_extensions: Vec<CopyExtension>,
-    /// Optional, typed requirements that must exist in the patched Android manifest before this
-    /// mod is enabled.
+    /// Optional MBF-specific requirements that must exist in the patched Android manifest before
+    /// this mod is enabled. Other QMOD installers may safely ignore this root extension.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub manifest_requirements: Option<ManifestRequirements>,
+    pub mbf_manifest_requirements: Option<ManifestRequirements>,
 }
 
 impl Default for ModInfo {
@@ -189,7 +189,7 @@ impl Default for ModInfo {
             library_files: Default::default(),
             file_copies: Default::default(),
             copy_extensions: Default::default(),
-            manifest_requirements: Default::default(),
+            mbf_manifest_requirements: Default::default(),
             modloader: Some("Scotland2".into()),
             late_mod_files: Default::default(),
         }
@@ -245,7 +245,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn manifest_requirements_are_optional_for_existing_qmods() {
+    fn mbf_manifest_requirements_are_optional_for_existing_qmods() {
         let manifest: ModInfo = serde_json::from_value(serde_json::json!({
             "_QPVersion": "1.2.0",
             "name": "Legacy mod",
@@ -255,7 +255,30 @@ mod tests {
         }))
         .unwrap();
 
-        assert_eq!(manifest.manifest_requirements, None);
+        assert_eq!(manifest.mbf_manifest_requirements, None);
+    }
+
+    #[test]
+    fn deserializes_mbf_manifest_requirements_without_changing_qmod_version() {
+        let manifest: ModInfo = serde_json::from_value(serde_json::json!({
+            "_QPVersion": "0.1.2",
+            "name": "Discord integration",
+            "id": "discord-integration",
+            "author": "Example",
+            "version": "1.0.0",
+            "mbfManifestRequirements": {
+                "queryPackages": ["com.discord"]
+            }
+        }))
+        .unwrap();
+
+        assert_eq!(manifest.schema_version, Version::new(0, 1, 2));
+        assert_eq!(
+            manifest.mbf_manifest_requirements,
+            Some(ManifestRequirements {
+                query_packages: vec!["com.discord".to_string()]
+            })
+        );
     }
 
     #[test]
