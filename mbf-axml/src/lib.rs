@@ -57,6 +57,7 @@ pub enum AttributeValue {
     Integer(i32),
     Reference(u32), // Reference ID
     Float(f32),
+    Dimension(u32), // Android dimension
 }
 
 #[derive(Copy, Clone, PartialEq, Debug)]
@@ -113,6 +114,7 @@ enum AttributeTypeId {
     Reference,
     String,
     Float,
+    Dimension,
 }
 
 impl AttributeTypeId {
@@ -124,6 +126,7 @@ impl AttributeTypeId {
             0x01 => Some(Self::Reference),
             0x03 => Some(Self::String),
             0x04 => Some(Self::Float),
+            0x05 => Some(Self::Dimension),
             _ => None,
         }
     }
@@ -136,6 +139,7 @@ impl AttributeTypeId {
             Self::Reference => 0x01,
             Self::String => 0x03,
             Self::Float => 0x04,
+            Self::Dimension => 0x05,
         };
 
         (basic_type << 24) | 0x000008
