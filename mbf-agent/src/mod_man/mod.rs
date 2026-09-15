@@ -123,6 +123,78 @@ impl<'cache> ModManager<'cache> {
         self.mods.get(id)
     }
 
+    /// Finds manifest requirements that would prevent `id` and its currently loaded required
+    /// dependencies from being enabled.
+    ///
+    /// Dependencies that have not been downloaded yet are checked by
+    /// [ModManager::install_mod_with_manifest] immediately after they are loaded and before their
+    /// files are copied.
+    pub fn missing_manifest_requirements(
+        &self,
+        id: &str,
+        declared_query_packages: &HashSet<String>,
+    ) -> Result<Vec<MissingManifestRequirements>> {
+        let mut visited = HashSet::new();
+        let mut missing = Vec::new();
+        self.collect_missing_manifest_requirements(
+            id,
+            declared_query_packages,
+            &mut visited,
+            &mut missing,
+        )?;
+        Ok(missing)
+    }
+
+    fn collect_missing_manifest_requirements(
+        &self,
+        id: &str,
+        declared_query_packages: &HashSet<String>,
+        visited: &mut HashSet<String>,
+        missing: &mut Vec<MissingManifestRequirements>,
+    ) -> Result<()> {
+        if !visited.insert(id.to_string()) {
+            return Ok(());
+        }
+
+        let mod_rc = self
+            .mods
+            .get(id)
+            .ok_or_else(|| anyhow!("Could not inspect mod with ID {id} as it did not exist"))?;
+        let mod_ref = mod_rc.borrow();
+
+        if let Some(requirements) = &mod_ref.manifest().mbf_manifest_requirements {
+            let query_packages = requirements.missing_query_packages(declared_query_packages);
+            if !query_packages.is_empty() {
+                missing.push(MissingManifestRequirements {
+                    mod_id: id.to_string(),
+                    query_packages,
+                });
+            }
+        }
+
+        let dependencies: Vec<String> = mod_ref
+            .manifest()
+            .dependencies
+            .iter()
+            .filter(|dependency| dependency.required)
+            .map(|dependency| dependency.id.clone())
+            .collect();
+        drop(mod_ref);
+
+        for dependency_id in dependencies {
+            if self.mods.contains_key(&dependency_id) {
+                self.collect_missing_manifest_requirements(
+                    &dependency_id,
+                    declared_query_packages,
+                    visited,
+                    missing,
+                )?;
+            }
+        }
+
+        Ok(())
+    }
+
     /// Loads the installed mods from the [paths::QMODS] directory in ModData.
     ///
     /// Also loads any legacy (non-extracted) mods found in the [paths::OLD_QMODS] directory,
@@ -220,9 +292,22 @@ impl<'cache> ModManager<'cache> {
     /// the newer version to be installed.)
     /// - `id` is not the ID of an installed mod.
     ///
-    /// This function will NOT fail if the mod is missing one of its stated mod/lib/late_mod files, but will instead
-    /// log a warning.
-    pub fn install_mod(&mut self, id: &str) -> Result<()> {
+    /// This function will NOT fail if the mod is missing one of its stated mod/lib/late_mod files,
+    /// but will instead log a warning. It will refuse to copy files for the mod or its dependencies
+    /// unless their typed manifest requirements are already present in the application manifest.
+    pub fn install_mod_with_manifest(
+        &mut self,
+        id: &str,
+        declared_query_packages: &HashSet<String>,
+    ) -> Result<()> {
+        self.install_mod_internal(id, declared_query_packages)
+    }
+
+    fn install_mod_internal(
+        &mut self,
+        id: &str,
+        declared_query_packages: &HashSet<String>,
+    ) -> Result<()> {
         // Install the mod's dependencies if applicable
         let mod_rc = self
             .mods
@@ -235,6 +320,17 @@ impl<'cache> ModManager<'cache> {
         let to_install = (*mod_rc).borrow();
         if to_install.installed() {
             return Ok(());
+        }
+
+        if let Some(requirements) = &to_install.manifest().mbf_manifest_requirements {
+            let query_packages = requirements.missing_query_packages(declared_query_packages);
+            if !query_packages.is_empty() {
+                return Err(MissingManifestRequirements {
+                    mod_id: id.to_string(),
+                    query_packages,
+                }
+                .into());
+            }
         }
 
         info!(
@@ -252,18 +348,18 @@ impl<'cache> ModManager<'cache> {
                             dep.id, dep_ref.manifest().version, dep.version_range
                         );
                         drop(dep_ref);
-                        self.install_dependency(&dep)?;
+                        self.install_dependency(dep, declared_query_packages)?;
                     } else if !dep_ref.installed() && dep.required {
                         // Must install the dependency
                         info!("Dependency {} was not installed, reinstalling", dep.id);
                         drop(dep_ref);
-                        self.install_mod(&dep.id)?;
+                        self.install_mod_internal(&dep.id, declared_query_packages)?;
                     }
                 }
                 None => {
                     if dep.required {
                         info!("Dependency {} was not found: installing now", dep.id);
-                        self.install_dependency(&dep)?;
+                        self.install_dependency(dep, declared_query_packages)?;
                     }
                 }
             }
@@ -529,8 +625,15 @@ impl<'cache> ModManager<'cache> {
             return Err(anyhow!("QMOD schema validation failed: \n{log_builder}"));
         }
 
-        Ok(serde_json::from_value(manifest_value)
-            .expect("Failed to parse as QMOD manifest, despite being valid according to schema. This is a bug"))
+        let manifest: ModInfo = serde_json::from_value(manifest_value)
+            .expect("Failed to parse as QMOD manifest, despite being valid according to schema. This is a bug");
+        if let Some(requirements) = &manifest.mbf_manifest_requirements {
+            requirements
+                .validate()
+                .context("Validating manifest requirements")?;
+        }
+
+        Ok(manifest)
     }
 
     /// Used to avoid removing library files that are still in use by another mod when uninstalling a mod.
@@ -563,7 +666,11 @@ impl<'cache> ModManager<'cache> {
         retained_libs
     }
 
-    fn install_dependency(&mut self, dep: &ModDependency) -> Result<()> {
+    fn install_dependency(
+        &mut self,
+        dep: &ModDependency,
+        declared_query_packages: &HashSet<String>,
+    ) -> Result<()> {
         // First check if we can find a copy of the dependency in the mod repo, since this is the preferred option
         // The mod repo will likely have a more up-to-date version of the dependency than the dependency downloadIfMissing
         let link = if let Some(dep_url) = self.try_get_dep_from_mod_repo(dep) {
@@ -581,7 +688,7 @@ impl<'cache> ModManager<'cache> {
                 .context("Downloading dependency")?;
 
         self.try_load_new_mod(Cursor::new(dependency_bytes))?;
-        self.install_mod(&dep.id)?;
+        self.install_mod_internal(&dep.id, declared_query_packages)?;
         Ok(())
     }
 
@@ -813,5 +920,63 @@ impl<'cache> ModManager<'cache> {
         }
 
         Ok(self.mod_repo.as_ref().expect("Just loaded mod repo"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn schema() -> JSONSchema {
+        JSONSchema::options()
+            .compile(&serde_json::from_str(QMOD_SCHEMA).unwrap())
+            .unwrap()
+    }
+
+    fn valid_manifest(schema_version: &str) -> serde_json::Value {
+        serde_json::json!({
+            "_QPVersion": schema_version,
+            "name": "Manifest test",
+            "id": "manifest-test",
+            "author": "Example",
+            "version": "1.0.0",
+            "modFiles": []
+        })
+    }
+
+    #[test]
+    fn schema_keeps_existing_qmods_valid() {
+        assert!(schema().is_valid(&valid_manifest("1.2.0")));
+    }
+
+    #[test]
+    fn schema_accepts_mbf_query_packages_in_existing_qmod_versions() {
+        for version in ["0.1.2", "1.2.0"] {
+            let mut manifest = valid_manifest(version);
+            manifest["mbfManifestRequirements"] = serde_json::json!({
+                "queryPackages": ["com.discord", "com.spotify.music"]
+            });
+
+            assert!(schema().is_valid(&manifest));
+        }
+    }
+
+    #[test]
+    fn schema_rejects_unstandardized_version_1_3() {
+        assert!(!schema().is_valid(&valid_manifest("1.3.0")));
+    }
+
+    #[test]
+    fn schema_rejects_untyped_or_malformed_manifest_changes() {
+        for requirements in [
+            serde_json::json!({ "queryPackages": [] }),
+            serde_json::json!({ "permissions": ["android.permission.RECORD_AUDIO"] }),
+            serde_json::json!({ "queryPackages": ["com.discord\" />"] }),
+            serde_json::json!({ "queryPackages": ["com.discord", "com.discord"] }),
+        ] {
+            let mut manifest = valid_manifest("0.1.2");
+            manifest["mbfManifestRequirements"] = requirements;
+            assert!(!schema().is_valid(&manifest));
+        }
     }
 }

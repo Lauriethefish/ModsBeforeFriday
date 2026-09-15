@@ -1,5 +1,5 @@
 use std::{
-    ffi::OsStr, fs::{File, OpenOptions}, io::{Cursor, Read, Write}, path::{Path, PathBuf}, process::Command
+    ffi::OsStr, fs::{File, OpenOptions}, io::{Cursor, Read, Write}, path::{Path, PathBuf}, process::{Command, Output}
 };
 
 use crate::{
@@ -159,7 +159,7 @@ fn patch_and_reinstall(
         }
     }
 
-    reinstall_modded_app(&temp_apk_path).context("Reinstalling modded APK")?;
+    reinstall_modded_app(&temp_apk_path, manifest_only).context("Reinstalling modded APK")?;
     std::fs::remove_file(temp_apk_path)?;
 
     info!("Restoring OBB files");
@@ -189,34 +189,36 @@ pub fn backup_player_data() -> Result<()> {
     Ok(())
 }
 
-fn reinstall_modded_app(
-    temp_apk_path: &Path
-) -> Result<()> {
+fn reinstall_modded_app(temp_apk_path: &Path, replace_existing: bool) -> Result<()> {
     info!("Reinstalling modded app");
-    Command::new("pm")
-        .args(["uninstall", &PARAMETERS.apk_id])
-        .output()
-        .context("Uninstalling vanilla APK")?;
+    if !replace_existing {
+        let uninstall_output = Command::new("pm")
+            .args(["uninstall", &PARAMETERS.apk_id])
+            .output()
+            .context("Invoking package manager to uninstall vanilla APK")?;
+        ensure_pm_succeeded(uninstall_output, "uninstalling vanilla APK")?;
+    }
 
     let is_pico = get_android_device_manufacturer()
         .map(|v| v.to_lowercase().contains("pico"))
         .unwrap_or(false);
 
-    if is_pico {
-        Command::new("pm")
-            .args([
-                "install", 
-                "-i", "com.picovr.store", // needed to display game icon in the app launcher
-                &temp_apk_path.to_string_lossy()
-            ])
-            .output()
-            .context("Installing modded APK")?;
-    } else {
-        Command::new("pm")
-            .args(["install", &temp_apk_path.to_string_lossy()])
-            .output()
-            .context("Installing modded APK")?;
+    let mut install_command = Command::new("pm");
+    install_command.arg("install");
+    if replace_existing {
+        // Manifest-only repatches are signed with the same MBF certificate. Android package
+        // updates are transactional, so a rejected APK leaves the existing game installed.
+        install_command.arg("-r");
     }
+    if is_pico {
+        // Needed to display the game icon in the Pico app launcher.
+        install_command.args(["-i", "com.picovr.store"]);
+    }
+    let install_output = install_command
+        .arg(temp_apk_path)
+        .output()
+        .context("Invoking package manager to install modded APK")?;
+    ensure_pm_succeeded(install_output, "installing modded APK")?;
 
     info!("Granting external storage permission");
     Command::new("appops")
@@ -233,6 +235,21 @@ fn reinstall_modded_app(
         Command::new("pm")
             .args(["grant", &PARAMETERS.apk_id, "android.permission.READ_EXTERNAL_STORAGE"])
             .output()?;    
+    }
+
+    Ok(())
+}
+
+fn ensure_pm_succeeded(output: Output, action: &str) -> Result<()> {
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let reported_success = stdout.lines().any(|line| line.trim() == "Success");
+    if !output.status.success() || !reported_success {
+        anyhow::bail!(
+            "Package manager failed while {action}. stdout: `{}`, stderr: `{}`",
+            stdout.trim(),
+            stderr.trim()
+        );
     }
 
     Ok(())

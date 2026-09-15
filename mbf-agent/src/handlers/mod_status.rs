@@ -75,6 +75,7 @@ pub(super) fn get_app_info() -> Result<Option<response::AppInfo>> {
         obb_present,
         path: apk_path,
         manifest_xml,
+        query_packages: manifest_info.query_packages,
     }))
 }
 

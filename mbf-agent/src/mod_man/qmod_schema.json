@@ -5,7 +5,7 @@
   "description": "A mod of the format described by QuestPatcher.",
   "examples": [
     {
-      "_QPVersion": "1.2.0",
+      "_QPVersion": "0.1.2",
       "name": "ExampleMod2",
       "id": "example-mod-2",
       "author": "Lauriethefish#6700",
@@ -13,6 +13,11 @@
       "packageId": "com.AnotherAxiom.GorillaTag",
       "packageVersion": "1.0.1",
       "isLibrary": false,
+      "mbfManifestRequirements": {
+        "queryPackages": [
+          "com.discord"
+        ]
+      },
       "modFiles": [
         "libexample-mod-2.so"
       ],
@@ -68,7 +73,7 @@
         "1.2.0"
       ],
       "default": "",
-      "description": "The version of the schema to use for QuestPatcher. Must be 0.1.0, 0.1.1, 0.1.2, 1.0.0, 1.1.0 or 1.2.0",
+      "description": "The version of the schema to use for QuestPatcher.",
       "examples": [
         "1.2.0"
       ],
@@ -180,6 +185,32 @@
       ],
       "title": "Modloader",
       "type": "string"
+    },
+    "mbfManifestRequirements": {
+      "$id": "#/properties/mbfManifestRequirements",
+      "type": "object",
+      "title": "MBF Android Manifest Requirements",
+      "description": "Optional MBF-specific typed Android manifest declarations that must exist before the mod can be enabled.",
+      "required": [
+        "queryPackages"
+      ],
+      "properties": {
+        "queryPackages": {
+          "$id": "#/properties/mbfManifestRequirements/properties/queryPackages",
+          "type": "array",
+          "title": "Visible packages",
+          "description": "Android package IDs to add as package children of the manifest queries element.",
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "maxLength": 255,
+            "pattern": "^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+$"
+          }
+        }
+      },
+      "additionalProperties": false
     },
     "modFiles": {
       "$id": "#/properties/modFiles",

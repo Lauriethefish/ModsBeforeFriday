@@ -77,7 +77,14 @@ export interface Mods {
 export interface ModSyncResult {
     type: 'ModSyncResult',
     installed_mods: Mod[],
-    failures: string | null
+    failures: string | null,
+    // Optional so a new frontend remains compatible with an older cached agent.
+    manifest_changes_required?: MissingManifestRequirement[]
+}
+
+export interface MissingManifestRequirement {
+    mod_id: string,
+    query_packages: string[]
 }
 
 export interface Patched {

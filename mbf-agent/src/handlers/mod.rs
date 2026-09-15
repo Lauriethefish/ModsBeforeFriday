@@ -151,7 +151,7 @@ fn install_core_mods(
         .load_mods()
         .context("Loading core mods - is one invalid? If so, this is a BIG problem")?;
     for core_mod in &core_mods.mods {
-        mod_manager.install_mod(&core_mod.id)?;
+        mod_manager.install_mod_with_manifest(&core_mod.id, &app_info.query_packages)?;
     }
     mod_status::mark_all_core_mods(&mod_manager, &core_mods.mods);
 
