@@ -16,6 +16,11 @@
 //! and they are written in the XML with the format `[REF ID_HERE]`. This is necessary as the attribute value type must be set to `reference` for Android to parse the value
 //! correctly.
 //!
+//! DIMENSIONS:
+//! Dimensions use normal text, e.g. `300.0px` or `12.5dip`. Input also accepts
+//! `dp`, `sp`, `pt`, `in` and `mm`. Recompiling may normalise the packed radix.
+//! `[DIM VALUE_HERE]` remains supported for raw values and unknown unit codes.
+//!
 //! TYPED ATTRIBUTE VALUES:
 //! In regular XML, attribute values are always strings, with stringified booleans and integers etc, used for other data types.
 //! In AXML attribute values can be strings, booleans, integers, references or styles (styles are not implemented currently.)
@@ -24,7 +29,7 @@
 //!
 //! When AXML attributes are converted to strings in this implementation, the values "true" "false" and any integers represent their AXML data types.
 
-use anyhow::{Context, Result};
+use anyhow::{ensure, Context, Result};
 use std::collections::HashMap;
 use xml::common::Position;
 
@@ -284,11 +289,12 @@ fn stringify_attr_value(value: AxmlAttrValue) -> String {
         AxmlAttrValue::String(s) => s,
         AxmlAttrValue::Reference(reference) => format!("[REF {reference}]"),
         AxmlAttrValue::Float(f) => f.to_string(),
+        AxmlAttrValue::Dimension(value) => stringify_dimension(value),
     }
 }
 
 // Converts an attribute value back from a string to the value of an AXML attribute.
-// If the value is a valid integer, boolean or reference, it will be stored using the appropriate AXML attribute type.
+// Recognised literals are stored using their corresponding AXML attribute type.
 fn attr_value_from_string(string: String) -> Result<AxmlAttrValue> {
     Ok(if string == "true" {
         AxmlAttrValue::Boolean(true)
@@ -298,13 +304,100 @@ fn attr_value_from_string(string: String) -> Result<AxmlAttrValue> {
         AxmlAttrValue::Integer(i)
     } else if let Ok(f) = string.parse::<f32>() {
         AxmlAttrValue::Float(f)
+    } else if let Some(dimension) = string.strip_prefix("[DIM ") {
+        AxmlAttrValue::Dimension(
+            dimension
+                .strip_suffix(']')
+                .context("Invalid axml dimension: missing closing bracket")?
+                .parse::<u32>()
+                .context("Invalid axml dimension")?,
+        )
     } else if string.starts_with("[REF ") {
         AxmlAttrValue::Reference(
             string[5..string.len() - 1]
                 .parse::<u32>()
                 .context("Invalid axml reference")?,
         )
+    } else if let Some(dimension) = parse_dimension(&string)? {
+        AxmlAttrValue::Dimension(dimension)
     } else {
         AxmlAttrValue::String(string)
     })
+}
+
+const DIMENSION_UNITS: [&str; 6] = ["px", "dip", "sp", "pt", "in", "mm"];
+// Indexed by radix: 23p0, 16p7, 8p15, 0p23.
+const DIMENSION_FRACTION_BITS: [u32; 4] = [0, 7, 15, 23];
+const DIMENSION_MANTISSA_LIMIT: i32 = 1 << 23;
+
+// TypedValue.complexToFloat and coerceToString:
+// https://android.googlesource.com/platform/frameworks/base/+/master/core/java/android/util/TypedValue.java
+fn stringify_dimension(packed: u32) -> String {
+    // Bits 0-3 hold the unit, 4-5 the radix, and 8-31 the signed mantissa.
+    let Some(unit) = DIMENSION_UNITS.get((packed & 0b1111) as usize) else {
+        return format!("[DIM {packed}]");
+    };
+    let value = unpack_dimension(packed);
+    // Float Debug formatting keeps a decimal point for integers (300.0px)
+    // and enough digits to recover the same f32 when the XML is read again.
+    format!("{value:?}{unit}")
+}
+
+fn unpack_dimension(packed: u32) -> f32 {
+    let radix = ((packed >> 4) & 0b11) as usize;
+    let mantissa = (packed as i32) >> 8;
+    mantissa as f32 / (1u32 << DIMENSION_FRACTION_BITS[radix]) as f32
+}
+
+// None means ordinary text; an error means a numeric dimension is invalid.
+fn parse_dimension(string: &str) -> Result<Option<u32>> {
+    // Android's unitNames table accepts dp as an alias for dip:
+    // https://android.googlesource.com/platform/frameworks/base/+/master/libs/androidfw/ResourceTypes.cpp
+    let string = string.trim();
+    let parsed_unit = DIMENSION_UNITS
+        .iter()
+        .enumerate()
+        .find_map(|(unit, suffix)| {
+            string.strip_suffix(suffix).map(|number| (number, unit as u32))
+        })
+        .or_else(|| string.strip_suffix("dp").map(|number| (number, 1)));
+    let Some((number, unit)) = parsed_unit else {
+        return Ok(None);
+    };
+    let looks_numeric = number.starts_with(|c: char| c.is_ascii_digit() || matches!(c, '+' | '-' | '.'));
+    let value = match number.parse::<f32>() {
+        Ok(value) => value,
+        Err(error) if looks_numeric => return Err(error).context("Invalid axml dimension number"),
+        Err(_) => return Ok(None),
+    };
+    pack_dimension(value, unit).map(Some)
+}
+
+fn pack_dimension(value: f32, unit: u32) -> Result<u32> {
+    let limit = DIMENSION_MANTISSA_LIMIT as f32;
+    ensure!(
+        value.is_finite() && (-limit..limit).contains(&value),
+        "Invalid axml dimension: value must be finite and fit a signed 24-bit mantissa"
+    );
+
+    let radix = if value.fract() == 0.0 {
+        0
+    } else if value.abs() < 1.0 {
+        3
+    } else if value.abs() < 256.0 {
+        2
+    } else if value.abs() < 65536.0 {
+        1
+    } else {
+        0
+    };
+    let scaled = value as f64 * (1u32 << DIMENSION_FRACTION_BITS[radix]) as f64;
+    // Java Math.round rounds ties toward positive infinity. Use f64 for the
+    // addition so an already integral f32 mantissa cannot round up accidentally.
+    let mantissa = (scaled + 0.5).floor() as i32;
+    ensure!(
+        (-DIMENSION_MANTISSA_LIMIT..DIMENSION_MANTISSA_LIMIT).contains(&mantissa),
+        "Invalid axml dimension: rounded value is out of range"
+    );
+    Ok(((mantissa as u32 & 0xffffff) << 8) | ((radix as u32) << 4) | unit)
 }
