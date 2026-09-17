@@ -19,6 +19,7 @@
     "@yume-chan/adb": "workspace:^",
     "@yume-chan/adb-credential-web": "workspace:^",
     "@yume-chan/adb-daemon-webusb": "workspace:^",
+    "@yume-chan/async": "^4.1.3",
     "@yume-chan/stream-extra": "workspace:^",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
