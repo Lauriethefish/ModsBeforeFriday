@@ -2,6 +2,7 @@ import { ScaleLoader } from "react-spinners";
 import { useSyncStore } from "../SyncStore";
 import { LogWindow, LogWindowControls } from "./LogWindow";
 import { ErrorModal } from "./Modal";
+import { getLang } from "../localization/shared";
 
 // Component that displays the log window when an operation is in progress, and displays errors when the operation failed.
 export function OperationModals() {
@@ -18,7 +19,7 @@ export function OperationModals() {
 
     return <>
         <SyncingModal isVisible={needSyncModal}
-            title={currentOperation ?? "Log output"}
+            title={currentOperation ?? getLang().logOutput}
             subtext={statusText}
             onClose={canClose ? () => setLogsManuallyOpen(false) : undefined} />
         <ErrorModal isVisible={currentError !== null}
@@ -33,7 +34,7 @@ export function OperationModals() {
 function SyncingModal({ isVisible, title, subtext, onClose }:
     { 
         isVisible: boolean,
-        title: string,
+        title: string| JSX.Element,
         subtext: string | null,
         onClose?: () => void }) {
     if(isVisible) {

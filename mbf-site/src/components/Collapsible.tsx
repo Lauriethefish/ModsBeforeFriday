@@ -3,7 +3,7 @@ import { ReactNode, useEffect, useRef, useState } from "react";
 import '../css/Collapsible.css';
 
 // A menu that can be collapsed and expanded with a mouse click.
-export function Collapsible({ title, children, defaultOpen }: { title: string, children: ReactNode, defaultOpen?: boolean }) {
+export function Collapsible({ title, children, defaultOpen }: { title: string | JSX.Element, children: ReactNode, defaultOpen?: boolean }) {
     const [expanded, setExpanded] = useState(defaultOpen);
 
     const content = useRef<HTMLDivElement | null>(null);

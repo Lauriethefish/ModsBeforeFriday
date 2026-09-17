@@ -1,4 +1,5 @@
 import { useRef } from "react";
+import { getLang } from "../localization/shared";
 
 export function SplashScreenSelector({ selected, onSelected }:
     {
@@ -23,10 +24,10 @@ export function SplashScreenSelector({ selected, onSelected }:
                     }
                     ev.target.value = "";
                 }}
-            />Select splash screen
+            />{getLang().selectSplashScreen}
         </button>
         {selected !== null && <span className="hoverStrikethrough" style={{ fontSize: "small" }} onClick={() => onSelected(null)}>
-<br/>(Using <code className="codeBox">{selected.name}</code> as splash)</span>}
+<br/>{getLang().usingSplash(selected.name)}</span>}
         <br/>
     </>
 }

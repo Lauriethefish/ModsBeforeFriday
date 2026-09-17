@@ -8,6 +8,7 @@ import BugIcon from '../icons/debug.svg';
 import CheckboxEmpty from '../icons/checkbox-empty.svg';
 import CheckboxFilled from '../icons/checkbox-filled.svg';
 import UpdateIcon from '../icons/update-icon.svg';
+import { getLang } from "../localization/shared";
 
 export function ModRepoCard({ mod, onInstall, update, isFlagged, setFlagged }: 
     { 
@@ -32,20 +33,20 @@ export function ModRepoCard({ mod, onInstall, update, isFlagged, setFlagged }:
                         onClick={() => setFlagged(!isFlagged)} />
                 </span>
                 {mod.name} v{mod.version}
-                <p className="author">by {mod.author}</p>
+                <p className="author">{getLang().author_by} {mod.author}</p>
             </span>
             <p>{mod.description}</p>
             <div className="auxOptions">
                 <a href={mod.source} target="_blank">
-                    <LabelledIconButton iconSrc={CodeIcon} iconAlt="Programming code" label="Source Code" noIconOnMobile/>
+                    <LabelledIconButton iconSrc={CodeIcon} iconAlt="Programming code" label={getLang().sourceCodeBtnText} noIconOnMobile/>
                 </a>
                 {mod.source.includes("github") && 
                     <a href={mod.source + "/issues"} target="_blank">
-                        <LabelledIconButton iconSrc={BugIcon} iconAlt="A bug" label="Report bug" noIconOnMobile/>
+                        <LabelledIconButton iconSrc={BugIcon} iconAlt="A bug" label={getLang().reportBugBtnText} noIconOnMobile/>
                     </a>}
 
                 <button className="installMod" onClick={onInstall}>
-                    {update ? "Update" : "Install"}
+                    {update ? getLang().updateBtnText : getLang().installBtnText }
                     <img src={update ? UpdateIcon : DownloadIcon} />
                 </button>
             </div>

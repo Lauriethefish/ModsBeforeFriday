@@ -24,7 +24,7 @@ export function Modal(props: ModalProps) {
 
 interface ErrorModalProps {
     isVisible: boolean,
-    title: string,
+    title: string | JSX.Element,
     description?: string | null,
     children?: ReactNode,
     onClose: () => void
