@@ -18,7 +18,6 @@ import { OpenLogsButton } from './components/OpenLogsButton';
 import { isViewingOnIos, isViewingOnMobile, isViewingOnWindows, usingOculusBrowser } from './platformDetection';
 import { SourceUrl } from '.';
 import { useDeviceStore } from './DeviceStore';
-import { NoDiff } from './components/NoDiff';
 
 type NoDeviceCause = "NoDeviceSelected" | "DeviceInUse";
 
