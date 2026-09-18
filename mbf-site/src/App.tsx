@@ -114,7 +114,7 @@ function ChooseDevice() {
           <Title />
           <p>To get started, plug your Quest in with a USB-C cable and click the button below.</p>
           <p>Want see what mods are available? You can find a full list <a href="https://mods.bsquest.xyz" target="_blank" rel="noopener noreferrer">here!</a></p>
-         
+
           <NoCompatibleDevices />
 
           <div className="chooseDeviceContainer">
@@ -287,7 +287,7 @@ function OculusBrowserMessage() {
   return <div className="container mainContainer">
     <h1>Quest Browser Detected</h1>
     <p>MBF has detected that you're trying to use the built-in Quest browser.</p>
-    <p>Unfortunately, <b>you cannot use MBF on the device you are attempting to mod.</b></p>
+    <p>Unfortunately, <b>you cannot use the MBF website on the device you are attempting to mod.</b></p>
     <DevicesSupportingModding />
 
     <p>(MBF can be used on a Quest if you install a chromium browser, however this can only be used to mod <b>another Quest headset</b>, connected via USB.)</p>

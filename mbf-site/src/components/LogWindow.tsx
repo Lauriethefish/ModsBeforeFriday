@@ -25,9 +25,9 @@ export function LogItem({ event }: { event: LogMsg }) {
             </span>
         case 'Debug':
         case 'Trace':
-            return <p className="logItem logDebug">{event.message}</p>
+            return <div className="logItem logDebug">{event.message}</div>
         default:
-            return <p className="logItem">{event.message}</p>
+            return <div className="logItem">{event.message}</div>
     }
 }
 
