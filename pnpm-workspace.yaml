@@ -3,3 +3,6 @@ packages:
   - ya-webadb/libraries/*
   - ya-webadb/toolchain/*
   - mbf-site
+allowBuilds:
+  esbuild: true
+  unrs-resolver: true
