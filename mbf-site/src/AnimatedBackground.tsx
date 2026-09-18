@@ -314,7 +314,7 @@ export function setBgUserPreference(showBg: boolean) {
 // Updates whether or not the background is visible based upon the current user settings
 // and whether the platform is mobile or desktop.
 export function updateBackgroundVisibility() {
-	const showBackground = getBgUserPreference() && !isViewingOnMobile() && Animation !== undefined;
+	const showBackground = getBgUserPreference() && !isViewingOnMobile() && document.body.animate !== undefined;
 	if(showBackground && !isBackgroundVisible()) {
 		createAnimatedBackground();
 	}	else if(!showBackground && isBackgroundVisible()) {
