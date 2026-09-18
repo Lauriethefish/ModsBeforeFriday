@@ -518,7 +518,11 @@ function NoDiffAvailable({ version }: { version: string }) {
         <p>You have Beat Saber v{trimGameVersion(version)}, which has no support for mods.</p>
         <p>MBF is designed to downgrade (un-update) your Beat Saber version to a version with mod support <b>but the necessary patches have not yet been generated,</b> as a Beat Saber update has only just been released.</p>
         <p>Patch generation needs manual input and <b>will happen as soon as the author of MBF is available</b>, which will take from 30 minutes to 24 hours.</p>
-        <p><b>PLEASE WAIT in the meanwhile.</b> You can refresh this page and reconnect to your Quest to check if the patch has been generated.</p>
+        <p>In the meantime, you can use the <b>Legacy Branch</b> for downgrading!</p>
+        <p>Go to your app library, find Beat Saber, press and hold on the app, and then select the settings option from the dropdown menu that appears.</p>
+        <p>Once inside the settings menu, select <b>release channels</b>, and then change your version from <b>LIVE</b> to a different version that is <b>greater than or equal to the version you wish to downgrade to.</b></p>
+        <p>For example, if you wanted to mod <b>1.40.8</b>, select <b>"legacy1.40.8_unity_v2021.3.1.16f1"</b> from the menu and hit confirm. Then reinstall your game and refresh this page!</p>
+
     </div>
 }
 
