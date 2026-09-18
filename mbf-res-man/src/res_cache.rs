@@ -125,9 +125,9 @@ impl<'agent> ResCache<'agent> {
                 .modified()
                 .context("Getting cached file last modified")?;
 
-            request = request.set(
+            request = request.header(
                 "If-Modified-Since",
-                &httpdate::fmt_http_date(cache_last_modified),
+                httpdate::fmt_http_date(cache_last_modified),
             );
         }
 
@@ -135,13 +135,13 @@ impl<'agent> ResCache<'agent> {
         let etag_cache = etag_cache_ref.as_mut().unwrap();
 
         if let Some(cached_etag) = etag_cache.get(cached_file_name) {
-            request = request.set("If-None-Match", &cached_etag);
+            request = request.header("If-None-Match", cached_etag.as_str());
         }
 
         let resp = request.call().context("HTTP GET to get file to cache")?;
-        if resp.status() != 304 {
+        if resp.status().as_u16() != 304 {
             // If cached file out of date. (or no cache)
-            if let Some(etag) = resp.header("ETag") {
+            if let Some(etag) = resp.headers().get("ETag").and_then(|v| v.to_str().ok()) {
                 debug!("Got ETag {etag} for {cached_file_name}");
                 etag_cache.insert(cached_file_name.to_owned(), etag.to_owned());
                 drop(etag_cache_ref);
@@ -157,7 +157,7 @@ impl<'agent> ResCache<'agent> {
                 .open(&cached_path)
                 .context("Opening cache file for writing: is the directory writable?")?;
 
-            std::io::copy(&mut resp.into_reader(), &mut cache_handle)
+            std::io::copy(&mut resp.into_body().into_reader(), &mut cache_handle)
                 .context("Copying response to cache")?;
         } else {
             // If using cache, ETag should be the same so no need to check it again.

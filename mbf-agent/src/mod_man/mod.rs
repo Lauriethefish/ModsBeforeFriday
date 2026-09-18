@@ -14,7 +14,7 @@ use std::{
     rc::Rc,
 };
 
-use jsonschema::JSONSchema;
+use jsonschema::Validator;
 use log::{debug, error, info, warn};
 pub use manifest::*;
 pub use loaded_mod::Mod;
@@ -45,7 +45,7 @@ pub struct ModManager<'cache> {
     /// A map of mod IDs to mods.
     mods: HashMap<String, Rc<RefCell<Mod>>>,
     /// The JSON schema used to validate the QMOD manifest.
-    schema: JSONSchema,
+    schema: Validator,
     /// The folder in which QMOD files are found given the current game version.
     qmods_dir: String,
     /// The full versionName of the current Beat Saber version.
@@ -69,12 +69,11 @@ impl<'cache> ModManager<'cache> {
     pub fn new(game_version: String, res_cache: &'cache ResCache) -> Self {
         Self {
             mods: HashMap::new(),
-            schema: JSONSchema::options()
-                .compile(
-                    &serde_json::from_str::<serde_json::Value>(QMOD_SCHEMA)
-                        .expect("QMOD schema should be valid JSON"),
-                )
-                .expect("QMOD schema should be a valid JSON schema"),
+            schema: jsonschema::validator_for(
+                &serde_json::from_str::<serde_json::Value>(QMOD_SCHEMA)
+                    .expect("QMOD schema should be valid JSON"),
+            )
+            .expect("QMOD schema should be a valid JSON schema"),
             // Each game version stores its QMODs in a different directory.
             qmods_dir: (&PARAMETERS.qmods).replace('$', &game_version),
             game_version,
@@ -518,12 +517,12 @@ impl<'cache> ModManager<'cache> {
         }
 
         // Now validate against the schema
-        if let Err(errors) = self.schema.validate(&manifest_value) {
+        if !self.schema.is_valid(&manifest_value) {
             let mut log_builder = String::new();
 
-            for error in errors {
+            for error in self.schema.iter_errors(&manifest_value) {
                 log_builder.push_str(&format!("Validation error: {}\n", error));
-                log_builder.push_str(&format!("Instance path: {}\n", error.instance_path));
+                log_builder.push_str(&format!("Instance path: {}\n", error.instance_path()));
             }
 
             return Err(anyhow!("QMOD schema validation failed: \n{log_builder}"));
