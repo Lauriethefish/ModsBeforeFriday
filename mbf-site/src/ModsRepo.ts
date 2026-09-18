@@ -5,6 +5,7 @@ export interface ModRepoMod {
     id: string,
     version: string,
     download: string,
+    isLibrary: boolean,
     source: string,
     author: string,
     cover: string | null,
