@@ -8,14 +8,15 @@ import { AdbDaemonTransport, Adb } from '@yume-chan/adb';
 import AdbWebCredentialStore from "@yume-chan/adb-credential-web";
 import { DeviceModder } from './DeviceModder';
 import { ErrorModal } from './components/Modal';
-import { Bounce, ToastContainer } from 'react-toastify';
+import { Bounce, toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { CornerMenu } from './components/CornerMenu';
 import { installLoggers, setCoreModOverrideUrl } from './Agent';
 import { Log } from './Logging';
 import { OperationModals } from './components/OperationModals';
 import { OpenLogsButton } from './components/OpenLogsButton';
-import { isViewingOnIos, isViewingOnMobile, isViewingOnWindows, usingOculusBrowser } from './platformDetection';
+import { CopyableCommand } from './components/CopyableCommand';
+import { isViewingOnIos, isViewingOnLinux, isViewingOnMobile, isViewingOnWindows, usingOculusBrowser } from './platformDetection';
 import { SourceUrl } from '.';
 import { useDeviceStore } from './DeviceStore';
 
@@ -146,8 +147,16 @@ function ChooseDevice() {
                   setAuthing(false);
                   setChosenDevice(device);
 
-                  await device.transport.disconnected;
-                  setChosenDevice(null);
+                  try {
+                    await device.transport.disconnected;
+                  } catch(error) {
+                    Log.warn("Quest connection lost: " + error);
+                  }
+
+                  if(useDeviceStore.getState().device === device) {
+                    setChosenDevice(null);
+                    toast.warning("Quest disconnected. Reconnect your Quest to continue.");
+                  }
                 }
 
               } catch(error) {
@@ -188,11 +197,16 @@ function DeviceInUse() {
   <p>Some other app is trying to access your Quest, e.g. SideQuest.</p>
   {isViewingOnWindows() ? 
     <>
-      <p>To fix this, close SideQuest if you have it open, press <span className="codeBox">Win + R</span> and type the following text, and finally press enter.</p>
-      <span className="codeBox">taskkill /IM adb.exe /F</span>  
+      <p>To fix this, close SideQuest if you have it open, press <span className="codeBox">Win + R</span>, paste the following command, and press Enter.</p>
+      <CopyableCommand command="taskkill /IM adb.exe /F" />
       <p>Alternatively, restart your computer.</p>
 
       <AskLaurie />
+    </>
+    : isViewingOnLinux() ? <>
+      <p>Close SideQuest and any other apps using your Quest, then open a terminal and run:</p>
+      <CopyableCommand command="pkill -x adb" />
+      <p>Then try connecting again. Alternatively, restart your computer.</p>
     </>
     : <p>To fix this, restart your {isViewingOnMobile() ? "phone" : "computer"}.</p>}
  </>
