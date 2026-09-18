@@ -17,10 +17,17 @@ interface ManifestOptionInfo {
     // A dictionary of metadata element name attributes to value attributes
     // These are added within the `application` element when the option is toggled on.
     app_metadata?: { [name: string]: string },
-    native_libraries?: string[]
+    native_libraries?: string[],
+    queried_packages?: string[]
 }
 
 const displayedOptions: ManifestOptionInfo[] = [
+    {
+        name: "Discord visibility",
+        permissions: [],
+        features: [],
+        queried_packages: ["com.discord"]
+    },
     {
         name: "Microphone Access",
         permissions: ["android.permission.RECORD_AUDIO"],
@@ -63,7 +70,8 @@ interface ManifestState {
     permissions: string[],
     features: string[],
     metadata: { [name: string]: string },
-    nativeLibraries: string[]
+    nativeLibraries: string[],
+    queriedPackages: string[]
 }
 
 interface ManifestStateProps {
@@ -79,7 +87,8 @@ function getStateFromManifest(manifest: AndroidManifest): ManifestState {
         permissions: manifest.getPermissions(),
         features: manifest.getFeatures(),
         metadata: manifest.getMetadata(),
-        nativeLibraries: manifest.getNativeLibraries()
+        nativeLibraries: manifest.getNativeLibraries(),
+        queriedPackages: manifest.getQueriedPackages()
     };
 }
 
@@ -124,7 +133,8 @@ function ToggleMenu({ state, manifest, updateState }: ManifestStateProps) {
                 permInfo.permissions.every(feature => state.permissions.includes(feature)) &&
                 (permInfo.app_metadata === undefined || Object.entries(permInfo.app_metadata)
                     .every(entry => state.metadata[entry[0]] == entry[1])) &&
-                (permInfo.native_libraries === undefined || permInfo.native_libraries.every(lib => state.nativeLibraries.includes(lib)))
+                (permInfo.native_libraries === undefined || permInfo.native_libraries.every(lib => state.nativeLibraries.includes(lib))) &&
+                (permInfo.queried_packages === undefined || permInfo.queried_packages.every(pkg => state.queriedPackages.includes(pkg)))
 
             return <span id="namedSlider" key={permInfo.name}>
                 <Slider on={enabled}
@@ -136,11 +146,13 @@ function ToggleMenu({ state, manifest, updateState }: ManifestStateProps) {
                                 Object.entries(permInfo.app_metadata).forEach(pair => manifest.setMetadata(pair[0], pair[1]))
                             }
                             permInfo.native_libraries?.forEach(lib => manifest.addNativeLibrary(lib));
+                            permInfo.queried_packages?.forEach(pkg => manifest.addQueriedPackage(pkg));
     
                         }   else    {
                             permInfo.permissions.forEach(feat => manifest.removePermission(feat));
                             permInfo.features.forEach(perm => manifest.removeFeature(perm));
                             permInfo.native_libraries?.forEach(lib => manifest.removeNativeLibrary(lib));
+                            permInfo.queried_packages?.forEach(pkg => manifest.removeQueriedPackage(pkg));
                             if(permInfo.app_metadata) {
                                 Object.keys(permInfo.app_metadata).forEach(name => manifest.removeMetadata(name))
                             }
@@ -158,6 +170,14 @@ function ToggleMenu({ state, manifest, updateState }: ManifestStateProps) {
 
 function TextFieldMenu({ state, manifest, updateState }: ManifestStateProps) {
     return <>
+        <EditableList title="Package queries" list={state.queriedPackages} addItem={item => {
+            manifest.addQueriedPackage(item);
+            updateState();
+        }} removeItem={item => {
+            manifest.removeQueriedPackage(item);
+            updateState();
+        }} />
+        <br/>
         <EditableList title="Permissions" list={state.permissions} addItem={item => {
             manifest.addPermission(item);
             updateState();
