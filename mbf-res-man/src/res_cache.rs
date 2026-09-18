@@ -11,17 +11,6 @@ use anyhow::{anyhow, Context, Result};
 use log::{debug, warn};
 use serde::de::DeserializeOwned;
 
-fn describe_ureq_error(err: &ureq::Error) -> String {
-    match err {
-        ureq::Error::Status(status, resp) => {
-            format!("HTTP {status} response: {}", resp.status_text())
-        }
-        ureq::Error::Transport(transport_err) => {
-            format!("transport error: {transport_err} ({transport_err:?})")
-        }
-    }
-}
-
 /// We separate this out into an enum as if a file can't be fetched,
 /// then it is useful to know that the *fetching* was the problem and not the *parsing*
 /// so that the user can be warned of their failing internet connection.
@@ -173,31 +162,17 @@ impl<'agent> ResCache<'agent> {
             }
         }
 
-        let resp = match request.call() {
-            Ok(resp) => resp,
-            Err(ureq::Error::Status(304, resp)) => resp,
-            Err(ureq::Error::Status(404, _)) => {
-                return Err(anyhow!("File not found at {url}"));
-            }
-            Err(ureq::Error::Status(status, _)) => {
-                return Err(anyhow!("Unexpected HTTP {status} response fetching {url}"));
-            }
-            Err(err) => {
-                return Err(anyhow!(describe_ureq_error(&err)).context(format!(
-                    "HTTP GET failed for {url} while caching to {}",
-                    cached_path.display()
-                )));
-            }
-        };
+        let resp = request.call().with_context(|| {
+            format!(
+                "HTTP GET failed for {url} while caching to {}",
+                cached_path.display()
+            )
+        })?;
 
         match resp.status() {
             304 => {
                 // Cached copy is still valid
                 debug!("Using cached file {cached_file_name} for {url}");
-            }
-            404 => {
-                // No cached copy and file not found at URL
-                return Err(anyhow!("File not found at {url}"));
             }
             200 => {
                 if let Some(etag) = resp.header("ETag") {
@@ -250,20 +225,10 @@ impl<'agent> ResCache<'agent> {
         url: &str,
         cached_file_name: &str,
     ) -> Result<T, JsonPullError> {
-        let json_bytes = match self.get_bytes_cached(url, cached_file_name) {
-            Ok(bytes) => bytes,
-            Err(fetch_err) => {
-                let root_cause = fetch_err
-                    .chain()
-                    .last()
-                    .map(ToString::to_string)
-                    .unwrap_or_else(|| fetch_err.to_string());
-
-                return Err(JsonPullError::FetchError(fetch_err.context(format!(
-                    "Fetching JSON from {url} into cache file {cached_file_name} failed: {root_cause}"
-                ))));
-            }
-        };
+        let json_bytes = self
+            .get_bytes_cached(url, cached_file_name)
+            .with_context(|| format!("Fetching JSON from {url} into cache file {cached_file_name}"))
+            .map_err(JsonPullError::FetchError)?;
 
         match serde_json::from_slice(&json_bytes) {
             Ok(result) => Ok(result),
