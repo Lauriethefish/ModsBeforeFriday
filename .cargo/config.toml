@@ -1,3 +1,0 @@
-[target.aarch64-linux-android]
-linker = "/home/delta984/.var/app/com.visualstudio.code/data/QPM-RS/ndk/27.3.13750724+preview-0/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang"
-ar = "/home/delta984/.var/app/com.visualstudio.code/data/QPM-RS/ndk/27.3.13750724+preview-0/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar"
