@@ -65,6 +65,8 @@
     padding: 3px;
     border-radius: 4px;
     transition-duration: 100ms;
+    height: 30px;
+    cursor: pointer;
 }
 
 #removeMod > img {

@@ -44,6 +44,20 @@ a {
 .mainContainer {
     max-width: min(40rem, 95vw);
     overflow: hidden;
+    color: #E5E5E5;
+}
+
+.mainContainer p {
+    line-height: 1.6;
+}
+
+.mainContainer h3 + p {
+    margin-top: 0.4rem;
+}
+
+.mainContainer li {
+    line-height: 1.6;
+    margin-bottom: 0.75rem;
 }
 
 .sticky {
@@ -89,7 +103,7 @@ button:hover {
 }
 
 .warning {
-    color: red;
+    color: #FF4D4D;
     font-weight: bold;
 }
 
