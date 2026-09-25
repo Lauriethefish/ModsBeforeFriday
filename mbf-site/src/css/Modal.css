@@ -18,11 +18,13 @@
 .modal {
     margin: 5rem auto auto;
     background-color: #1f1f1f;
-    max-width: min(30rem, 95%);
+    width: 95%;
+    max-width: 30rem;
 }
 
 .screenWidth {
-    width: min(30rem, 85vw);
+    width: calc(100vw - 6rem);
+    max-width: 30rem;
 }
 
 .syncingWindow {
