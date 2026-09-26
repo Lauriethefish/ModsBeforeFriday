@@ -54,7 +54,7 @@ const displayedOptions: ManifestOptionInfo[] = [
     },
     {
         name: "Bluetooth",
-        permissions: ["android.permission.BLUETOOTH", "android.permission.BLUETOOTH_CONNECT"],
+        permissions: ["android.permission.BLUETOOTH", "android.permission.BLUETOOTH_CONNECT", "android.permission.BLUETOOTH_SCAN"],
         features: []
     },
     {
