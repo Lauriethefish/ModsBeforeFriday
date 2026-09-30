@@ -1,5 +1,5 @@
 /// <reference types="w3c-web-usb" />
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import './css/App.css';
 import { AdbDaemonWebUsbConnection, AdbDaemonWebUsbDeviceManager } from '@yume-chan/adb-daemon-webusb';
@@ -7,7 +7,7 @@ import { AdbDaemonTransport, Adb } from '@yume-chan/adb';
 
 import AdbWebCredentialStore from "@yume-chan/adb-credential-web";
 import { DeviceModder } from './DeviceModder';
-import { ErrorModal } from './components/Modal';
+import { cancelConfirmations, ConfirmationModal, ErrorModal } from './components/Modal';
 import { Bounce, toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { CornerMenu } from './components/CornerMenu';
@@ -282,10 +282,16 @@ function AppContents() {
 }
 
 function App() {
+  // Cancel confirmations if the device gets disconnected or changed
+  useEffect(() => useDeviceStore.subscribe((state, previous) => {
+    if (state.device !== previous.device) cancelConfirmations();
+  }), []);
+
   return <div className='main'>
     <AppContents />
     <CornerMenu />
     <OperationModals />
+    <ConfirmationModal />
     <ToastContainer
       position="bottom-right"
       theme="dark"

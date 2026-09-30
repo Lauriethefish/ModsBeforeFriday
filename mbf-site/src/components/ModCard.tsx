@@ -3,8 +3,7 @@ import { Mod, trimGameVersion } from '../Models'
 import { Slider } from './Slider';
 import TrashCan from '../icons/trash.svg';
 import Code from '../icons/code.svg';
-import { YesNoModal } from './Modal';
-import { useState } from 'react';
+import { confirm } from './Modal';
 
 interface ModCardProps {
     mod: Mod,
@@ -35,9 +34,6 @@ function CoreModWarning(props: { mod: Mod }) {
 }
 
 export function ModCard(props: ModCardProps) {
-    const [requestRemove, setRequestRemove] = useState(false);
-    const [requestDisable, setRequestDisable] = useState(false);
-    const [wrongGameVersion, setWrongGameVersion] = useState(false);
     const setEnabled = (enabled: boolean) => {
         props.onEnabledChanged(enabled);
         props.mod.is_enabled = enabled;
@@ -55,19 +51,52 @@ export function ModCard(props: ModCardProps) {
         <p className='descriptionText'>{props.mod.description}</p>
 
         <div className='modControls'>
-            <div id="removeMod" onClick={() => setRequestRemove(true)}>
+            <button type="button" id="removeMod" onClick={async () => {
+                if (
+                    await confirm(
+                        props.mod.is_core ? "Remove core mod " : "Confirm removal",
+                        <>
+                            {props.mod.is_core && <CoreModWarning mod={props.mod} />}
+                            <p>Are you sure that you want to remove {props.mod.name} v{props.mod.version}?</p>
+                        </>
+                    )
+                ) {
+                    props.onRemoved();
+                }
+            }}>
                 <img src={TrashCan} alt="Remove mod icon" />
-            </div>
-            <Slider on={props.pendingChange !== undefined ? props.pendingChange : props.mod.is_enabled} valueChanged={value => {
+            </button>
+            <Slider on={props.pendingChange !== undefined ? props.pendingChange : props.mod.is_enabled} valueChanged={async value => {
                 if(value && props.mod.game_version != null 
                     && props.mod.game_version !== props.gameVersion
                     && !props.mod.is_core) { // Do not show the wrong game version prompt for core mods.
                         // This is because modders sometimes forget to update the game version, but if the mod is core
                         // then we know it's designed for the current version anyway, so there's no need for the prompt.
-                    setWrongGameVersion(true);
+                    if (
+                        await confirm(
+                            "Wrong game version",
+                            <>
+                                <p>The mod {props.mod.name} v{props.mod.version} is designed for game version {props.mod.game_version === null ? null : trimGameVersion(props.mod.game_version)} but you have {trimGameVersion(props.gameVersion)}.</p>
+                                <p className="warning">It is EXTREMELY likely that enabling it will crash your game and mess up your mods in a way that could be VERY DIFFICULT to undo.</p>
+                                <p>Are you sure you still want to enable it (you don't)?</p>
+                            </>
+                        )
+                    ) {
+                        setEnabled(true);
+                    }
                 }   else    {
                     if(!value && props.mod.is_core) {
-                        setRequestDisable(true);
+                        if (
+                            await confirm(
+                                "Disable core mod",
+                                <>
+                                    <CoreModWarning mod={props.mod} />
+                                    <p>Are you still sure that you want to disable {props.mod.name} v{props.mod.version}?</p>
+                                </>
+                            )
+                        ) {
+                            setEnabled(false);
+                        }
                     }   else    {
                         setEnabled(value);
                     }
@@ -75,37 +104,5 @@ export function ModCard(props: ModCardProps) {
             }}/>
         </div>
 
-        <YesNoModal
-            title={props.mod.is_core ? "Remove core mod " : "Confirm removal"}
-            onYes={() => {
-                setRequestRemove(false);
-                props.onRemoved();
-            }}
-            onNo={()=> setRequestRemove(false)}
-            isVisible={requestRemove}>
-            {props.mod.is_core && <CoreModWarning mod={props.mod} />}
-
-            <p>Are you sure that you want to remove {props.mod.name} v{props.mod.version}?</p>
-        </YesNoModal>
-        <YesNoModal title="Disable core mod"
-            onYes={() => {
-                setRequestDisable(false);
-                setEnabled(false);
-            }}
-            onNo={() => setRequestDisable(false)}
-            isVisible={requestDisable}>
-            <CoreModWarning mod={props.mod} />
-
-            <p>Are you still sure that you want to disable {props.mod.name} v{props.mod.version}?</p>
-        </YesNoModal>
-
-        <YesNoModal title="Wrong game version"
-            onYes={() => { setEnabled(true); setWrongGameVersion(false) }}
-            onNo={() => setWrongGameVersion(false)} 
-            isVisible={wrongGameVersion}>
-            <p>The mod {props.mod.name} v{props.mod.version} is designed for game version {props.mod.game_version === null ? null : trimGameVersion(props.mod.game_version)} but you have {trimGameVersion(props.gameVersion)}.</p>
-            <p className="warning">It is EXTREMELY likely that enabling it will crash your game and mess up your mods in a way that could be VERY DIFFICULT to undo.</p>
-            <p>Are you sure you still want to enable it (you don't)?</p>
-        </YesNoModal>
     </div>
 }

@@ -10,7 +10,7 @@ import { ModStatus } from '../Messages';
 import { AndroidManifest } from '../AndroidManifest';
 import { useSetError, wrapOperation } from '../SyncStore';
 import { Log } from '../Logging';
-import { Modal } from './Modal';
+import { confirm } from './Modal';
 import { SplashScreenSelector } from './SplashScreenSelector';
 import { useDeviceStore } from '../DeviceStore';
 import { gameId } from '../game_info';
@@ -89,6 +89,18 @@ function ModTools({ quit, modStatus, setModStatus }: {
           description="Deletes all installed mods, then installs only the core mods."
           onClick={async () => {
             if (!device) return;
+            if (
+                !(await confirm(
+                    "Reinstall only core mods?",
+                    <>
+                        <p>This will delete all installed mods, then install only the core mods. You will need to reinstall any non-core mods you want to use.</p>
+                        <p>Are you sure you want to continue?</p>
+                    </>
+                ))
+            ) {
+                return;
+            }
+            if (useDeviceStore.getState().device !== device) return;
 
             await wrapOperation(
               "Reinstalling only core mods",
@@ -105,6 +117,18 @@ function ModTools({ quit, modStatus, setModStatus }: {
           description="Uninstalls the game: this will remove all mods and quit MBF."
           onClick={async () => {
             if (!device) return;
+            if (
+                !(await confirm(
+                    "Uninstall Beat Saber?",
+                    <>
+                        <p>This will uninstall Beat Saber, remove all mods, and quit MBF. You will need to reinstall the game from the Meta store.</p>
+                        <p>Are you sure you want to continue?</p>
+                    </>
+                ))
+            ) {
+                return;
+            }
+            if (useDeviceStore.getState().device !== device) return;
 
             const setError = useSetError("Failed to uninstall Beat Saber");
             try {
