@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import './css/App.css';
-import { AdbDaemonWebUsbConnection, AdbDaemonWebUsbDeviceManager } from '@yume-chan/adb-daemon-webusb';
+import { AdbDaemonWebUsbConnection, AdbDaemonWebUsbDevice, AdbDaemonWebUsbDeviceManager } from '@yume-chan/adb-daemon-webusb';
 import { AdbDaemonTransport, Adb } from '@yume-chan/adb';
 
 import AdbWebCredentialStore from "@yume-chan/adb-credential-web";
@@ -42,7 +42,7 @@ async function connect(
     connection = await quest.connect();
     installLoggers();
   } catch(err) {
-    if(String(err).includes("The device is already in used")) {
+    if(err instanceof AdbDaemonWebUsbDevice.DeviceBusyError) {
       Log.warn("Full interface error: " + err);
       // Some other ADB daemon is hogging the connection, so we can't get to the Quest.
       return "DeviceInUse";
