@@ -1,0 +1,96 @@
+name: Deploy to Cloudflare Pages
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['*']
+
+jobs:
+  check-secrets:
+    name: Check for Cloudflare secrets
+    runs-on: ubuntu-latest
+    outputs:
+      hasSecrets: ${{ steps.check.outputs.hasSecrets }}
+    steps:
+      - name: Check for secrets
+        id: check
+        run: |
+          if [[ -n "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" && -n "${{ secrets.CLOUDFLARE_API_KEY }}" ]]; then
+            echo "hasSecrets=true" >> $GITHUB_OUTPUT
+          else
+            echo "hasSecrets=false" >> $GITHUB_OUTPUT
+          fi
+  build:
+    needs: check-secrets
+    if: ${{ needs.check-secrets.outputs.hasSecrets == 'true' }}
+    uses: ./.github/workflows/build.yml
+    with:
+      baseUrl: './'
+      artifactName: mbf-site
+
+  cf-pages:
+    env:
+      COMPATIBILITY_DATE: 2026-04-06
+
+    name: Deploy to Cloudflare Pages
+    if: ${{ needs.check-secrets.outputs.hasSecrets == 'true' }}
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.build.outputs.artifactName }}
+          path: .
+
+      - name: Get default branch
+        id: repo
+        run: |
+          DEFAULT_BRANCH=$(curl -s \
+            -H "Authorization: Bearer ${{ github.token }}" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/${{ github.repository }} \
+            | jq -r .default_branch)
+          echo "default_branch=$DEFAULT_BRANCH" >> $GITHUB_OUTPUT
+          
+          if [[ -n "${{ secrets.CLOUDFLARE_DEPLOY_BRANCH }}" ]]; then
+            echo "Deploy branch set to ${{ secrets.CLOUDFLARE_DEPLOY_BRANCH }}"
+            DEPLOY_BRANCH=${{ secrets.CLOUDFLARE_DEPLOY_BRANCH }}
+          else
+            echo "Deploy branch not set, using default branch $DEFAULT_BRANCH"
+            DEPLOY_BRANCH=$DEFAULT_BRANCH
+          fi
+          SAFE_BRANCH=$(echo "${{ github.ref_name }}" | tr '/' '-')
+          echo "short_sha=${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
+          echo "safe_branch=$SAFE_BRANCH" >> $GITHUB_OUTPUT
+          echo "deploy_branch=$DEPLOY_BRANCH" >> $GITHUB_OUTPUT
+
+      - name: Deploy to Cloudflare (Version)
+        id: branch-deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          wranglerVersion: '*'
+          apiToken: ${{ secrets.CLOUDFLARE_API_KEY }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: versions upload --assets ./mbf-site --preview-alias "${{ steps.repo.outputs.safe_branch }}" "--name=modsbeforefriday" --compatibility-date ${{ env.COMPATIBILITY_DATE }}
+
+      - name: Update job summary
+        env:
+          cmd_output: ${{ steps.branch-deploy.outputs.command-output }}
+        run: |
+          echo "$cmd_output" | grep "Version Preview " >> $GITHUB_STEP_SUMMARY
+
+      - name: Deploy to Cloudflare
+        id: deploy
+        if: github.ref_name == steps.repo.outputs.deploy_branch
+        uses: cloudflare/wrangler-action@v3
+        with:
+          wranglerVersion: '*'
+          apiToken: ${{ secrets.CLOUDFLARE_API_KEY }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --assets ./mbf-site --name=modsbeforefriday --compatibility-date ${{ env.COMPATIBILITY_DATE }}
+
+      - name: Update job summary
+        if: github.ref_name == steps.repo.outputs.deploy_branch
+        run: |
+          echo "Deployment URL: ${{ steps.deploy.outputs.deployment-url }}" >> $GITHUB_STEP_SUMMARY

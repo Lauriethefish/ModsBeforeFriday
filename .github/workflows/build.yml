@@ -1,29 +1,31 @@
-name: "Compile and deploy"
+name: "Build Site"
 on:
-  workflow_dispatch:
-  push:
-    branches: ['deploy']
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-concurrency:
-  group: 'pages'
-  cancel-in-progress: true
+  workflow_call:
+    inputs:
+      baseUrl:
+        required: false
+        default: './'
+        type: string
+      artifactName:
+        required: false
+        default: mbf-site
+        type: string
+    outputs:
+      artifactName:
+        description: 'The name of the artifact containing the built site'
+        value: ${{ inputs.artifactName }}
+        
 
 jobs:
   build:
-    name: Build and deploy site
+    name: Build Site
     runs-on: ubuntu-latest
     env:
       CC_aarch64-linux-android: /home/runner/android-ndk-r27c/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android31-clang
       AR_aarch64-linux-android: /home/runner/android-ndk-r27c/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
-      BASE_URL: './'
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      BASE_URL: ${{ inputs.baseUrl }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: 'true'
 
@@ -34,7 +36,7 @@ jobs:
 
       - name: Agent Cache
         id: agent_cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           key: mbf-agent-${{ steps.agent_hash.outputs.hash }}
           path: |
@@ -43,7 +45,7 @@ jobs:
 
       - name: Rust target cache
         if: steps.agent_cache.outputs.cache-hit != 'true'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           key: rust-target-newlibmain-${{ steps.agent_hash.outputs.hash }}
           restore-keys: rust-target-newlibmain-
@@ -89,7 +91,7 @@ jobs:
       - name: Site Hash
         id: site_hash
         run: |
-          echo "hash=$(find mbf-site -type f -exec md5sum {} \; | md5sum - | cut -d ' ' -f1)" >> $GITHUB_OUTPUT
+          echo "hash=$(find mbf-site ya-webadb pnpm-lock.yaml pnpm-workspace.yaml -type f -exec md5sum {} \; | md5sum - | cut -d ' ' -f1)" >> $GITHUB_OUTPUT
 
       - name: Site Cache
         id: site_cache
@@ -99,35 +101,34 @@ jobs:
           path: |
             mbf-site/dist
 
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v6
         if: steps.site_cache.outputs.cache-hit != 'true'
         with:
           node-version: 20.x
 
-      - uses: pnpm/action-setup@v2
+      - uses: pnpm/action-setup@v3
+        if: steps.site_cache.outputs.cache-hit != 'true'
         with:
-          version: 9.5.0
+          version: latest
 
       - name: pnpm install 
+        if: steps.site_cache.outputs.cache-hit != 'true'
         run: pnpm install
 
       - name: pnpm build
+        if: steps.site_cache.outputs.cache-hit != 'true'
         run: pnpm recursive run build
 
       - name: pnpm install
+        if: steps.site_cache.outputs.cache-hit != 'true'
         run: cd mbf-site && pnpm install
 
       - name: pnpm build
+        if: steps.site_cache.outputs.cache-hit != 'true'
         run: cd mbf-site && pnpm build
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-
+      
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          path: './mbf-site/dist'
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          name: ${{ inputs.artifactName }}
+          path: './mbf-site/dist/*'
