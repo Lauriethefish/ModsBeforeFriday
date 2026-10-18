@@ -1,21 +1,22 @@
 /// <reference types="w3c-web-usb" />
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import './css/App.css';
-import { AdbDaemonWebUsbConnection, AdbDaemonWebUsbDeviceManager } from '@yume-chan/adb-daemon-webusb';
+import { AdbDaemonWebUsbConnection, AdbDaemonWebUsbDevice, AdbDaemonWebUsbDeviceManager } from '@yume-chan/adb-daemon-webusb';
 import { AdbDaemonTransport, Adb } from '@yume-chan/adb';
 
 import AdbWebCredentialStore from "@yume-chan/adb-credential-web";
 import { DeviceModder } from './DeviceModder';
-import { ErrorModal } from './components/Modal';
-import { Bounce, ToastContainer } from 'react-toastify';
+import { cancelConfirmations, ConfirmationModal, ErrorModal } from './components/Modal';
+import { Bounce, toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { CornerMenu } from './components/CornerMenu';
 import { installLoggers, setCoreModOverrideUrl } from './Agent';
 import { Log } from './Logging';
 import { OperationModals } from './components/OperationModals';
 import { OpenLogsButton } from './components/OpenLogsButton';
-import { isViewingOnIos, isViewingOnMobile, isViewingOnWindows, usingOculusBrowser } from './platformDetection';
+import { CopyableCommand } from './components/CopyableCommand';
+import { isViewingOnIos, isViewingOnLinux, isViewingOnMobile, isViewingOnWindows, usingOculusBrowser } from './platformDetection';
 import { SourceUrl } from '.';
 import { useDeviceStore } from './DeviceStore';
 
@@ -41,7 +42,7 @@ async function connect(
     connection = await quest.connect();
     installLoggers();
   } catch(err) {
-    if(String(err).includes("The device is already in used")) {
+    if(err instanceof AdbDaemonWebUsbDevice.DeviceBusyError) {
       Log.warn("Full interface error: " + err);
       // Some other ADB daemon is hogging the connection, so we can't get to the Quest.
       return "DeviceInUse";
@@ -114,7 +115,7 @@ function ChooseDevice() {
           <Title />
           <p>To get started, plug your Quest in with a USB-C cable and click the button below.</p>
           <p>Want see what mods are available? You can find a full list <a href="https://mods.bsquest.xyz" target="_blank" rel="noopener noreferrer">here!</a></p>
-         
+
           <NoCompatibleDevices />
 
           <div className="chooseDeviceContainer">
@@ -146,8 +147,16 @@ function ChooseDevice() {
                   setAuthing(false);
                   setChosenDevice(device);
 
-                  await device.transport.disconnected;
-                  setChosenDevice(null);
+                  try {
+                    await device.transport.disconnected;
+                  } catch(error) {
+                    Log.warn("Quest connection lost: " + error);
+                  }
+
+                  if(useDeviceStore.getState().device === device) {
+                    setChosenDevice(null);
+                    toast.warning("Quest disconnected. Reconnect your Quest to continue.");
+                  }
                 }
 
               } catch(error) {
@@ -188,11 +197,16 @@ function DeviceInUse() {
   <p>Some other app is trying to access your Quest, e.g. SideQuest.</p>
   {isViewingOnWindows() ? 
     <>
-      <p>To fix this, close SideQuest if you have it open, press <span className="codeBox">Win + R</span> and type the following text, and finally press enter.</p>
-      <span className="codeBox">taskkill /IM adb.exe /F</span>  
+      <p>To fix this, close SideQuest if you have it open, press <span className="codeBox">Win + R</span>, paste the following command, and press Enter.</p>
+      <CopyableCommand command="taskkill /IM adb.exe /F" />
       <p>Alternatively, restart your computer.</p>
 
       <AskLaurie />
+    </>
+    : isViewingOnLinux() ? <>
+      <p>Close SideQuest and any other apps using your Quest, then open a terminal and run:</p>
+      <CopyableCommand command="pkill -x adb" />
+      <p>Then try connecting again. Alternatively, restart your computer.</p>
     </>
     : <p>To fix this, restart your {isViewingOnMobile() ? "phone" : "computer"}.</p>}
  </>
@@ -268,10 +282,16 @@ function AppContents() {
 }
 
 function App() {
+  // Cancel confirmations if the device gets disconnected or changed
+  useEffect(() => useDeviceStore.subscribe((state, previous) => {
+    if (state.device !== previous.device) cancelConfirmations();
+  }), []);
+
   return <div className='main'>
     <AppContents />
     <CornerMenu />
     <OperationModals />
+    <ConfirmationModal />
     <ToastContainer
       position="bottom-right"
       theme="dark"
@@ -287,7 +307,7 @@ function OculusBrowserMessage() {
   return <div className="container mainContainer">
     <h1>Quest Browser Detected</h1>
     <p>MBF has detected that you're trying to use the built-in Quest browser.</p>
-    <p>Unfortunately, <b>you cannot use MBF on the device you are attempting to mod.</b></p>
+    <p>Unfortunately, <b>you cannot use the MBF website on the device you are attempting to mod.</b></p>
     <DevicesSupportingModding />
 
     <p>(MBF can be used on a Quest if you install a chromium browser, however this can only be used to mod <b>another Quest headset</b>, connected via USB.)</p>

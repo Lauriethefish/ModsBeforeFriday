@@ -1,3 +1,4 @@
+#!/usr/bin/env pwsh
 Param(
     [Parameter(Mandatory=$false)]
     [Switch] $release,

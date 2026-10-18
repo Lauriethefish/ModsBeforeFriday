@@ -180,6 +180,7 @@ impl<'r, R: Read + Seek> AxmlReader<'r, R> {
             Some(AttributeTypeId::Float) => {
                 AttributeValue::Float(f32::from_bits(raw_value))
             }
+            Some(AttributeTypeId::Dimension) => AttributeValue::Dimension(raw_value),
             None => return Err(anyhow!("Attribute type ID {type_id} was not recognised")),
         };
 
