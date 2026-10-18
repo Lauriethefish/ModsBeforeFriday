@@ -9,6 +9,7 @@ import DebugIcon from '../icons/debug.svg';
 import CopyIcon from '../icons/copy.svg';
 import QuitIcon from '../icons/exit.svg';
 import { IconButton } from './IconButton';
+import { copyToClipboard } from '../copyToClipboard';
 import { toast } from 'react-toastify';
 
 export function LogItem({ event }: { event: LogMsg }) {
@@ -25,9 +26,9 @@ export function LogItem({ event }: { event: LogMsg }) {
             </span>
         case 'Debug':
         case 'Trace':
-            return <p className="logItem logDebug">{event.message}</p>
+            return <div className="logItem logDebug">{event.message}</div>
         default:
-            return <p className="logItem">{event.message}</p>
+            return <div className="logItem">{event.message}</div>
     }
 }
 
@@ -60,7 +61,7 @@ export function LogWindowControls({ onClose }: { onClose?: () => void}) {
     const { enableDebugLogs, setEnableDebugLogs } = useLogStore();
 
     return <div className="logWindowControls">
-        <IconButton src={CopyIcon} iconSize={25} alt="Copy Logs to clipboard" onClick={async () => copyLogsToClipboard()}/>
+        <IconButton src={CopyIcon} iconSize={25} alt="Copy Logs to clipboard" onClick={copyLogsToClipboard} />
         <IconButton src={DebugIcon} iconSize={25} alt="Enable Debug Logs"
             onClick={() => setEnableDebugLogs(!enableDebugLogs)}
             isOn={enableDebugLogs}/>
@@ -69,6 +70,9 @@ export function LogWindowControls({ onClose }: { onClose?: () => void}) {
 }
 
 async function copyLogsToClipboard() {
-    await navigator.clipboard.writeText(Log.getLogsAsString());
-    toast.success("Copied logs to clipboard");
+    if (await copyToClipboard(Log.getLogsAsString())) {
+        toast.success('Copied logs to clipboard');
+    } else {
+        toast.error('Could not copy the logs. Please select and copy them manually.');
+    }
 }

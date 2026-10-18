@@ -11,6 +11,10 @@ export function isViewingOnMobile() {
     return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 }
 
+export function isViewingOnLinux(): boolean {
+    return /Linux/i.test(navigator.userAgent) && !isViewingOnMobile();
+}
+
 // Kindly provided by Pierre
 // https://stackoverflow.com/a/9039885
 export function isViewingOnIos() {

@@ -61,10 +61,13 @@
 }
 
 #removeMod {
+    all: unset;
     background-color: rgb(179, 10, 10);
     padding: 3px;
     border-radius: 4px;
     transition-duration: 100ms;
+    height: 30px;
+    cursor: pointer;
 }
 
 #removeMod > img {
@@ -74,6 +77,15 @@
 #removeMod:hover {
     background-color: rgb(209, 10, 10);
     transition-duration: 100ms;
+}
+
+#removeMod:focus {
+    outline: 2px solid white;
+    outline-offset: 3px;
+}
+
+#removeMod:focus:not(:focus-visible) {
+    outline: none;
 }
 
 .idVersionText {

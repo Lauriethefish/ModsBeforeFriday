@@ -1,0 +1,31 @@
+.copyableCommand {
+    display: inline-flex;
+    max-width: 100%;
+    box-sizing: border-box;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.copyableCommand code {
+    flex: 1;
+    padding: 5px 5px 5px 10px;
+    min-width: 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.copyableCommand button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    background: transparent;
+}
+
+.copyableCommand button:hover {
+    background: #444444;
+}
+
+.copyableCommand button:active {
+    background: #4b4b4b;
+}

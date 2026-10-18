@@ -96,6 +96,52 @@ export class AndroidManifest {
         return this.features;
     }
 
+    private getQueryElements(): Element[] {
+        return Array.from(this.manifestEl.childNodes)
+            .filter((node): node is Element => node.nodeType === Node.ELEMENT_NODE && node.nodeName === "queries");
+    }
+
+    // Reads only package queries, leaving intent and provider queries untouched.
+    public getQueriedPackages(): string[] {
+        const packages = new Set<string>();
+        for(const queries of this.getQueryElements()) {
+            for(const child of queries.children) {
+                if(child.tagName !== "package") continue;
+
+                const name = child.getAttributeNS(ANDROID_NS_URI, "name");
+                if(name !== null) packages.add(name);
+            }
+        }
+        return Array.from(packages);
+    }
+
+    // Adds package visibility under <manifest><queries>, without duplicates.
+    public addQueriedPackage(packageName: string) {
+        if(this.getQueriedPackages().includes(packageName)) {
+            return;
+        }
+
+        let queries = this.getQueryElements()[0];
+        if(queries === undefined) {
+            queries = this.document.createElement("queries");
+            this.manifestEl.appendChild(queries);
+        }
+        const packageElement = this.document.createElement("package");
+        packageElement.setAttributeNS(ANDROID_NS_URI, `${this.androidNsPrefix}:name`, packageName);
+        queries.appendChild(packageElement);
+    }
+
+    public removeQueriedPackage(packageName: string) {
+        for(const queries of this.getQueryElements()) {
+            for(const child of Array.from(queries.children)) {
+                if(child.tagName !== "package") continue;
+
+                const name = child.getAttributeNS(ANDROID_NS_URI, "name");
+                if(name === packageName) queries.removeChild(child);
+            }
+        }
+    }
+
     // Gets a map of metadata element names to metadata values within the application element of the manifest.
     public getMetadata(): { [name: string]: string } {
         return this.metadata;
