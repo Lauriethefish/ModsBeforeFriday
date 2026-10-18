@@ -57,27 +57,35 @@ fn download_file_to_stream<T: FnMut(usize, Option<usize>) -> ()>(
         .ureq_agent
         .get(url)
         // We can't properly process gzipped or any other compressed data when using ranges to carry out a partial download.
-        .set("Accept-Encoding", "identity");
+        .header("Accept-Encoding", "identity");
     if file_offset != 0 {
         // No need for range header if downloading the whole file.
         // Specify that we only want the portion of the file from the specified offset
-        req = req.set("Range", &format!("bytes={file_offset}-"));
+        req = req.header("Range", format!("bytes={file_offset}-"));
     }
 
     let resp = req
         .call()
         .map_err(|err| DownloadFileError::InitialRequest(err))?;
 
-    *out_supports_ranges = resp.header("Accept-Ranges") == Some("bytes");
+    *out_supports_ranges = resp
+        .headers()
+        .get("Accept-Ranges")
+        .and_then(|v| v.to_str().ok())
+        == Some("bytes");
     *out_filename = get_filename_from_headers(&resp);
 
-    let content_length: Option<usize> = match resp.header("Content-Length") {
+    let content_length: Option<usize> = match resp
+        .headers()
+        .get("Content-Length")
+        .and_then(|v| v.to_str().ok())
+    {
         Some(length_str) => length_str.parse().ok(),
         None => None,
     };
 
     // Successfully got the response, now turn it into a reader and begin to copy it to the output
-    let mut reader = resp.into_reader();
+    let mut reader = resp.into_body().into_reader();
 
     if let None = content_length {
         warn!(
@@ -120,8 +128,12 @@ fn copy_stream_progress<T: FnMut(usize) -> ()>(
 /// Extracts the filename from the Content-Disposition HTTP header
 /// Returns None if the Content-Disposition header is missing, does not contain the filename,
 /// or has any other formatting issue.
-fn get_filename_from_headers(resp: &ureq::Response) -> Option<String> {
-    match resp.header("Content-Disposition") {
+fn get_filename_from_headers(resp: &ureq::http::Response<ureq::Body>) -> Option<String> {
+    match resp
+        .headers()
+        .get("Content-Disposition")
+        .and_then(|v| v.to_str().ok())
+    {
         // Locate the filename within the header
         Some(cont_dis) => match cont_dis.find("filename=") {
             Some(index) => {
@@ -232,17 +244,17 @@ pub fn download_with_attempts(
                 match err {
                     DownloadFileError::InitialRequest(ureq_err) => match ureq_err {
                         // Do not attempt to download again if the error is not network related
-                        ureq::Error::Status(code, _resp) => {
+                        ureq::Error::StatusCode(code) => {
                             return Err(anyhow!("Request failed as got status {code} from server."))
                         }
-                        ureq::Error::Transport(transport_err) => {
+                        other_err => {
                             if dl_failed {
-                                return Err(transport_err)
+                                return Err(other_err)
                                     .context("Downloading file: all attempts exhausted");
                             }
 
                             // Error occured due to internet connection, can make another attempt
-                            error!("Failed to make initial request: {transport_err}");
+                            error!("Failed to make initial request: {other_err}");
                         }
                     },
                     DownloadFileError::LostConnDuringDownload(io_error) => {

@@ -150,15 +150,15 @@ impl<'agent> ResCache<'agent> {
                 .modified()
                 .context("Getting cached file last modified")?;
 
-            request = request.set(
+            request = request.header(
                 "If-Modified-Since",
-                &httpdate::fmt_http_date(cache_last_modified),
+                httpdate::fmt_http_date(cache_last_modified),
             );
 
             let etag_cache_ref = self.etag_cache.borrow();
             let etag_cache = etag_cache_ref.as_ref().unwrap();
             if let Some(cached_etag) = etag_cache.get(cached_file_name) {
-                request = request.set("If-None-Match", cached_etag);
+                request = request.header("If-None-Match", cached_etag.as_str());
             }
         }
 
@@ -169,13 +169,13 @@ impl<'agent> ResCache<'agent> {
             )
         })?;
 
-        match resp.status() {
+        match resp.status().as_u16() {
             304 => {
                 // Cached copy is still valid
                 debug!("Using cached file {cached_file_name} for {url}");
             }
             200 => {
-                if let Some(etag) = resp.header("ETag") {
+                if let Some(etag) = resp.headers().get("ETag").and_then(|v| v.to_str().ok()) {
                     debug!("Got ETag {etag} for {cached_file_name}");
                     let mut etag_cache_ref = self.etag_cache.borrow_mut();
                     let etag_cache = etag_cache_ref.as_mut().unwrap();
@@ -192,7 +192,7 @@ impl<'agent> ResCache<'agent> {
                     .open(&cached_path)
                     .context("Opening cache file for writing: is the directory writable?")?;
 
-                std::io::copy(&mut resp.into_reader(), &mut cache_handle)
+                std::io::copy(&mut resp.into_body().into_reader(), &mut cache_handle)
                     .context("Copying response to cache")?;
             }
             status => {

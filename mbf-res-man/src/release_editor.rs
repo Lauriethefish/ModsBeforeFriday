@@ -36,10 +36,10 @@ pub struct ReleaseAsset {
     pub crc32: Option<u32>,
 }
 
-fn set_headers(req: ureq::Request, auth_token: &str) -> ureq::Request {
-    req.set("Accept", "application/vnd.github+json")
-        .set("Authorization", &format!("Bearer {auth_token}"))
-        .set("X-GitHub-Api-Version", "2022-11-28")
+fn set_headers<S>(req: ureq::RequestBuilder<S>, auth_token: &str) -> ureq::RequestBuilder<S> {
+    req.header("Accept", "application/vnd.github+json")
+        .header("Authorization", format!("Bearer {auth_token}"))
+        .header("X-GitHub-Api-Version", "2022-11-28")
 }
 
 // Reads the details about an asset, other than its CRC32, from the github JSON response
@@ -60,7 +60,7 @@ pub fn get_assets(release: &Release, auth_token: &str) -> Result<Vec<ReleaseAsse
 
     let resp = set_headers(crate::default_agent::get_agent().get(&req_path), auth_token).call()?;
 
-    let document: serde_json::Value = serde_json::from_reader(resp.into_reader())?;
+    let document: serde_json::Value = serde_json::from_reader(resp.into_body().into_reader())?;
     let mut assets = Vec::new();
     for asset in document.get("assets").unwrap().as_array().unwrap() {
         assets.push(read_asset_details(asset))
@@ -77,7 +77,7 @@ pub fn get_latest_release(repo: Repo, auth_token: &str) -> Result<Release> {
 
     let resp = set_headers(crate::default_agent::get_agent().get(&req_path), auth_token).call()?;
 
-    let document: serde_json::Value = serde_json::from_reader(resp.into_reader())?;
+    let document: serde_json::Value = serde_json::from_reader(resp.into_body().into_reader())?;
     let release_id = document.get("id").unwrap().as_i64().unwrap();
 
     Ok(Release {
@@ -116,17 +116,21 @@ pub fn upload_asset_from_reader(
     let length = content.stream_position()?;
     content.seek(SeekFrom::Start(0))?;
 
+    // ureq 3.x's reader-based send body always uses chunked transfer-encoding, so read the
+    // (known-length) content into memory to get a proper Content-Length instead.
+    let mut body = Vec::with_capacity(length as usize);
+    content.read_to_end(&mut body)?;
+
     let resp = set_headers(
         crate::default_agent::get_agent()
             .post(&req_path)
             .query("name", file_name),
         auth_token,
     )
-    .set("Content-Type", "application/octet-stream")
-    .set("Content-Length", &length.to_string())
-    .send(content)?;
+    .header("Content-Type", "application/octet-stream")
+    .send(&body)?;
 
-    let document: serde_json::Value = serde_json::from_reader(resp.into_reader())?;
+    let document: serde_json::Value = serde_json::from_reader(resp.into_body().into_reader())?;
     Ok(read_asset_details(&document))
 }
 
@@ -210,10 +214,10 @@ pub fn read_existing_asset_crc32s(
     {
         Some(crc32_asset) => {
             let resp = set_headers(ureq::get(&crc32_asset.url), auth_token)
-                .set("Accept", "application/octet-stream")
+                .header("Accept", "application/octet-stream")
                 .call()?;
 
-            let json_str = resp.into_string()?;
+            let json_str = resp.into_body().read_to_string()?;
             Ok((Some(crc32_asset.clone()), serde_json::from_str(&json_str)?))
         }
         None => Ok((None, HashMap::new())),
