@@ -268,7 +268,7 @@ fn load_string_pool(data: &mut (impl Read + Seek)) -> Result<(Vec<String>, bool)
         ))?;
 
         if utf8 {
-            let _ = read_utf8_len(data)?; // TODO: Figure out what this represents
+            let _utf16_length = read_utf8_len(data)?;
 
             // TODO: Apparently extra bytes can exist beyond the end of this length according to our previous implementation
             // Check if this is actually the case.
@@ -298,7 +298,7 @@ fn read_utf8_len(data: &mut impl Read) -> Result<u16> {
     let mut length = data.read_u8()? as u16;
     if length & 0x80 != 0 {
         // Last bit set, so length is 2 bytes
-        length = (length & 0x7F << 8) | data.read_u8()? as u16;
+        length = ((length & 0x7F) << 8) | data.read_u8()? as u16;
     }
 
     Ok(length)
@@ -309,7 +309,7 @@ fn read_utf8_len(data: &mut impl Read) -> Result<u16> {
 fn read_utf16_len(data: &mut impl Read) -> Result<u32> {
     let mut length = data.read_u16::<LE>()? as u32;
     if length & 0x8000 != 0 {
-        length = (length & 0x7FFF << 16) | data.read_u16::<LE>()? as u32;
+        length = ((length & 0x7FFF) << 16) | data.read_u16::<LE>()? as u32;
     }
 
     Ok(length)
