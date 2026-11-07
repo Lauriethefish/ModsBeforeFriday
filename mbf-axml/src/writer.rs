@@ -357,9 +357,10 @@ impl<'w, W: Write> AxmlWriter<'w, W> {
 
     // Calculates the length of the given string within the string pool
     fn get_pooled_str_len(&self, str: &str) -> usize {
-        // Each string is prefixed with an extra 0 byte.
-        // The purpose of this byte is unknown, I have not found an implementation that uses it
-        1 + if str.len() > 0x7F { 2 } else { 1 } + str.len()
+        // Android stores the UTF-16 length, UTF-8 byte length, bytes, then a NUL.
+        let utf16_len = str.encode_utf16().count();
+        (if utf16_len > 0x7F { 2 } else { 1 })
+            + (if str.len() > 0x7F { 2 } else { 1 }) + str.len() + 1
     }
 
     // Saves the AXML string pool, as UTF-8
@@ -380,7 +381,7 @@ impl<'w, W: Write> AxmlWriter<'w, W> {
         self.data.write_u32::<LE>(0)?; // Purpose unknown
 
         // Write out the offset to each string within the pool
-        let mut curr_str_offset = 0; // Ignore the initial 0 byte
+        let mut curr_str_offset = 0;
         for str in self.linear_string_pool.iter() {
             self.data.write_u32::<LE>(
                 curr_str_offset
@@ -392,9 +393,10 @@ impl<'w, W: Write> AxmlWriter<'w, W> {
 
         // Now write each string within the pool
         for str in self.linear_string_pool.iter() {
-            self.data.write_u8(0)?; // TODO: Figure out what this byte is for
+            write_utf8_len(self.data, str.encode_utf16().count())?;
             write_utf8_len(self.data, str.len())?;
             self.data.write_all(str.as_bytes())?;
+            self.data.write_u8(0)?;
         }
 
         Ok(())
