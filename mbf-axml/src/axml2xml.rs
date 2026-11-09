@@ -288,7 +288,7 @@ fn stringify_attr_value(value: AxmlAttrValue) -> String {
         AxmlAttrValue::Integer(i) => i.to_string(),
         AxmlAttrValue::String(s) => s,
         AxmlAttrValue::Reference(reference) => format!("[REF {reference}]"),
-        AxmlAttrValue::Float(f) => f.to_string(),
+        AxmlAttrValue::Float(f) => format!("{f:?}"),
         AxmlAttrValue::Dimension(value) => stringify_dimension(value),
     }
 }
