@@ -187,6 +187,8 @@ class Wrapper():
             args.game_version = supported_versions[-1]
 
     def patch(self, args):
+        self.get_mod_status(args);
+
         if not self.mod_status['core_mods']:
             self.log('    \033[33m Core Mod data not found! Is your headset connected to the internet?', level=WARN)
             return
@@ -216,6 +218,8 @@ class Wrapper():
         if args.override_core_mod_url:
             payload_args['override_core_mod_url'] = args.override_core_mod_url
         
+        payload_args['device_pre_v51'] = args.device_pre_v51
+
         self.send_payload('Patch', **payload_args)
 
     def fix_player_data(self, args):
@@ -514,6 +518,7 @@ class Wrapper():
         patch_parser.add_argument('-a', '--allow_no_core_mods', action='store_true', help='Allows installing versions that do not have core mods')
         patch_parser.add_argument('-o', '--override_core_mod_url', help='Use a custom URL for core mods')
         patch_parser.add_argument('-n', '--no_downgrade', action='store_true', help='Use the existing beatsaber version. Do not downgrade')
+        patch_parser.add_argument('-p', '--device_pre_v51', action='store_true', help='Set this flag if your headset is using an OS version older than v51')
         patch_parser.add_argument('-r', '--remodding', action='store_true', help='Informs the agent that it should be remodding the game')
         patch_parser.add_argument('-m', '--manifest', help='Specifies a custom .xml file to use as the app manifest')
         patch_parser.set_defaults(func=self.patch)
