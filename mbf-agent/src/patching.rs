@@ -1,12 +1,12 @@
 use std::{
-    ffi::OsStr, fs::{File, OpenOptions}, io::{Cursor, Read, Write}, path::{Path, PathBuf}, process::Command
+    ffi::OsStr, fs::{File, OpenOptions}, io::{Cursor, Read, Write}, path::{Path, PathBuf}, process::{Command, Output}
 };
 
 use crate::{
     data_fix::fix_colour_schemes, downgrading, downloads, models::response::{AppInfo, InstallStatus, ModLoader}, parameters::PARAMETERS, ModTag
 };
 use mbf_axml::{self, AxmlWriter};
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use log::{debug, info, warn};
 use mbf_res_man::{
     external_res,
@@ -193,30 +193,23 @@ fn reinstall_modded_app(
     temp_apk_path: &Path
 ) -> Result<()> {
     info!("Reinstalling modded app");
-    Command::new("pm")
-        .args(["uninstall", &PARAMETERS.apk_id])
-        .output()
-        .context("Uninstalling vanilla APK")?;
+    // If this fails, the existing app is still installed, so stop here rather than attempting an install that cannot succeed
+    // (the modded APK has a different signature, so cannot be installed over the top of the existing app).
+    run_pm(&["uninstall", &PARAMETERS.apk_id]).context("Uninstalling vanilla APK")?;
 
     let is_pico = get_android_device_manufacturer()
         .map(|v| v.to_lowercase().contains("pico"))
         .unwrap_or(false);
 
+    let apk_path = temp_apk_path.to_string_lossy();
+    let mut install_args = vec!["install"];
     if is_pico {
-        Command::new("pm")
-            .args([
-                "install", 
-                "-i", "com.picovr.store", // needed to display game icon in the app launcher
-                &temp_apk_path.to_string_lossy()
-            ])
-            .output()
-            .context("Installing modded APK")?;
-    } else {
-        Command::new("pm")
-            .args(["install", &temp_apk_path.to_string_lossy()])
-            .output()
-            .context("Installing modded APK")?;
+        install_args.extend(["-i", "com.picovr.store"]); // needed to display game icon in the app launcher
     }
+    install_args.push(&apk_path);
+
+    run_pm(&install_args)
+        .context("Installing modded APK failed, and the existing app is already uninstalled: reinstall the game, then try again")?;
 
     info!("Granting external storage permission");
     Command::new("appops")
@@ -236,6 +229,39 @@ fn reinstall_modded_app(
     }
 
     Ok(())
+}
+
+// Runs the Android package manager (`pm`) with the given arguments.
+// Unlike using `Command::output` directly, this gives an Err if `pm` exits with a failure status,
+// including what `pm` printed (e.g. `Failure [INSTALL_FAILED_INSUFFICIENT_STORAGE]`) in the error.
+fn run_pm(args: &[&str]) -> Result<()> {
+    let output: Output = Command::new("pm")
+        .args(args)
+        .output()
+        .with_context(|| format!("Invoking `pm {}`", args.join(" ")))?;
+
+    if output.status.success() {
+        return Ok(());
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    // For some failures (e.g. an APK that cannot be parsed), `pm` prints a whole Java stack trace.
+    // Keep the messages but drop the stack frames so that the error stays readable.
+    let pm_message = stdout
+        .lines()
+        .chain(stderr.lines())
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with("at ") && !line.starts_with("... "))
+        .collect::<Vec<_>>()
+        .join(" / ");
+
+    Err(anyhow!(
+        "`pm {}` failed ({}): {}",
+        args.join(" "),
+        output.status,
+        if pm_message.is_empty() { "no output" } else { &pm_message }
+    ))
 }
 
 fn save_libunity(
